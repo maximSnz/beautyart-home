@@ -102,7 +102,7 @@
         details.subsection details.subsection { margin-left: 8px; }
         details.subsection details.subsection > summary { font-size: .95em; color: rgba(255,255,255,.8); }
 
-        /* Ссылка уровня подраздела (Сводный отчёт) */
+        /* Ссылка уровня подраздела (Сводный отчёт, Калькулятор потребности) */
         .sub-link {
             display: flex; align-items: center;
             font-size: .88em; font-weight: 600; color: #fff;
@@ -129,21 +129,52 @@
         .menu-item:hover { background: rgba(255, 255, 255, 0.25); transform: translateX(3px); }
         .menu-item:last-child { margin-bottom: 0; }
 
-        /* === ПРАВАЯ ОБЛАСТЬ (пустая, под будущее) === */
+        /* === ПРАВАЯ ОБЛАСТЬ (графическая карточка) === */
         .content-area {
-            background: rgba(255, 255, 255, 0.10);
+            display: flex; flex-direction: column; gap: 20px;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.12);
             backdrop-filter: blur(20px) saturate(1.4); -webkit-backdrop-filter: blur(20px) saturate(1.4);
             border: 1px solid rgba(255, 255, 255, 0.3);
             border-radius: 16px;
-            padding: 30px;
+            padding: 24px;
             box-shadow: 0 8px 32px rgba(28, 13, 46, 0.2);
-            display: flex; align-items: center; justify-content: center;
-            min-height: 400px;
+            color: #fff;
         }
-        .placeholder { text-align: center; color: rgba(255,255,255,.75); font-family: 'Forum', serif; }
-        .placeholder-icon { font-size: 4em; margin-bottom: 16px; opacity: .4; }
-        .placeholder-text { font-size: 1.3em; margin-bottom: 8px; }
-        .placeholder-sub { font-size: .95em; opacity: .7; }
+        .card-head {
+            display: flex; align-items: center; gap: 10px;
+            margin-bottom: 18px; font-family: 'Forum', serif;
+        }
+        .card-title { font-size: 1.15em; font-weight: 400; text-shadow: 0 1px 3px rgba(0,0,0,.3); }
+        .card-subtitle { font-size: .85em; opacity: .75; margin-left: auto; }
+
+        .chart-box {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            padding: 16px 14px 10px;
+            margin-bottom: 14px;
+        }
+        .chart-svg { width: 100%; height: auto; display: block; }
+
+        .chart-legend {
+            display: flex; flex-wrap: wrap; gap: 18px;
+            padding: 4px 6px; font-size: .85em; font-family: 'Forum', serif;
+        }
+        .legend-item { display: inline-flex; align-items: center; gap: 7px; }
+        .legend-sw { width: 24px; height: 3px; border-radius: 2px; display: inline-block; }
+        .legend-sw-dashed {
+            width: 24px; height: 0;
+            border-top: 2.5px dashed;
+            display: inline-block;
+        }
+
+        .placeholder {
+            text-align: center; color: rgba(255,255,255,.75);
+            font-family: 'Forum', serif; padding: 20px 0;
+        }
+        .placeholder-sub { font-size: .9em; opacity: .7; margin-top: 6px; }
 
         /* === МОБИЛЬНАЯ АДАПТАЦИЯ === */
         @media (max-width: 900px) {
@@ -174,8 +205,8 @@
                     <summary>🎯 Управление компанией</summary>
                     <div class="section-body">
                         <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1cJGvUwr0DC3f2bRh_5Q2VeivtDyhpmpqOWYbvPEWjgs/edit?usp=share_link" target="_blank">Функциональная стратегия</a>
+                        <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1QggOaNjI7y-i3xZIiZrdVH_q1xsmHYpMwVRH9n1wliY/edit?gid=203679960#gid=203679960" target="_blank">Маркетинговая стратегия</a>
                         <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1iYyzAie6x3H5nWO0biFXoZp694YhS5Qp/edit?usp=sharing&ouid=111894160779270511410&rtpof=true&sd=true" target="_blank">Реестр платежей</a>
-                        <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1idpmes30UDhTsB_y4STfLmdXz-BXnhiS/edit?gid=207979019#gid=207979019" target="_blank">Реестр цен</a>
                         <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1dzhhdjCeNe4-cwU4_y-2caX6PvO9TG3yAxBH2OB_VEY/edit" target="_blank">Схема RACI</a>
                         <a class="menu-item" href="https://stormbpmn.com/app/diagram/6a9c167a-c2fb-4bf3-b690-3253f7de3a7f?o=7ffd" target="_blank">BPMN</a>
                     </div>
@@ -186,32 +217,25 @@
                     <summary>💼 Коммерческая деятельность</summary>
                     <div class="section-body">
 
-                        <!-- Блок ИП -->
+                        <!-- Блок ИП (без «Управление продажами») -->
                         <details class="subsection">
                             <summary>👤 ИП Колдомов</summary>
                             <a class="sub-link" href="https://maximsnz.github.io/beautyart/private.html" target="_blank">🔒 Сводный отчёт</a>
-                            <details class="subsection">
-                                <summary>Управление продажами</summary>
-                                <a class="menu-item" href="https://maximsnz.github.io/beautyart/weekly.html" target="_blank">Управление остатками</a>
-                                <a class="menu-item" href="https://maximsnz.github.io/beautyart/plan.html" target="_blank">Реализация плана продаж</a>
-                            </details>
+                            <a class="menu-item" href="https://maximsnz.github.io/beautyart/weekly.html" target="_blank">Управление остатками</a>
+                            <a class="menu-item" href="https://maximsnz.github.io/beautyart/plan.html" target="_blank">Реализация плана продаж</a>
                         </details>
 
                         <!-- Блок ООО -->
                         <details class="subsection">
                             <summary>🏢 ООО Beauty Art</summary>
                             <a class="sub-link" href="https://maximsnz.github.io/beautyart-ooo/private.html" target="_blank">🔒 Сводный отчёт</a>
-                            <details class="subsection">
-                                <summary>Управление продажами</summary>
-                                <a class="menu-item" href="https://maximsnz.github.io/beautyart-ooo/weekly.html" target="_blank">Управление остатками</a>
-                                <a class="menu-item" href="https://maximsnz.github.io/beautyart-ooo/plan.html" target="_blank">Реализация плана продаж</a>
-                            </details>
+                            <a class="menu-item" href="https://maximsnz.github.io/beautyart-ooo/weekly.html" target="_blank">Управление остатками</a>
+                            <a class="menu-item" href="https://maximsnz.github.io/beautyart-ooo/plan.html" target="_blank">Реализация плана продаж</a>
                         </details>
 
                         <!-- Прочее -->
                         <details class="subsection">
                             <summary>Прочее</summary>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1QggOaNjI7y-i3xZIiZrdVH_q1xsmHYpMwVRH9n1wliY/edit?gid=203679960#gid=203679960" target="_blank">Маркетинговая стратегия</a>
                             <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1dKzV0kQJ2PADrCe96x8_pyL5-KhAITRqFV7jhxaonP0/edit?usp=sharing" target="_blank">Бюджет</a>
                             <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1SuU4fVKUs26E78qdnChItDIWAQkInPX_cK5l2UCTV78/edit?gid=360342603#gid=360342603" target="_blank">Реестр товаров СТМ</a>
                             <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1GwyVCyQQKBKnU67JPtECjiwYPUyzPQwCh3zIF1AtsaI/edit?usp=sharing" target="_blank">Отчет инфографика</a>
@@ -240,24 +264,79 @@
                             <a class="menu-item" href="https://drive.google.com/drive/folders/1_Fz3CNW4iBB_0RP7CXGB1-78Pw0i7Z4f?usp=share_link" target="_blank">Прайс-листы поставщиков</a>
                         </details>
                         <details class="subsection">
-                            <summary>Калькуляторы и инструкции</summary>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1phz8_haUkVjqosNeDyjNe5O1f0xnMBLifEZlvZEhJgM/edit?usp=share_link" target="_blank">Калькулятор потребности Ozon</a>
+                            <summary>Калькуляторы и расчеты</summary>
+                            <a class="sub-link" href="https://docs.google.com/spreadsheets/d/1phz8_haUkVjqosNeDyjNe5O1f0xnMBLifEZlvZEhJgM/edit?usp=share_link" target="_blank">🔒 Калькулятор потребности Ozon</a>
                             <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1v-7wH76vwrMSqHsVrvArNIDLnEVRQ7WQg75AWi0A0OU/edit?usp=share_link" target="_blank">Калькулятор закупок Ozon</a>
                             <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1I1jTRsu6PFjcvljguxj5BBiw34PdTIQf1XfNkXokEMs/edit?usp=share_link" target="_blank">Калькулятор закупок WB</a>
                             <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1hv1R7XAFRoI6EBJlQzYqpI8vie_lSEZ117M7NQ9CoiE/edit?usp=share_link" target="_blank">Калькулятор закупок Ozon ООО</a>
-                            <a class="menu-item" href="https://docs.google.com/document/d/1nQzERK9gCpyjyHKcuQTAsp1n1a3EJw9fJWJhyyfBo6s/edit?usp=share_link" target="_blank">Инструкция «Калькулятор закупок Ozon»</a>
                         </details>
                     </div>
                 </details>
 
             </aside>
 
-            <!-- ПРАВАЯ ОБЛАСТЬ (пустая, под будущее) -->
+            <!-- ПРАВАЯ ОБЛАСТЬ: glass-карточка с графиком -->
             <div class="content-area">
-                <div class="placeholder">
-                    <div class="placeholder-icon">📊</div>
-                    <div class="placeholder-text">Область для контента</div>
-                    <div class="placeholder-sub">Здесь будут размещены дашборды, метрики или другой контент</div>
+                <div class="glass-card">
+                    <div class="card-head">
+                        <span style="font-size:1.3em">📈</span>
+                        <span class="card-title">Сводные отклонения по рынкам</span>
+                        <span class="card-subtitle">шт/день за последние 30 дней</span>
+                    </div>
+
+                    <div class="chart-box">
+                        <svg class="chart-svg" viewBox="0 0 800 320" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+                            <!-- Оси -->
+                            <line x1="50" y1="20" x2="50" y2="280" stroke="rgba(255,255,255,0.4)" stroke-width="1.2"/>
+                            <line x1="50" y1="150" x2="770" y2="150" stroke="rgba(255,255,255,0.3)" stroke-width="1" stroke-dasharray="3 4"/>
+                            <line x1="50" y1="280" x2="770" y2="280" stroke="rgba(255,255,255,0.4)" stroke-width="1.2"/>
+
+                            <!-- Горизонтальные сетки -->
+                            <line x1="50" y1="85" x2="770" y2="85" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+                            <line x1="50" y1="215" x2="770" y2="215" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+
+                            <!-- Метки оси Y -->
+                            <text x="44" y="24" text-anchor="end" fill="rgba(255,255,255,0.7)" font-family="Forum" font-size="11">+40</text>
+                            <text x="44" y="89" text-anchor="end" fill="rgba(255,255,255,0.6)" font-family="Forum" font-size="11">+20</text>
+                            <text x="44" y="154" text-anchor="end" fill="rgba(255,255,255,0.8)" font-family="Forum" font-size="11">0</text>
+                            <text x="44" y="219" text-anchor="end" fill="rgba(255,255,255,0.6)" font-family="Forum" font-size="11">−20</text>
+                            <text x="44" y="284" text-anchor="end" fill="rgba(255,255,255,0.7)" font-family="Forum" font-size="11">−40</text>
+
+                            <!-- Линии Ильи -->
+                            <!-- увеличить продажи (сплошная) -->
+                            <polyline fill="none" stroke="#E33D78" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+                                points="60,170 100,155 140,130 180,110 220,95 260,120 300,140 340,125 380,105 420,85 460,70 500,90 540,115 580,100 620,80 660,95 700,110 740,95"/>
+                            <!-- снизить продажи (пунктирная) -->
+                            <polyline fill="none" stroke="#E33D78" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="6 5" opacity="0.85"
+                                points="60,140 100,155 140,170 180,190 220,210 260,195 300,180 340,200 380,215 420,230 460,215 500,200 540,185 580,205 620,220 660,205 700,190 740,205"/>
+
+                            <!-- Линии Ольги -->
+                            <!-- увеличить продажи (сплошная) -->
+                            <polyline fill="none" stroke="#78A6C7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+                                points="60,160 100,180 140,175 180,155 220,140 260,130 300,115 340,135 380,155 420,140 460,125 500,110 540,130 580,145 620,130 660,115 700,130 740,120"/>
+                            <!-- снизить продажи (пунктирная) -->
+                            <polyline fill="none" stroke="#78A6C7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="6 5" opacity="0.85"
+                                points="60,155 100,140 140,145 180,165 220,180 260,175 300,190 340,185 380,170 420,180 460,195 500,210 540,195 580,180 620,195 660,205 700,190 740,200"/>
+
+                            <!-- Подписи дат по оси X -->
+                            <text x="60"  y="300" text-anchor="middle" fill="rgba(255,255,255,0.55)" font-family="Forum" font-size="10">07.09</text>
+                            <text x="240" y="300" text-anchor="middle" fill="rgba(255,255,255,0.55)" font-family="Forum" font-size="10">14.09</text>
+                            <text x="420" y="300" text-anchor="middle" fill="rgba(255,255,255,0.55)" font-family="Forum" font-size="10">21.09</text>
+                            <text x="600" y="300" text-anchor="middle" fill="rgba(255,255,255,0.55)" font-family="Forum" font-size="10">28.09</text>
+                            <text x="740" y="300" text-anchor="middle" fill="rgba(255,255,255,0.75)" font-family="Forum" font-size="10" font-weight="700">07.10</text>
+                        </svg>
+                    </div>
+
+                    <div class="chart-legend">
+                        <span class="legend-item"><span class="legend-sw" style="background:#E33D78"></span>Илья — увеличить продажи</span>
+                        <span class="legend-item"><span class="legend-sw-dashed" style="border-color:#E33D78"></span>Илья — снизить продажи</span>
+                        <span class="legend-item"><span class="legend-sw" style="background:#78A6C7"></span>Ольга — увеличить продажи</span>
+                        <span class="legend-item"><span class="legend-sw-dashed" style="border-color:#78A6C7"></span>Ольга — снизить продажи</span>
+                    </div>
+
+                    <div class="placeholder" style="margin-top:14px;padding:0">
+                        <div class="placeholder-sub">Нажмите на «Сводный отчёт» в меню, чтобы открыть полную аналитику</div>
+                    </div>
                 </div>
             </div>
         </div>
