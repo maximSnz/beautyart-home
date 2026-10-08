@@ -398,15 +398,30 @@
             bandAxis(1, 'right', C_MARGIN, scaleB.max, v => fmtMillions(v), 'Маржа, млн. руб.', plan);
             bandAxis(2, 'left', C_PCT, scaleC.max, v => fmt1(v), 'Маржинальность, %', pctPlan);
 
+            const spanStartMs = weeks[0].start.getTime(), spanEndMs = weeks[n - 1].end.getTime() + 86400000;
+            const xDay = t => padL + inset + dataW * ((t - spanStartMs) / (spanEndMs - spanStartMs));
+            const dailyPointsOnLine = (vals, yMax, band, color, prefix, fmtV) => {
+                if (!vals || vals.length < 2) return '';
+                const pts = vals.map((v, i) => [x(i), v]);
+                let out = '';
+                for (let t = spanStartMs; t <= spanEndMs; t += 86400000) {
+                    const px = xDay(t);
+                    if (px < pts[0][0] || px > pts[pts.length - 1][0]) continue;
+                    let i = 0; while (i < pts.length - 2 && px > pts[i + 1][0]) i++;
+                    const f = (px - pts[i][0]) / (pts[i + 1][0] - pts[i][0]);
+                    const v = pts[i][1] + (pts[i + 1][1] - pts[i][1]) * f;
+                    out += `<circle class="chart-point" cx="${px.toFixed(1)}" cy="${yBand(band, v, yMax).toFixed(1)}" r="2" fill="${color}" opacity="0.5" data-label="${fmtShort(new Date(t))}" data-value="${prefix}: ${fmtV(v)}"/>`;
+                }
+                return out;
+            };
             if (ordersDaily.length > 1) {
-                const spanStartMs = weeks[0].start.getTime(), spanEndMs = weeks[n - 1].end.getTime() + 86400000;
-                const xDay = t => padL + inset + dataW * ((t - spanStartMs) / (spanEndMs - spanStartMs));
                 let o = ''; ordersDaily.forEach((od, i) => { o += (i === 0 ? 'M ' : ' L ') + xDay(od.t) + ' ' + yBand(0, od.rub, scaleD); });
                 svg += `<path d="${o}" fill="none" stroke="${C_ORD}" stroke-width="1.5" stroke-linecap="round" opacity="0.35"/>`;
                 ordersDaily.forEach(od => { const d = new Date(od.t); svg += `<circle class="chart-point" cx="${xDay(od.t)}" cy="${yBand(0, od.rub, scaleD)}" r="2" fill="${C_ORD}" opacity="0.45" data-label="${fmtShort(d)}" data-value="Заказы: ${fmtMillions(od.rub)} млн руб • ${od.pcs.toLocaleString('ru-RU')} шт."/>`; });
             }
             if (pcsPlan) { const py = yBand(0, pcsPlan, scaleA.max); svg += `<line x1="${padL}" y1="${py}" x2="${plotRight}" y2="${py}" stroke="${C_PCS}" stroke-width="2" stroke-dasharray="6 6"/>`; }
             if (factPcs.length > 1) { let f = `M ${x(0)} ${yBand(0, factPcs[0], scaleA.max)}`; factPcs.forEach((v, i) => { if (i > 0) f += ` L ${x(i)} ${yBand(0, v, scaleA.max)}`; }); svg += `<path d="${f}" fill="none" stroke="${C_FACT}" stroke-width="2.5" stroke-linecap="round"/>`; }
+                        svg += dailyPointsOnLine(factPcs, scaleA.max, 0, C_FACT, 'Факт заказы (накопит.)', v => Math.round(v).toLocaleString('ru-RU') + ' шт');
             factPcs.forEach((v, i) => {
                 const px = x(i), py = yBand(0, v, scaleA.max);
                 const weekly = weekOrdPcs[i] || 0;
@@ -420,6 +435,7 @@
                 svg += `<text class="vlbl" x="${px}" y="${py + 16}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${bad ? C_DOWN : C_FACT}" font-family="Forum">${pl}</text>`;
             });
             if (projPcs.length > 1) { let p = `M ${x(0)} ${yBand(0, projPcs[0], scaleA.max)}`; projPcs.forEach((v, i) => { if (i > 0) p += ` L ${x(i)} ${yBand(0, v, scaleA.max)}`; }); svg += `<path d="${p}" fill="none" stroke="${C_PCS}" stroke-width="2.5" stroke-linecap="round"/>`; }
+                        svg += dailyPointsOnLine(projPcs, scaleA.max, 0, C_PCS, 'Прогноз заказы', v => Math.round(v).toLocaleString('ru-RU') + ' шт');
             projPcs.forEach((v, i) => {
                 const py = yBand(0, v, scaleA.max);
                 const dev = v - pcsPlan; const devP = pcsPlan ? dev / pcsPlan * 100 : 0;
@@ -433,6 +449,7 @@
             const planY = yBand(1, plan, scaleB.max);
             svg += `<line x1="${padL}" y1="${planY}" x2="${plotRight}" y2="${planY}" stroke="${C_MARGIN}" stroke-width="2.5" stroke-dasharray="8 6"/>`;
             if (factVals.length > 1) { let f = `M ${x(0)} ${yBand(1, factVals[0], scaleB.max)}`; factVals.forEach((v, i) => { if (i > 0) f += ` L ${x(i)} ${yBand(1, v, scaleB.max)}`; }); svg += `<path d="${f}" fill="none" stroke="${C_FACT}" stroke-width="2.5" stroke-linecap="round"/>`; }
+                        svg += dailyPointsOnLine(factVals, scaleB.max, 1, C_FACT, 'Факт маржи (накопит.)', fmtRubShort);
             factVals.forEach((v, i) => {
                 const px = x(i), py = yBand(1, v, scaleB.max);
                 const weekly = factWeekly[i];
@@ -448,6 +465,7 @@
                 svg += `<text class="vlbl" x="${px}" y="${ly}" text-anchor="middle" font-size="10" font-weight="700" fill="${bad ? C_DOWN : C_FACT}" font-family="Forum">${pl}</text>`;
             });
             if (lineVals.length > 1) { let l = `M ${x(0)} ${yBand(1, lineVals[0], scaleB.max)}`; lineVals.forEach((v, i) => { if (i > 0) l += ` L ${x(i)} ${yBand(1, v, scaleB.max)}`; }); svg += `<path class="chart-line" d="${l}" fill="none" stroke="${C_MARGIN}" stroke-width="3" stroke-linecap="round"/>`; }
+                        svg += dailyPointsOnLine(lineVals, scaleB.max, 1, C_MARGIN, 'Прогноз маржи', fmtRubShort);
             lineVals.forEach((v, i) => {
                 const py = yBand(1, v, scaleB.max);
                 const dev = v - plan; const devP = plan ? dev / plan * 100 : 0;
@@ -462,6 +480,7 @@
             const ppY = yBand(2, pctPlan, scaleC.max);
             svg += `<line x1="${padL}" y1="${ppY}" x2="${plotRight}" y2="${ppY}" stroke="${C_PCT}" stroke-width="2" stroke-dasharray="6 6"/>`;
             if (pctVals.length > 1) { let p = `M ${x(0)} ${yBand(2, pctVals[0], scaleC.max)}`; pctVals.forEach((v, i) => { if (i > 0) p += ` L ${x(i)} ${yBand(2, v, scaleC.max)}`; }); svg += `<path d="${p}" fill="none" stroke="${C_PCT}" stroke-width="2.5" stroke-linecap="round"/>`; }
+                        svg += dailyPointsOnLine(pctVals, scaleC.max, 2, C_PCT, 'Маржинальность', fmtPct);
             pctVals.forEach((v, i) => {
                 const py = yBand(2, v, scaleC.max);
                 const dev = v - pctPlan; const bad = dev < 0;
