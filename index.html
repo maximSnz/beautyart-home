@@ -94,6 +94,8 @@
             text-decoration: none; text-shadow: 0 1px 3px rgba(0,0,0,.25); transition: background .2s;
         }
         .sub-link:hover { background: rgba(227, 61, 120, 0.35); }
+        .sub-link.locked { cursor: not-allowed; opacity: .75; }
+        .sub-link.locked:hover { background: rgba(227, 61, 120, 0.18); }
 
         .menu-item {
             display: block; padding: 6px 10px 6px 14px; margin-bottom: 4px;
@@ -127,7 +129,6 @@
         .week-select-glass:focus { outline: none; border-color: #E33D78; }
         .week-select-glass option { color: #333; background: #fff; }
 
-        /* светлая матовая подложка: цветные подписи читаются как в private.html */
         .chart-box {
             position: relative;
             background: rgba(255, 255, 255, 0.92);
@@ -183,6 +184,8 @@
         <div class="main-layout">
             <!-- ЛЕВОЕ МЕНЮ -->
             <aside class="sidebar">
+
+                <!-- УПРАВЛЕНИЕ КОМПАНИЕЙ -->
                 <details class="menu-section">
                     <summary>🎯 Управление компанией</summary>
                     <div class="section-body">
@@ -191,9 +194,11 @@
                         <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1iYyzAie6x3H5nWO0biFXoZp694YhS5Qp/edit?usp=sharing&ouid=111894160779270511410&rtpof=true&sd=true" target="_blank">Реестр платежей</a>
                         <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1dzhhdjCeNe4-cwU4_y-2caX6PvO9TG3yAxBH2OB_VEY/edit" target="_blank">Схема RACI</a>
                         <a class="menu-item" href="https://stormbpmn.com/app/diagram/6a9c167a-c2fb-4bf3-b690-3253f7de3a7f?o=7ffd" target="_blank">BPMN</a>
+                        <span class="sub-link locked" title="Раздел закрыт до предоставления доступа">🔒 График отпусков</span>
                     </div>
                 </details>
 
+                <!-- КОММЕРЧЕСКАЯ ДЕЯТЕЛЬНОСТЬ -->
                 <details class="menu-section" open>
                     <summary>💼 Коммерческая деятельность</summary>
                     <div class="section-body">
@@ -202,6 +207,9 @@
                             <a class="sub-link" href="https://maximsnz.github.io/beautyart/private.html" target="_blank">🔒 Сводный отчёт</a>
                             <a class="menu-item" href="https://maximsnz.github.io/beautyart/weekly.html" target="_blank">Управление остатками</a>
                             <a class="menu-item" href="https://maximsnz.github.io/beautyart/plan.html" target="_blank">Реализация плана продаж</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/144n5raWV8mKbBdRQ8pEEfcgc8T_WaNzQ7NDWhRLQnSw/edit?" target="_blank">Юнит-экономика 1.0</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1jF6sDrGninnHtG24xIqVv4uiRZolHtaL4sd8Tj7VWCU/edit?gid=1634462589#gid=1634462589" target="_blank">Юнит-экономика 2.0</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/18iaMB0iAT4fKAFd-tFfMopklFzAb8cKGXwqRSyxX7AQ/edit?gid=116615647#gid=116615647" target="_blank">Управленческая отчетность</a>
                         </details>
                         <details class="subsection">
                             <summary>🏢 ООО Beauty Art</summary>
@@ -209,23 +217,21 @@
                             <a class="menu-item" href="https://maximsnz.github.io/beautyart-ooo/weekly.html" target="_blank">Управление остатками</a>
                             <a class="menu-item" href="https://maximsnz.github.io/beautyart-ooo/plan.html" target="_blank">Реализация плана продаж</a>
                         </details>
-                        <details class="subsection">
-                            <summary>Прочее</summary>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1dKzV0kQJ2PADrCe96x8_pyL5-KhAITRqFV7jhxaonP0/edit?usp=sharing" target="_blank">Бюджет</a>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1SuU4fVKUs26E78qdnChItDIWAQkInPX_cK5l2UCTV78/edit?gid=360342603#gid=360342603" target="_blank">Реестр товаров СТМ</a>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1GwyVCyQQKBKnU67JPtECjiwYPUyzPQwCh3zIF1AtsaI/edit?usp=sharing" target="_blank">Отчет инфографика</a>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/110zZ6aGFr3LzqiZKfnfMQubTwGmztEmPN0n2AmRoXBw/edit?usp=sharing" target="_blank">Отчет реклама</a>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/18iaMB0iAT4fKAFd-tFfMopklFzAb8cKGXwqRSyxX7AQ/edit?gid=116615647#gid=116615647" target="_blank">Управленческая отчетность</a>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/144n5raWV8mKbBdRQ8pEEfcgc8T_WaNzQ7NDWhRLQnSw/edit?" target="_blank">Юнит-экономика для МП</a>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1cnkJ7KJQL-3PdwEJN0Shpr6MiVUNElAoYKbzigbrrsU/edit?usp=sharing" target="_blank">Таблица РНП by Александр</a>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1Rg4JiBIx0Znn-QJKvZ_sMCBrrOiXDLygExsfztJnlZ4/edit?gid=942743257#gid=942743257" target="_blank">Таблица РНП by Алекс</a>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1B9nOTn5kvCp4UMax5L9uE46TNc785onp/edit?gid=1415273616#gid=1415273616" target="_blank">Отчет менеджера</a>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1e9aBsZ4R_rC2ILQNB45bG3bQYaXL7Y3spiecBjl1QLw/edit?gid=1925528841#gid=1925528841" target="_blank">Маркетинговое обоснование товара</a>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1cRTfpp1U6B6pKtuikuR8BumBLZLd5KEskz_v50e90ys/edit?usp=sharing" target="_blank">Коммерческое обоснование товара</a>
-                        </details>
                     </div>
                 </details>
 
+                <!-- МАРКЕТИНГ И ПРОДВИЖЕНИЕ -->
+                <details class="menu-section">
+                    <summary>📣 Маркетинг и продвижение</summary>
+                    <div class="section-body">
+                        <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1dKzV0kQJ2PADrCe96x8_pyL5-KhAITRqFV7jhxaonP0/edit?usp=sharing" target="_blank">Бюджет</a>
+                        <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1SuU4fVKUs26E78qdnChItDIWAQkInPX_cK5l2UCTV78/edit?gid=360342603#gid=360342603" target="_blank">Реестр товаров СТМ</a>
+                        <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1GwyVCyQQKBKnU67JPtECjiwYPUyzPQwCh3zIF1AtsaI/edit?usp=sharing" target="_blank">Отчет инфографика</a>
+                        <a class="menu-item" href="https://docs.google.com/spreadsheets/d/110zZ6aGFr3LzqiZKfnfMQubTwGmztEmPN0n2AmRoXBw/edit?usp=sharing" target="_blank">Отчет реклама</a>
+                    </div>
+                </details>
+
+                <!-- ЛОГИСТИКА И ДОСТАВКА -->
                 <details class="menu-section">
                     <summary>🚚 Логистика и доставка</summary>
                     <div class="section-body">
@@ -246,6 +252,16 @@
                         </details>
                     </div>
                 </details>
+
+                <!-- ФОРМИРОВАНИЕ АССОРТИМЕНТА -->
+                <details class="menu-section">
+                    <summary>🧩 Формирование ассортимента</summary>
+                    <div class="section-body">
+                        <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1e9aBsZ4R_rC2ILQNB45bG3bQYaXL7Y3spiecBjl1QLw/edit?gid=1925528841#gid=1925528841" target="_blank">Маркетинговое обоснование товара</a>
+                        <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1cRTfpp1U6B6pKtuikuR8BumBLZLd5KEskz_v50e90ys/edit?usp=sharing" target="_blank">Коммерческое обоснование товара</a>
+                    </div>
+                </details>
+
             </aside>
 
             <!-- ПРАВАЯ ОБЛАСТЬ: живой график -->
@@ -322,7 +338,6 @@
         const fmt1 = v => v.toLocaleString('ru-RU', { maximumFractionDigits: 1 });
         function niceScale(maxValue, tickCount = 4) { if (maxValue <= 0) maxValue = 1; const rawStep = maxValue / tickCount; const mag = Math.pow(10, Math.floor(Math.log10(rawStep))); const norm = rawStep / mag; let step; if (norm <= 1) step = mag; else if (norm <= 2) step = 2 * mag; else if (norm <= 2.5) step = 2.5 * mag; else if (norm <= 5) step = 5 * mag; else step = 10 * mag; return { step, max: Math.ceil(maxValue / step) * step }; }
 
-        // === СЖАТЫЕ ГАБАРИТЫ: 900x470 вместо 900x600 ===
         function drawChart(boxId, tooltipId, cfg) {
             const box = document.getElementById(boxId), tooltip = document.getElementById(tooltipId);
             const weeks = cfg.weeks, weekLabels = cfg.weekLabels, n = weeks.length;
@@ -371,7 +386,6 @@
             bandAxis(1, 'right', C_MARGIN, scaleB.max, v => fmtMillions(v), 'Маржа, млн. руб.', plan);
             bandAxis(2, 'left', C_PCT, scaleC.max, v => fmt1(v), 'Маржинальность, %', pctPlan);
 
-            // дневной ряд заказов + ТОЧКИ по дням (с тултипами)
             if (ordersDaily.length > 1) {
                 const spanStartMs = weeks[0].start.getTime(), spanEndMs = weeks[n - 1].end.getTime() + 86400000;
                 const xDay = t => padL + inset + dataW * ((t - spanStartMs) / (spanEndMs - spanStartMs));
@@ -387,7 +401,7 @@
                 const dW = (i > 0 && weekOrdPcs[i - 1]) ? weekly - weekOrdPcs[i - 1] : null;
                 const bad = dW !== null && dW < 0;
                 let tip = `Заказы: ${weekly.toLocaleString('ru-RU')} шт.`;
-                if (dW !== null) { const dp = dW / weekOrdPcs[i - 1] * 100; tip += • Динамика: ${dW >= 0 ? '+' : '−'}${Math.abs(dW).toLocaleString('ru-RU')} шт. (${dp >= 0 ? '+' : '−'}${Math.abs(dp).toLocaleString('ru-RU', { maximumFractionDigits: 1 })}%)`; }
+                if (dW !== null) { const dp = dW / weekOrdPcs[i - 1] * 100; tip += ` • Динамика: ${dW >= 0 ? '+' : '−'}${Math.abs(dW).toLocaleString('ru-RU')} шт. (${dp >= 0 ? '+' : '−'}${Math.abs(dp).toLocaleString('ru-RU', { maximumFractionDigits: 1 })}%)`; }
                 let pl = fmtRubShort(v);
                 if (dW !== null) { const dp = dW / weekOrdPcs[i - 1] * 100; const col = dW >= 0 ? C_UP : C_DOWN; const sg = dW >= 0 ? '+' : '−'; pl += ` <tspan fill="${col}">(${sg}${Math.abs(dW).toLocaleString('ru-RU')} шт / ${sg}${Math.abs(dp).toLocaleString('ru-RU', { maximumFractionDigits: 1 })}%)</tspan>`; }
                 svg += `<circle class="chart-point${bad ? ' pulse-bad' : ''}" cx="${px}" cy="${py}" r="4" fill="${bad ? C_DOWN : C_FACT}" data-label="Факт заказов, ${weekLabels[i]}" data-value="${tip}"/>`;
@@ -453,7 +467,6 @@
             const path = box.querySelector('.chart-line');
             if (path) { const len = path.getTotalLength(); path.style.strokeDasharray = len; path.style.strokeDashoffset = len; path.getBoundingClientRect(); path.style.transition = 'stroke-dashoffset 1s ease'; path.style.strokeDashoffset = '0'; }
 
-            // живые тултипы на всех точках
             box.querySelectorAll('.chart-point').forEach(pt => {
                 pt.dataset.r0 = pt.getAttribute('r');
                 const show = () => { const b = box.getBoundingClientRect(), r = pt.getBoundingClientRect(); tooltip.innerHTML = `<strong>${pt.dataset.label}</strong>${pt.dataset.value}`; tooltip.style.display = 'block'; tooltip.style.left = (r.left - b.left + r.width / 2) + 'px'; tooltip.style.top = (r.top - b.top - 8) + 'px'; pt.setAttribute('r', String(parseFloat(pt.dataset.r0) + 2)); };
