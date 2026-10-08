@@ -7,43 +7,50 @@
     <link href="https://fonts.googleapis.com/css2?family=Forum&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; }
         body {
             font-family: 'Forum', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #78A6C7 0%, #E33D78 50%, #7D3673 100%);
-            min-height: 100vh;
-            padding: 20px;
+            padding: 16px;
+            overflow: hidden; /* экран статичен, скроллятся только колонки */
         }
-        .container { max-width: 1400px; margin: 0 auto; }
+        .container { max-width: 1700px; margin: 0 auto; height: 100%; display: flex; flex-direction: column; gap: 16px; }
 
         /* === ШАПКА (glass) === */
         .header {
-            display: flex; align-items: center; gap: 20px; margin-bottom: 20px;
-            padding: 20px 30px; background: rgba(255, 255, 255, 0.15);
+            flex: 0 0 auto;
+            display: flex; align-items: center; gap: 20px;
+            padding: 14px 26px; background: rgba(255, 255, 255, 0.15);
             backdrop-filter: blur(20px) saturate(1.4); -webkit-backdrop-filter: blur(20px) saturate(1.4);
             border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.3);
             box-shadow: 0 8px 32px rgba(28, 13, 46, 0.2);
             position: relative; z-index: 200;
         }
         .logo-link { display: inline-block; flex: 0 0 auto; }
-        .logo { width: 60px; height: auto; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2)); transition: transform .3s ease; display: block; }
+        .logo { width: 52px; height: auto; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2)); transition: transform .3s ease; display: block; }
         .logo-link:hover .logo { transform: scale(1.1); }
         .company-name {
-            font-family: 'Forum', serif; font-size: 2em; font-weight: 400; color: white;
+            font-family: 'Forum', serif; font-size: 1.8em; font-weight: 400; color: white;
             text-shadow: 0 2px 8px rgba(28, 13, 46, 0.4); letter-spacing: 2px;
         }
 
-        /* === LAYOUT === */
-        .main-layout { display: grid; grid-template-columns: 300px 1fr; gap: 20px; align-items: start; }
+        /* === LAYOUT: колонки тянутся под экран, скролл внутри === */
+        .main-layout {
+            flex: 1; min-height: 0;
+            display: grid;
+            grid-template-columns: clamp(240px, 21vw, 320px) 1fr;
+            gap: 16px;
+        }
 
-        /* === ЛЕВОЕ МЕНЮ (glass) === */
+        /* === ЛЕВОЕ МЕНЮ (glass, скролл внутри) === */
         .sidebar {
+            min-height: 0; overflow-y: auto;
             background: rgba(255, 255, 255, 0.15);
             backdrop-filter: blur(20px) saturate(1.4); -webkit-backdrop-filter: blur(20px) saturate(1.4);
             border: 1px solid rgba(255, 255, 255, 0.3);
             border-radius: 16px; padding: 14px;
             box-shadow: 0 8px 32px rgba(28, 13, 46, 0.2);
-            position: sticky; top: 20px; color: #fff;
-            max-height: calc(100vh - 40px); overflow-y: auto;
+            color: #fff;
             scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.4) transparent;
         }
         .sidebar::-webkit-scrollbar { width: 6px; }
@@ -108,67 +115,81 @@
         .menu-item:hover { background: rgba(255, 255, 255, 0.25); transform: translateX(3px); }
         .menu-item:last-child { margin-bottom: 0; }
 
-        /* === ПРАВАЯ ОБЛАСТЬ: glass-карточка с ЖИВЫМ графиком === */
-        .content-area { display: flex; flex-direction: column; gap: 20px; }
+        /* === ПРАВАЯ КОЛОНКА (скролл внутри, если не влезает) === */
+        .content-area { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 16px;
+            scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.4) transparent; }
+        .content-area::-webkit-scrollbar { width: 6px; }
+        .content-area::-webkit-scrollbar-thumb { background: rgba(255,255,255,.35); border-radius: 3px; }
+
         .glass-card {
             background: rgba(255, 255, 255, 0.12);
             backdrop-filter: blur(20px) saturate(1.4); -webkit-backdrop-filter: blur(20px) saturate(1.4);
             border: 1px solid rgba(255, 255, 255, 0.3);
-            border-radius: 16px; padding: 20px 22px;
+            border-radius: 16px; padding: 16px 20px;
             box-shadow: 0 8px 32px rgba(28, 13, 46, 0.2);
             color: #fff;
         }
-        .card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; font-family: 'Forum', serif; flex-wrap: wrap; }
-        .card-title { font-size: 1.15em; font-weight: 400; text-shadow: 0 1px 3px rgba(0,0,0,.3); }
+        .card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-family: 'Forum', serif; flex-wrap: wrap; }
+        .card-title { font-size: 1.1em; font-weight: 400; text-shadow: 0 1px 3px rgba(0,0,0,.3); }
         .week-select-glass {
-            margin-left: auto; padding: 6px 10px;
+            margin-left: auto; padding: 5px 10px;
             border: 1px solid rgba(255,255,255,.4); border-radius: 8px;
-            font-family: 'Forum', serif; font-size: .85em; color: #fff;
+            font-family: 'Forum', serif; font-size: .82em; color: #fff;
             background: rgba(255,255,255,.15); cursor: pointer; max-width: 240px;
         }
         .week-select-glass:focus { outline: none; border-color: #E33D78; }
         .week-select-glass option { color: #333; background: #fff; }
 
+        /* график прямо на стекле */
         .chart-box {
             position: relative;
-            background: rgba(255, 255, 255, 0.92);
-            border: 1px solid rgba(255, 255, 255, 0.5);
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.22);
             border-radius: 12px; padding: 8px 6px 4px;
         }
-        .chart-box svg { width: 100%; height: auto; display: block; }
+        .chart-box svg { width: 100%; height: auto; max-height: 62vh; display: block; }
         .chart-tooltip {
             position: absolute; display: none; pointer-events: none;
-            background: #1C0D2E; color: white; padding: 8px 12px; border-radius: 8px;
+            background: rgba(28, 13, 46, 0.92); color: white; padding: 8px 12px; border-radius: 8px;
             font-family: 'Forum', serif; font-size: 0.85em; line-height: 1.4;
             transform: translate(-50%, -100%); white-space: nowrap;
             box-shadow: 0 4px 12px rgba(28, 13, 46, 0.4); z-index: 5;
+            backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
         }
         .chart-tooltip strong { color: #E33D78; display: block; }
         .chart-point { cursor: pointer; }
         .pulse-bad { animation: pulseBad 3s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
         @keyframes pulseBad { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.35); opacity: 0.7; } }
 
-        .legend-bottom { display: flex; gap: 26px; flex-wrap: wrap; justify-content: space-between; margin-top: 14px; padding: 0 4px; }
-        .legend-col { display: flex; flex-direction: column; gap: 6px; }
-        .legend-item { display: inline-flex; align-items: center; gap: 8px; font-family: 'Forum', serif; color: rgba(255,255,255,.92); font-size: .82em; text-shadow: 0 1px 3px rgba(0,0,0,.25); }
-        .sw { width: 34px; height: 3px; display: inline-block; border-radius: 2px; flex: 0 0 auto; }
+        /* легенда как в private: 3 колонки, компактно */
+        .legend-bottom { display: flex; gap: 18px; flex-wrap: wrap; justify-content: space-between; margin-top: 10px; padding: 0 4px; }
+        .legend-col { display: flex; flex-direction: column; gap: 4px; }
+        .legend-item { display: inline-flex; align-items: center; gap: 7px; font-family: 'Forum', serif; color: rgba(255,255,255,.9); font-size: .72em; text-shadow: 0 1px 3px rgba(0,0,0,.25); }
+        .sw { width: 30px; height: 3px; display: inline-block; border-radius: 2px; flex: 0 0 auto; }
         .sw.dash-pink { background: repeating-linear-gradient(90deg, #E33D78 0 6px, transparent 6px 10px); }
         .sw.solid-pink { background: #E33D78; }
         .sw.dash-amber { background: repeating-linear-gradient(90deg, #F59E0B 0 6px, transparent 6px 10px); }
         .sw.solid-amber { background: #F59E0B; }
         .sw.dash-teal { background: repeating-linear-gradient(90deg, #14b8a6 0 6px, transparent 6px 10px); }
         .sw.solid-teal { background: #14b8a6; }
-        .sw.solid-plum { background: #7D3673; }
-        .sw.pale-green { background: #22c55e; opacity: 0.4; }
-        .card-note { margin-top: 12px; font-size: .8em; color: rgba(255,255,255,.65); font-family: 'Forum', serif; }
+        .sw.solid-plum { background: #c084fc; }
+        .sw.pale-green { background: #22c55e; opacity: 0.45; }
 
+        /* === АДАПТАЦИЯ === */
+        @media (max-width: 1100px) {
+            .main-layout { grid-template-columns: 260px 1fr; }
+        }
         @media (max-width: 900px) {
-            .main-layout { grid-template-columns: 1fr; }
-            .sidebar { position: static; max-height: none; }
-            body { padding: 10px; }
-            .header { padding: 15px 20px; }
-            .company-name { font-size: 1.6em; }
-            .legend-bottom { flex-direction: column; gap: 10px; }
+            body { overflow: auto; height: auto; padding: 10px; }
+            .container { height: auto; }
+            .main-layout { display: flex; flex-direction: column; }
+            .sidebar, .content-area { overflow: visible; min-height: auto; }
+            .company-name { font-size: 1.5em; }
+            .legend-bottom { flex-direction: column; gap: 8px; }
+            .chart-box svg { max-height: none; }
+        }
+        @media (min-height: 1200px) {
+            .chart-box svg { max-height: 70vh; }
         }
     </style>
 </head>
@@ -184,8 +205,6 @@
         <div class="main-layout">
             <!-- ЛЕВОЕ МЕНЮ -->
             <aside class="sidebar">
-
-                <!-- УПРАВЛЕНИЕ КОМПАНИЕЙ -->
                 <details class="menu-section">
                     <summary>🎯 Управление компанией</summary>
                     <div class="section-body">
@@ -198,7 +217,6 @@
                     </div>
                 </details>
 
-                <!-- КОММЕРЧЕСКАЯ ДЕЯТЕЛЬНОСТЬ -->
                 <details class="menu-section" open>
                     <summary>💼 Коммерческая деятельность</summary>
                     <div class="section-body">
@@ -220,7 +238,6 @@
                     </div>
                 </details>
 
-                <!-- МАРКЕТИНГ И ПРОДВИЖЕНИЕ -->
                 <details class="menu-section">
                     <summary>📣 Маркетинг и продвижение</summary>
                     <div class="section-body">
@@ -231,7 +248,6 @@
                     </div>
                 </details>
 
-                <!-- ЛОГИСТИКА И ДОСТАВКА -->
                 <details class="menu-section">
                     <summary>🚚 Логистика и доставка</summary>
                     <div class="section-body">
@@ -253,7 +269,6 @@
                     </div>
                 </details>
 
-                <!-- ФОРМИРОВАНИЕ АССОРТИМЕНТА -->
                 <details class="menu-section">
                     <summary>🧩 Формирование ассортимента</summary>
                     <div class="section-body">
@@ -261,10 +276,9 @@
                         <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1cRTfpp1U6B6pKtuikuR8BumBLZLd5KEskz_v50e90ys/edit?usp=sharing" target="_blank">Коммерческое обоснование товара</a>
                     </div>
                 </details>
-
             </aside>
 
-            <!-- ПРАВАЯ ОБЛАСТЬ: живой график -->
+            <!-- ПРАВАЯ КОЛОНКА: живой график на стекле -->
             <div class="content-area">
                 <div class="glass-card">
                     <div class="card-head">
@@ -290,17 +304,18 @@
                             <div class="legend-item"><span class="sw pale-green"></span>Заказы, млн (день)</div>
                         </div>
                     </div>
-                    <div class="card-note">* Данные демонстрационные. Полная версия с группами товаров, динамикой и протоколом планёрки — в разделе «🔒 Сводный отчёт».</div>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        // === движок графика, перенесён из private.html ===
+        // === движок графика из private.html, палитра адаптирована под glass ===
         const CHART_DATA = {};
         const GROUP_NAMES = ['Уход для волос','Уход для лица','Маникюр и педикюр','Парфюмерия','Инструменты','Краска для волос','Аксессуары','SPA-уход','Наборы','Уход для тела'];
-        const C_UP = '#16a34a', C_DOWN = '#dc2626';
+        const C_UP = '#4ade80', C_DOWN = '#f87171';
+        const GRID = 'rgba(255,255,255,0.14)', BASELINE = 'rgba(255,255,255,0.45)';
+        const TXT_WEEK = 'rgba(255,255,255,0.92)', TXT_SUB = 'rgba(255,255,255,0.55)';
 
         function getWeeksInMonth(year, monthIdx) { const weeks = []; const d = new Date(year, monthIdx, 1); d.setDate(d.getDate() + ((4 - d.getDay() + 7) % 7)); while (d.getMonth() === monthIdx && d.getFullYear() === year) { const monday = new Date(d); monday.setDate(monday.getDate() - 3); const sunday = new Date(d); sunday.setDate(sunday.getDate() + 3); weeks.push({ start: monday, end: sunday }); d.setDate(d.getDate() + 7); } return weeks; }
         function getISOWeek(date) { const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())); const dayNum = d.getUTCDay() || 7; d.setUTCDate(d.getUTCDate() + 4 - dayNum); const ys = new Date(Date.UTC(d.getUTCFullYear(), 0, 1)); return Math.ceil((((d - ys) / 86400000) + 1) / 7); }
@@ -361,12 +376,13 @@
             const scaleD = Math.max(...ordersDaily.map(o => o.rub), 1);
 
             const x = i => padL + inset + (n === 1 ? dataW / 2 : dataW * i / (n - 1));
-            const C_PCS = '#14b8a6', C_MARGIN = '#E33D78', C_PCT = '#d97706', C_ORD = '#22c55e', C_FACT = '#7D3673';
+            // палитра под glass: яркие серии + светлый «plum» для накопительных фактов
+            const C_PCS = '#2dd4bf', C_MARGIN = '#f472b6', C_PCT = '#fbbf24', C_ORD = '#4ade80', C_FACT = '#c084fc';
 
             let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
-            [1, 2].forEach(q => { svg += `<line x1="${padL}" y1="${qTop(q)}" x2="${plotRight}" y2="${qTop(q)}" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="2 4"/>`; });
-            svg += `<line x1="${padL}" y1="${baseY}" x2="${plotRight}" y2="${baseY}" stroke="#94a3b8" stroke-width="1.5"/>`;
-            weeks.forEach((w, i) => { svg += `<line x1="${x(i)}" y1="${padT}" x2="${x(i)}" y2="${baseY}" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="2 4"/>`; });
+            [1, 2].forEach(q => { svg += `<line x1="${padL}" y1="${qTop(q)}" x2="${plotRight}" y2="${qTop(q)}" stroke="${GRID}" stroke-width="1" stroke-dasharray="2 4"/>`; });
+            svg += `<line x1="${padL}" y1="${baseY}" x2="${plotRight}" y2="${baseY}" stroke="${BASELINE}" stroke-width="1.5"/>`;
+            weeks.forEach((w, i) => { svg += `<line x1="${x(i)}" y1="${padT}" x2="${x(i)}" y2="${baseY}" stroke="${GRID}" stroke-width="1" stroke-dasharray="2 4"/>`; });
 
             function bandAxis(q, side, color, max, fmt, title, planVal) {
                 const ax = side === 'left' ? padL - 12 : plotRight + 12;
@@ -374,7 +390,7 @@
                 const anchor = side === 'left' ? 'end' : 'start';
                 const lx = side === 'left' ? ax - 6 : ax + 6;
                 svg += `<line x1="${ax}" y1="${top}" x2="${ax}" y2="${bottom}" stroke="${color}" stroke-width="1.5"/>`;
-                [0, 1].forEach(f => { const v = max * f, yy = yBand(q, v, max); svg += `<line x1="${ax}" y1="${yy}" x2="${side === 'left' ? ax - 4 : ax + 4}" y2="${yy}" stroke="${color}" stroke-width="1.5"/>`; svg += `<text x="${lx}" y="${yy + 4}" text-anchor="${anchor}" font-size="9.5" fill="${color}" opacity="0.75" font-family="Forum">${fmt(v)}</text>`; });
+                [0, 1].forEach(f => { const v = max * f, yy = yBand(q, v, max); svg += `<line x1="${ax}" y1="${yy}" x2="${side === 'left' ? ax - 4 : ax + 4}" y2="${yy}" stroke="${color}" stroke-width="1.5"/>`; svg += `<text x="${lx}" y="${yy + 4}" text-anchor="${anchor}" font-size="9.5" fill="${color}" opacity="0.85" font-family="Forum">${fmt(v)}</text>`; });
                 if (planVal != null) { const py = yBand(q, planVal, max); const midY = yBand(q, max / 2, max); const ly = (Math.abs(py - midY) < 10) ? py - 11 : py; svg += `<line x1="${ax}" y1="${py}" x2="${side === 'left' ? ax - 5 : ax + 5}" y2="${py}" stroke="${color}" stroke-width="2.5"/>`; svg += `<text x="${lx}" y="${ly + 4}" text-anchor="${anchor}" font-size="10.5" font-weight="700" fill="${color}" font-family="Forum">${fmt(planVal)}</text>`; }
                 const tX = side === 'left' ? 4 : W - 4;
                 const tAnchor = side === 'left' ? 'start' : 'end';
@@ -390,8 +406,8 @@
                 const spanStartMs = weeks[0].start.getTime(), spanEndMs = weeks[n - 1].end.getTime() + 86400000;
                 const xDay = t => padL + inset + dataW * ((t - spanStartMs) / (spanEndMs - spanStartMs));
                 let o = ''; ordersDaily.forEach((od, i) => { o += (i === 0 ? 'M ' : ' L ') + xDay(od.t) + ' ' + yBand(0, od.rub, scaleD); });
-                svg += `<path d="${o}" fill="none" stroke="${C_ORD}" stroke-width="1.5" stroke-linecap="round" opacity="0.3"/>`;
-                ordersDaily.forEach(od => { const d = new Date(od.t); svg += `<circle class="chart-point" cx="${xDay(od.t)}" cy="${yBand(0, od.rub, scaleD)}" r="2" fill="${C_ORD}" opacity="0.35" data-label="${fmtShort(d)}" data-value="Заказы: ${fmtMillions(od.rub)} млн руб • ${od.pcs.toLocaleString('ru-RU')} шт."/>`; });
+                svg += `<path d="${o}" fill="none" stroke="${C_ORD}" stroke-width="1.5" stroke-linecap="round" opacity="0.35"/>`;
+                ordersDaily.forEach(od => { const d = new Date(od.t); svg += `<circle class="chart-point" cx="${xDay(od.t)}" cy="${yBand(0, od.rub, scaleD)}" r="2" fill="${C_ORD}" opacity="0.45" data-label="${fmtShort(d)}" data-value="Заказы: ${fmtMillions(od.rub)} млн руб • ${od.pcs.toLocaleString('ru-RU')} шт."/>`; });
             }
             if (pcsPlan) { const py = yBand(0, pcsPlan, scaleA.max); svg += `<line x1="${padL}" y1="${py}" x2="${plotRight}" y2="${py}" stroke="${C_PCS}" stroke-width="2" stroke-dasharray="6 6"/>`; }
             if (factPcs.length > 1) { let f = `M ${x(0)} ${yBand(0, factPcs[0], scaleA.max)}`; factPcs.forEach((v, i) => { if (i > 0) f += ` L ${x(i)} ${yBand(0, v, scaleA.max)}`; }); svg += `<path d="${f}" fill="none" stroke="${C_FACT}" stroke-width="2.5" stroke-linecap="round"/>`; }
@@ -448,18 +464,18 @@
             });
 
             const ppY = yBand(2, pctPlan, scaleC.max);
-            svg += `<line x1="${padL}" y1="${ppY}" x2="${plotRight}" y2="${ppY}" stroke="#F59E0B" stroke-width="2" stroke-dasharray="6 6"/>`;
-            if (pctVals.length > 1) { let p = `M ${x(0)} ${yBand(2, pctVals[0], scaleC.max)}`; pctVals.forEach((v, i) => { if (i > 0) p += ` L ${x(i)} ${yBand(2, v, scaleC.max)}`; }); svg += `<path d="${p}" fill="none" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/>`; }
+            svg += `<line x1="${padL}" y1="${ppY}" x2="${plotRight}" y2="${ppY}" stroke="${C_PCT}" stroke-width="2" stroke-dasharray="6 6"/>`;
+            if (pctVals.length > 1) { let p = `M ${x(0)} ${yBand(2, pctVals[0], scaleC.max)}`; pctVals.forEach((v, i) => { if (i > 0) p += ` L ${x(i)} ${yBand(2, v, scaleC.max)}`; }); svg += `<path d="${p}" fill="none" stroke="${C_PCT}" stroke-width="2.5" stroke-linecap="round"/>`; }
             pctVals.forEach((v, i) => {
                 const py = yBand(2, v, scaleC.max);
                 const dev = v - pctPlan; const bad = dev < 0;
                 const col = dev >= 0 ? C_UP : C_DOWN; const sg = dev >= 0 ? '+' : '−';
                 const paren = ` <tspan fill="${col}">(${sg}${Math.abs(dev).toLocaleString('ru-RU', { maximumFractionDigits: 1 })} п.п.)</tspan>`;
-                svg += `<circle class="chart-point${bad ? ' pulse-bad' : ''}" cx="${x(i)}" cy="${py}" r="4.5" fill="white" stroke="${bad ? C_DOWN : '#F59E0B'}" stroke-width="2.5" data-label="Маржинальность, ${weekLabels[i]}" data-value="${fmtPct(v)}"/>`;
-                svg += `<text x="${x(i)}" y="${py - 9}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${bad ? C_DOWN : '#d97706'}" font-family="Forum">${fmtPct(v)}${paren}</text>`;
+                svg += `<circle class="chart-point${bad ? ' pulse-bad' : ''}" cx="${x(i)}" cy="${py}" r="4.5" fill="white" stroke="${bad ? C_DOWN : C_PCT}" stroke-width="2.5" data-label="Маржинальность, ${weekLabels[i]}" data-value="${fmtPct(v)}"/>`;
+                svg += `<text x="${x(i)}" y="${py - 9}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${bad ? C_DOWN : C_PCT}" font-family="Forum">${fmtPct(v)}${paren}</text>`;
             });
 
-            weeks.forEach((w, i) => { svg += `<text x="${x(i)}" y="${baseY + 18}" text-anchor="middle" font-size="12" font-weight="700" fill="#544273" font-family="Forum">${weekLabels[i]}</text>`; svg += `<text x="${x(i)}" y="${baseY + 33}" text-anchor="middle" font-size="9" fill="#94a3b8" font-family="Forum">${fmtShort(w.start)}–${fmtShort(w.end)}</text>`; });
+            weeks.forEach((w, i) => { svg += `<text x="${x(i)}" y="${baseY + 18}" text-anchor="middle" font-size="12" font-weight="700" fill="${TXT_WEEK}" font-family="Forum">${weekLabels[i]}</text>`; svg += `<text x="${x(i)}" y="${baseY + 33}" text-anchor="middle" font-size="9" fill="${TXT_SUB}" font-family="Forum">${fmtShort(w.start)}–${fmtShort(w.end)}</text>`; });
             svg += `</svg>`;
             box.querySelectorAll('svg').forEach(el => el.remove());
             box.insertAdjacentHTML('beforeend', svg);
