@@ -96,6 +96,12 @@
         details.subsection[open] > summary::after { transform: rotate(90deg); }
         details.subsection[open] > summary { margin-bottom: 6px; }
 
+        /* вложенность третьего уровня */
+        details.subsection .menu-item { margin-left: 8px; }
+        details.subsection .sub-link { margin-left: 8px; }
+        details.subsection details.subsection { margin-left: 8px; }
+        details.subsection details.subsection > summary { font-size: .95em; color: rgba(255,255,255,.8); }
+
         /* Ссылка уровня подраздела (Сводный отчёт) */
         .sub-link {
             display: flex; align-items: center;
@@ -163,36 +169,56 @@
             <!-- ЛЕВОЕ МЕНЮ -->
             <aside class="sidebar">
 
-                <!-- ИП КОЛДОМОВ -->
+                <!-- КОММЕРЧЕСКАЯ ДЕЯТЕЛЬНОСТЬ (внутри: ИП, ООО, Прочее) -->
                 <details class="menu-section">
-                    <summary>👤 ИП Колдомов</summary>
+                    <summary>💼 Коммерческая деятельность</summary>
                     <div class="section-body">
-                        <a class="sub-link" href="https://maximsnz.github.io/beautyart/private.html" target="_blank">🔒 Сводный отчёт</a>
-                        <details class="subsection">
-                            <summary>Управление продажами</summary>
-                            <a class="menu-item" href="https://maximsnz.github.io/beautyart/weekly.html" target="_blank">Управление остатками</a>
-                            <a class="menu-item" href="https://maximsnz.github.io/beautyart/plan.html" target="_blank">Реализация плана продаж</a>
-                        </details>
-                        <details class="subsection">
-                            <summary>Управление закупками</summary>
-                            <a class="menu-item" href="https://maximsnz.github.io/beautyart/products.html" target="_blank">База товаров</a>
-                        </details>
-                    </div>
-                </details>
 
-                <!-- ООО BEAUTY ART -->
-                <details class="menu-section">
-                    <summary>🏢 ООО Beauty Art</summary>
-                    <div class="section-body">
-                        <a class="sub-link" href="https://maximsnz.github.io/beautyart-ooo/private.html" target="_blank">🔒 Сводный отчёт</a>
+                        <!-- Блок ИП -->
                         <details class="subsection">
-                            <summary>Управление продажами</summary>
-                            <a class="menu-item" href="https://maximsnz.github.io/beautyart-ooo/weekly.html" target="_blank">Управление остатками</a>
-                            <a class="menu-item" href="https://maximsnz.github.io/beautyart-ooo/plan.html" target="_blank">Реализация плана продаж</a>
+                            <summary>👤 ИП Колдомов</summary>
+                            <a class="sub-link" href="https://maximsnz.github.io/beautyart/private.html" target="_blank">🔒 Сводный отчёт</a>
+                            <details class="subsection">
+                                <summary>Управление продажами</summary>
+                                <a class="menu-item" href="https://maximsnz.github.io/beautyart/weekly.html" target="_blank">Управление остатками</a>
+                                <a class="menu-item" href="https://maximsnz.github.io/beautyart/plan.html" target="_blank">Реализация плана продаж</a>
+                            </details>
+                            <details class="subsection">
+                                <summary>Управление закупками</summary>
+                                <a class="menu-item" href="https://maximsnz.github.io/beautyart/products.html" target="_blank">База товаров</a>
+                            </details>
                         </details>
+
+                        <!-- Блок ООО -->
                         <details class="subsection">
-                            <summary>Управление закупками</summary>
-                            <a class="menu-item" href="https://maximsnz.github.io/beautyart-ooo/products.html" target="_blank">База товаров</a>
+                            <summary>🏢 ООО Beauty Art</summary>
+                            <a class="sub-link" href="https://maximsnz.github.io/beautyart-ooo/private.html" target="_blank">🔒 Сводный отчёт</a>
+                            <details class="subsection">
+                                <summary>Управление продажами</summary>
+                                <a class="menu-item" href="https://maximsnz.github.io/beautyart-ooo/weekly.html" target="_blank">Управление остатками</a>
+                                <a class="menu-item" href="https://maximsnz.github.io/beautyart-ooo/plan.html" target="_blank">Реализация плана продаж</a>
+                            </details>
+                            <details class="subsection">
+                                <summary>Управление закупками</summary>
+                                <a class="menu-item" href="https://maximsnz.github.io/beautyart-ooo/products.html" target="_blank">База товаров</a>
+                            </details>
+                        </details>
+
+                        <!-- Прочее: существующие коммерческие ссылки -->
+                        <details class="subsection">
+                            <summary>Прочее</summary>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1QggOaNjI7y-i3xZIiZrdVH_q1xsmHYpMwVRH9n1wliY/edit?gid=203679960#gid=203679960" target="_blank">Маркетинговая стратегия</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1dKzV0kQJ2PADrCe96x8_pyL5-KhAITRqFV7jhxaonP0/edit?usp=sharing" target="_blank">Бюджет</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1SuU4fVKUs26E78qdnChItDIWAQkInPX_cK5l2UCTV78/edit?gid=360342603#gid=360342603" target="_blank">Реестр товаров СТМ</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1GwyVCyQQKBKnU67JPtECjiwYPUyzPQwCh3zIF1AtsaI/edit?usp=sharing" target="_blank">Отчет инфографика</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/110zZ6aGFr3LzqiZKfnfMQubTwGmztEmPN0n2AmRoXBw/edit?usp=sharing" target="_blank">Отчет реклама</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/18iaMB0iAT4fKAFd-tFfMopklFzAb8cKGXwqRSyxX7AQ/edit?gid=116615647#gid=116615647" target="_blank">Управленческая отчетность</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/144n5raWV8mKbBdRQ8pEEfcgc8T_WaNzQ7NDWhRLQnSw/edit?" target="_blank">Юнит-экономика для МП</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1cnkJ7KJQL-3PdwEJN0Shpr6MiVUNElAoYKbzigbrrsU/edit?usp=sharing" target="_blank">Таблица РНП by Александр</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1Rg4JiBIx0Znn-QJKvZ_sMCBrrOiXDLygExsfztJnlZ4/edit?gid=942743257#gid=942743257" target="_blank">Таблица РНП by Алекс</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1B9nOTn5kvCp4UMax5L9uE46TNc785onp/edit?gid=1415273616#gid=1415273616" target="_blank">Отчет менеджера</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1e9aBsZ4R_rC2ILQNB45bG3bQYaXL7Y3spiecBjl1QLw/edit?gid=1925528841#gid=1925528841" target="_blank">Маркетинговое обоснование товара</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1cRTfpp1U6B6pKtuikuR8BumBLZLd5KEskz_v50e90ys/edit?usp=sharing" target="_blank">Коммерческое обоснование товара</a>
                         </details>
                     </div>
                 </details>
@@ -219,43 +245,6 @@
                     </div>
                 </details>
 
-                <!-- КОММЕРЧЕСКАЯ ДЕЯТЕЛЬНОСТЬ -->
-                <details class="menu-section">
-                    <summary>💼 Коммерческая деятельность</summary>
-                    <div class="section-body">
-                        <details class="subsection">
-                            <summary>ИП</summary>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1QggOaNjI7y-i3xZIiZrdVH_q1xsmHYpMwVRH9n1wliY/edit?gid=203679960#gid=203679960" target="_blank">Маркетинговая стратегия</a>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1dKzV0kQJ2PADrCe96x8_pyL5-KhAITRqFV7jhxaonP0/edit?usp=sharing" target="_blank">Бюджет</a>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1SuU4fVKUs26E78qdnChItDIWAQkInPX_cK5l2UCTV78/edit?gid=360342603#gid=360342603" target="_blank">Реестр товаров СТМ</a>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1GwyVCyQQKBKnU67JPtECjiwYPUyzPQwCh3zIF1AtsaI/edit?usp=sharing" target="_blank">Отчет инфографика</a>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/110zZ6aGFr3LzqiZKfnfMQubTwGmztEmPN0n2AmRoXBw/edit?usp=sharing" target="_blank">Отчет реклама</a>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/18iaMB0iAT4fKAFd-tFfMopklFzAb8cKGXwqRSyxX7AQ/edit?gid=116615647#gid=116615647" target="_blank">Управленческая отчетность</a>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/144n5raWV8mKbBdRQ8pEEfcgc8T_WaNzQ7NDWhRLQnSw/edit?" target="_blank">Юнит-экономика для МП</a>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1cnkJ7KJQL-3PdwEJN0Shpr6MiVUNElAoYKbzigbrrsU/edit?usp=sharing" target="_blank">Таблица РНП by Александр</a>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1Rg4JiBIx0Znn-QJKvZ_sMCBrrOiXDLygExsfztJnlZ4/edit?gid=942743257#gid=942743257" target="_blank">Таблица РНП by Алекс</a>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1B9nOTn5kvCp4UMax5L9uE46TNc785onp/edit?gid=1415273616#gid=1415273616" target="_blank">Отчет менеджера</a>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1e9aBsZ4R_rC2ILQNB45bG3bQYaXL7Y3spiecBjl1QLw/edit?gid=1925528841#gid=1925528841" target="_blank">Маркетинговое обоснование товара</a>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1cRTfpp1U6B6pKtuikuR8BumBLZLd5KEskz_v50e90ys/edit?usp=sharing" target="_blank">Коммерческое обоснование товара</a>
-                        </details>
-                        <details class="subsection">
-                            <summary>ООО</summary>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1QggOaNjI7y-i3xZIiZrdVH_q1xsmHYpMwVRH9n1wliY/edit?gid=203679960#gid=203679960" target="_blank">Маркетинговая стратегия</a>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1dKzV0kQJ2PADrCe96x8_pyL5-KhAITRqFV7jhxaonP0/edit?usp=sharing" target="_blank">Бюджет</a>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1SuU4fVKUs26E78qdnChItDIWAQkInPX_cK5l2UCTV78/edit?gid=360342603#gid=360342603" target="_blank">Реестр товаров СТМ</a>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1GwyVCyQQKBKnU67JPtECjiwYPUyzPQwCh3zIF1AtsaI/edit?usp=sharing" target="_blank">Отчет инфографика</a>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/110zZ6aGFr3LzqiZKfnfMQubTwGmztEmPN0n2AmRoXBw/edit?usp=sharing" target="_blank">Отчет реклама</a>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/18iaMB0iAT4fKAFd-tFfMopklFzAb8cKGXwqRSyxX7AQ/edit?gid=116615647#gid=116615647" target="_blank">Управленческая отчетность</a>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/144n5raWV8mKbBdRQ8pEEfcgc8T_WaNzQ7NDWhRLQnSw/edit?" target="_blank">Юнит-экономика для МП</a>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1cnkJ7KJQL-3PdwEJN0Shpr6MiVUNElAoYKbzigbrrsU/edit?usp=sharing" target="_blank">Таблица РНП by Александр</a>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1Rg4JiBIx0Znn-QJKvZ_sMCBrrOiXDLygExsfztJnlZ4/edit?gid=942743257#gid=942743257" target="_blank">Таблица РНП by Алекс</a>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1B9nOTn5kvCp4UMax5L9uE46TNc785onp/edit?gid=1415273616#gid=1415273616" target="_blank">Отчет менеджера</a>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1e9aBsZ4R_rC2ILQNB45bG3bQYaXL7Y3spiecBjl1QLw/edit?gid=1925528841#gid=1925528841" target="_blank">Маркетинговое обоснование товара</a>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1cRTfpp1U6B6pKtuikuR8BumBLZLd5KEskz_v50e90ys/edit?usp=sharing" target="_blank">Коммерческое обоснование товара</a>
-                        </details>
-                    </div>
-                </details>
-
                 <!-- УПРАВЛЕНИЕ КОМПАНИЕЙ -->
                 <details class="menu-section">
                     <summary>🎯 Управление компанией</summary>
@@ -278,7 +267,4 @@
                     <div class="placeholder-sub">Здесь будут размещены дашборды, метрики или другой контент</div>
                 </div>
             </div>
-        </div>
-    </div>
-</body>
-</html>
+        
