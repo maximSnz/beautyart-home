@@ -15,74 +15,98 @@
         }
         .container { max-width: 1400px; margin: 0 auto; }
 
-        /* === ШАПКА (только логотип) === */
+        /* === ШАПКА (glass) === */
         .header {
             display: flex; align-items: center; gap: 20px; margin-bottom: 20px;
             padding: 20px 30px; background: rgba(255, 255, 255, 0.15);
-            border-radius: 16px; border: 2px solid rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(20px) saturate(1.4); -webkit-backdrop-filter: blur(20px) saturate(1.4);
+            border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.3);
             box-shadow: 0 8px 32px rgba(28, 13, 46, 0.2);
             position: relative; z-index: 200;
         }
         .logo-link { display: inline-block; flex: 0 0 auto; }
-        .logo {
-            width: 60px; height: auto; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));
-            transition: transform .3s ease; display: block;
-        }
+        .logo { width: 60px; height: auto; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2)); transition: transform .3s ease; display: block; }
         .logo-link:hover .logo { transform: scale(1.1); }
         .company-name {
             font-family: 'Forum', serif; font-size: 2em; font-weight: 400; color: white;
             text-shadow: 0 2px 8px rgba(28, 13, 46, 0.4); letter-spacing: 2px;
         }
 
-        /* === ОСНОВНОЙ LAYOUT === */
+        /* === LAYOUT === */
         .main-layout {
             display: grid;
-            grid-template-columns: 320px 1fr;
+            grid-template-columns: 280px 1fr;
             gap: 20px;
-            min-height: calc(100vh - 140px);
+            align-items: start;
         }
 
-        /* === ЛЕВОЕ МЕНЮ === */
+        /* === ЛЕВОЕ МЕНЮ (glass, сворачиваемое) === */
         .sidebar {
-            background: white;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(20px) saturate(1.4); -webkit-backdrop-filter: blur(20px) saturate(1.4);
+            border: 1px solid rgba(255, 255, 255, 0.3);
             border-radius: 16px;
-            padding: 24px;
-            box-shadow: 0 10px 30px rgba(28, 13, 46, 0.3);
-            border: 2px solid rgba(84, 66, 115, 0.2);
-            height: fit-content;
-            position: sticky;
-            top: 20px;
+            padding: 14px;
+            box-shadow: 0 8px 32px rgba(28, 13, 46, 0.2);
+            position: sticky; top: 20px;
+            color: #fff;
         }
-        .menu-section { margin-bottom: 28px; }
-        .menu-section:last-child { margin-bottom: 0; }
-        .section-title {
-            font-size: 1.4em; font-weight: 400; color: #1C0D2E;
-            margin-bottom: 16px; padding-bottom: 10px;
-            border-bottom: 3px solid #78A6C7;
-            font-family: 'Forum', serif;
-            display: flex; align-items: center; gap: 10px;
+
+        details.menu-section { margin-bottom: 10px; }
+        details.menu-section:last-child { margin-bottom: 0; }
+        details.menu-section > summary {
+            cursor: pointer; list-style: none;
+            display: flex; align-items: center; gap: 8px;
+            font-family: 'Forum', serif; font-size: 1.05em; color: #fff;
+            padding: 9px 12px; border-radius: 10px;
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            text-shadow: 0 1px 3px rgba(0,0,0,.25);
+            transition: background .2s;
         }
-        .section-icon { font-size: 1.2em; }
-        .subsection { margin-bottom: 16px; }
-        .subsection:last-child { margin-bottom: 0; }
-        .subsection-title {
-            font-size: 1em; font-weight: 600; color: #544273;
-            margin-bottom: 10px; font-family: 'Forum', serif;
-            padding-left: 8px; border-left: 3px solid #E33D78;
+        details.menu-section > summary:hover { background: rgba(255, 255, 255, 0.22); }
+        details.menu-section > summary::-webkit-details-marker { display: none; }
+        details.menu-section > summary::after {
+            content: '▸'; margin-left: auto; font-size: .8em; transition: transform .2s;
         }
+        details.menu-section[open] > summary::after { transform: rotate(90deg); }
+        details.menu-section[open] > summary { margin-bottom: 8px; }
+
+        .section-body { padding: 0 4px 4px; }
+
+        details.subsection { margin: 6px 0; }
+        details.subsection > summary {
+            cursor: pointer; list-style: none;
+            display: flex; align-items: center;
+            font-size: .88em; font-weight: 600; color: rgba(255,255,255,.9);
+            padding: 5px 8px; border-left: 3px solid #E33D78;
+            text-shadow: 0 1px 3px rgba(0,0,0,.25);
+        }
+        details.subsection > summary::-webkit-details-marker { display: none; }
+        details.subsection > summary::after {
+            content: '▸'; margin-left: auto; font-size: .75em; transition: transform .2s;
+        }
+        details.subsection[open] > summary::after { transform: rotate(90deg); }
+        details.subsection[open] > summary { margin-bottom: 6px; }
+
         .menu-item {
-            display: block; padding: 10px 12px; margin-bottom: 6px;
-            background: #f8f9fb; border-radius: 8px;
-            text-decoration: none; color: #333;
-            transition: all 0.2s ease; border: 2px solid transparent;
-            font-family: 'Forum', serif; font-size: 0.95em;
+            display: block; padding: 7px 10px 7px 14px; margin-bottom: 4px;
+            background: rgba(255, 255, 255, 0.10);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 8px;
+            text-decoration: none; color: #fff;
+            font-family: 'Forum', serif; font-size: .86em;
+            text-shadow: 0 1px 3px rgba(0,0,0,.25);
+            transition: background .2s, transform .2s;
         }
-        .menu-item:hover {
-            background: white; border-color: #78A6C7;
-            transform: translateX(4px);
-            box-shadow: 0 2px 8px rgba(120, 166, 199, 0.2);
-        }
+        .menu-item:hover { background: rgba(255, 255, 255, 0.25); transform: translateX(3px); }
         .menu-item:last-child { margin-bottom: 0; }
+        .menu-item.top-item {
+            background: rgba(227, 61, 120, 0.25);
+            border-color: rgba(227, 61, 120, 0.45);
+            margin: 8px 0;
+        }
+        .menu-item.top-item:hover { background: rgba(227, 61, 120, 0.4); }
 
         /* === ПРАВАЯ ОБЛАСТЬ (полезные ссылки) === */
         .content-area {
@@ -123,12 +147,8 @@
             transform: translateY(-3px);
             box-shadow: 0 4px 12px rgba(120, 166, 199, 0.25);
         }
-        .link-card .lc-name {
-            display: block; color: #544273; font-weight: 600; margin-bottom: 4px;
-        }
-        .link-card .lc-desc {
-            display: block; color: #888; font-size: 0.85em;
-        }
+        .link-card .lc-name { display: block; color: #544273; font-weight: 600; margin-bottom: 4px; }
+        .link-card .lc-desc { display: block; color: #888; font-size: 0.85em; }
 
         /* === МОБИЛЬНАЯ АДАПТАЦИЯ === */
         @media (max-width: 900px) {
@@ -143,7 +163,7 @@
 </head>
 <body>
     <div class="container">
-        <!-- ШАПКА (только логотип) -->
+        <!-- ШАПКА -->
         <div class="header">
             <a href="index.html" class="logo-link" title="На главную">
                 <img src="https://i.ibb.co/ZzbPQmQt/IMG-8031.png" alt="Beauty Art Logo" class="logo">
@@ -151,38 +171,65 @@
             <div class="company-name">Beauty Art</div>
         </div>
 
-        <!-- ОСНОВНОЙ LAYOUT -->
         <div class="main-layout">
             <!-- ЛЕВОЕ МЕНЮ -->
-            <div class="sidebar">
-                <div class="menu-section">
-                    <div class="section-title"><span class="section-icon">👤</span>ИП</div>
-                    <div class="subsection">
-                        <div class="subsection-title">Управление продажами</div>
-                        <a href="https://maximsnz.github.io/beautyart/weekly.html" class="menu-item">Управление остатками</a>
-                        <a href="https://maximsnz.github.io/beautyart/plan.html" class="menu-item">Реализация плана продаж</a>
-                        <a href="https://maximsnz.github.io/beautyart/private.html" class="menu-item">Сводный отчёт</a>
+            <aside class="sidebar">
+                <!-- ИП -->
+                <details class="menu-section" open>
+                    <summary>👤 ИП</summary>
+                    <div class="section-body">
+                        <details class="subsection" open>
+                            <summary>Управление продажами</summary>
+                            <a class="menu-item" href="https://maximsnz.github.io/beautyart/weekly.html" target="_blank">Управление остатками</a>
+                            <a class="menu-item" href="https://maximsnz.github.io/beautyart/plan.html" target="_blank">Реализация плана продаж</a>
+                        </details>
+                        <a class="menu-item top-item" href="https://maximsnz.github.io/beautyart/private.html" target="_blank">🔒 Сводный отчёт</a>
+                        <details class="subsection">
+                            <summary>Управление закупками</summary>
+                            <a class="menu-item" href="https://maximsnz.github.io/beautyart/products.html" target="_blank">База товаров</a>
+                        </details>
                     </div>
-                    <div class="subsection">
-                        <div class="subsection-title">Управление закупками</div>
-                        <a href="https://maximsnz.github.io/beautyart/products.html" class="menu-item">База товаров</a>
-                    </div>
-                </div>
+                </details>
 
-                <div class="menu-section">
-                    <div class="section-title"><span class="section-icon">🏢</span>ООО</div>
-                    <div class="subsection">
-                        <div class="subsection-title">Управление продажами</div>
-                        <a href="https://maximsnz.github.io/beautyart-ooo/weekly.html" class="menu-item">Управление остатками</a>
-                        <a href="https://maximsnz.github.io/beautyart-ooo/plan.html" class="menu-item">Реализация плана продаж</a>
-                        <a href="https://maximsnz.github.io/beautyart-ooo/private.html" class="menu-item">Сводный отчёт</a>
+                <!-- ООО -->
+                <details class="menu-section">
+                    <summary>🏢 ООО</summary>
+                    <div class="section-body">
+                        <details class="subsection">
+                            <summary>Управление продажами</summary>
+                            <a class="menu-item" href="https://maximsnz.github.io/beautyart-ooo/weekly.html" target="_blank">Управление остатками</a>
+                            <a class="menu-item" href="https://maximsnz.github.io/beautyart-ooo/plan.html" target="_blank">Реализация плана продаж</a>
+                        </details>
+                        <a class="menu-item top-item" href="https://maximsnz.github.io/beautyart-ooo/private.html" target="_blank">🔒 Сводный отчёт</a>
+                        <details class="subsection">
+                            <summary>Управление закупками</summary>
+                            <a class="menu-item" href="https://maximsnz.github.io/beautyart-ooo/products.html" target="_blank">База товаров</a>
+                        </details>
                     </div>
-                    <div class="subsection">
-                        <div class="subsection-title">Управление закупками</div>
-                        <a href="https://maximsnz.github.io/beautyart-ooo/products.html" class="menu-item">База товаров</a>
+                </details>
+
+                <!-- ЛОГИСТИКА И ДОСТАВКА -->
+                <details class="menu-section">
+                    <summary>🚚 Логистика и доставка</summary>
+                    <div class="section-body">
+                        <details class="subsection">
+                            <summary>Управление закупками</summary>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1arhP0SlodgIDGcSV_E7DFny772ExkRXGS0llKjhfwzw/edit?gid=596168910#gid=596168910" target="_blank">База товаров</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1l7fzbyoM7ml5HBeDz9alvJVtpEuX8zVfRwam1aTJaPA/edit?usp=share_link" target="_blank">Месячная потребность (план/факт)</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1GSZjUz3dDsbTas37rD42Y58CIIBGdLbfjwnC_3W5UFQ/edit?gid=1052591380#gid=1052591380" target="_blank">Еженедельные заявки</a>
+                            <a class="menu-item" href="https://drive.google.com/drive/folders/1_Fz3CNW4iBB_0RP7CXGB1-78Pw0i7Z4f?usp=share_link" target="_blank">Прайс-листы поставщиков</a>
+                        </details>
+                        <details class="subsection">
+                            <summary>Калькуляторы и инструкции</summary>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1phz8_haUkVjqosNeDyjNe5O1f0xnMBLifEZlvZEhJgM/edit?usp=share_link" target="_blank">Калькулятор потребности Ozon</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1v-7wH76vwrMSqHsVrvArNIDLnEVRQ7WQg75AWi0A0OU/edit?usp=share_link" target="_blank">Калькулятор закупок Ozon</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1I1jTRsu6PFjcvljguxj5BBiw34PdTIQf1XfNkXokEMs/edit?usp=share_link" target="_blank">Калькулятор закупок WB</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1hv1R7XAFRoI6EBJlQzYqpI8vie_lSEZ117M7NQ9CoiE/edit?usp=share_link" target="_blank">Калькулятор закупок Ozon ООО</a>
+                            <a class="menu-item" href="https://docs.google.com/document/d/1nQzERK9gCpyjyHKcuQTAsp1n1a3EJw9fJWJhyyfBo6s/edit?usp=share_link" target="_blank">Инструкция «Калькулятор закупок Ozon»</a>
+                        </details>
                     </div>
-                </div>
-            </div>
+                </details>
+            </aside>
 
             <!-- ПРАВАЯ ОБЛАСТЬ: ПОЛЕЗНЫЕ ССЫЛКИ -->
             <div class="content-area">
@@ -215,49 +262,6 @@
                         <a class="link-card" target="_blank" href="https://stormbpmn.com/app/diagram/6a9c167a-c2fb-4bf3-b690-3253f7de3a7f?o=7ffd">
                             <span class="lc-name">BPMN</span>
                             <span class="lc-desc">Моделирование бизнес-процессов</span>
-                        </a>
-                    </div>
-                </div>
-
-                <!-- Группа: Логистика и доставка -->
-                <div class="links-group">
-                    <div class="links-group-title"><span>🚚</span>Логистика и доставка</div>
-                    <div class="links-grid">
-                        <a class="link-card" target="_blank" href="https://docs.google.com/spreadsheets/d/1arhP0SlodgIDGcSV_E7DFny772ExkRXGS0llKjhfwzw/edit?gid=596168910#gid=596168910">
-                            <span class="lc-name">База товаров</span>
-                            <span class="lc-desc">Единый реестр товаров</span>
-                        </a>
-                        <a class="link-card" target="_blank" href="https://docs.google.com/spreadsheets/d/1l7fzbyoM7ml5HBeDz9alvJVtpEuX8zVfRwam1aTJaPA/edit?usp=share_link">
-                            <span class="lc-name">Месячная потребность (план/факт)</span>
-                            <span class="lc-desc">Плановый расчёт на месяц</span>
-                        </a>
-                        <a class="link-card" target="_blank" href="https://docs.google.com/spreadsheets/d/1GSZjUz3dDsbTas37rD42Y58CIIBGdLbfjwnC_3W5UFQ/edit?gid=1052591380#gid=1052591380">
-                            <span class="lc-name">Еженедельные заявки</span>
-                            <span class="lc-desc">Заявки на закупку и контроль</span>
-                        </a>
-                        <a class="link-card" target="_blank" href="https://drive.google.com/drive/folders/1_Fz3CNW4iBB_0RP7CXGB1-78Pw0i7Z4f?usp=share_link">
-                            <span class="lc-name">Прайс-листы поставщиков</span>
-                            <span class="lc-desc">Актуальные прайсы от поставщиков</span>
-                        </a>
-                        <a class="link-card" target="_blank" href="https://docs.google.com/spreadsheets/d/1phz8_haUkVjqosNeDyjNe5O1f0xnMBLifEZlvZEhJgM/edit?usp=share_link">
-                            <span class="lc-name">Калькулятор потребности Ozon</span>
-                            <span class="lc-desc">Расчёт потребности для Ozon</span>
-                        </a>
-                        <a class="link-card" target="_blank" href="https://docs.google.com/spreadsheets/d/1v-7wH76vwrMSqHsVrvArNIDLnEVRQ7WQg75AWi0A0OU/edit?usp=share_link">
-                            <span class="lc-name">Калькулятор закупок Ozon</span>
-                            <span class="lc-desc">Расчёт для Ozon</span>
-                        </a>
-                        <a class="link-card" target="_blank" href="https://docs.google.com/spreadsheets/d/1I1jTRsu6PFjcvljguxj5BBiw34PdTIQf1XfNkXokEMs/edit?usp=share_link">
-                            <span class="lc-name">Калькулятор закупок WB</span>
-                            <span class="lc-desc">Расчёт для Wildberries</span>
-                        </a>
-                        <a class="link-card" target="_blank" href="https://docs.google.com/spreadsheets/d/1hv1R7XAFRoI6EBJlQzYqpI8vie_lSEZ117M7NQ9CoiE/edit?usp=share_link">
-                            <span class="lc-name">Калькулятор закупок Ozon ООО</span>
-                            <span class="lc-desc">Расчёт для Ozon (ООО)</span>
-                        </a>
-                        <a class="link-card" target="_blank" href="https://docs.google.com/document/d/1nQzERK9gCpyjyHKcuQTAsp1n1a3EJw9fJWJhyyfBo6s/edit?usp=share_link">
-                            <span class="lc-name">Инструкция «Калькулятор закупок Ozon»</span>
-                            <span class="lc-desc">Регламент работы с калькулятором</span>
                         </a>
                     </div>
                 </div>
