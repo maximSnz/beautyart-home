@@ -35,12 +35,12 @@
         /* === LAYOUT === */
         .main-layout {
             display: grid;
-            grid-template-columns: 280px 1fr;
+            grid-template-columns: 300px 1fr;
             gap: 20px;
             align-items: start;
         }
 
-        /* === ЛЕВОЕ МЕНЮ (glass, сворачиваемое) === */
+        /* === ЛЕВОЕ МЕНЮ (glass, сворачиваемое, со скроллом) === */
         .sidebar {
             background: rgba(255, 255, 255, 0.15);
             backdrop-filter: blur(20px) saturate(1.4); -webkit-backdrop-filter: blur(20px) saturate(1.4);
@@ -50,14 +50,21 @@
             box-shadow: 0 8px 32px rgba(28, 13, 46, 0.2);
             position: sticky; top: 20px;
             color: #fff;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255,255,255,.4) transparent;
         }
+        .sidebar::-webkit-scrollbar { width: 6px; }
+        .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,.35); border-radius: 3px; }
+        .sidebar::-webkit-scrollbar-track { background: transparent; }
 
         details.menu-section { margin-bottom: 10px; }
         details.menu-section:last-child { margin-bottom: 0; }
         details.menu-section > summary {
             cursor: pointer; list-style: none;
             display: flex; align-items: center; gap: 8px;
-            font-family: 'Forum', serif; font-size: 1.05em; color: #fff;
+            font-family: 'Forum', serif; font-size: 1.02em; color: #fff;
             padding: 9px 12px; border-radius: 10px;
             background: rgba(255, 255, 255, 0.12);
             border: 1px solid rgba(255, 255, 255, 0.25);
@@ -79,7 +86,7 @@
             cursor: pointer; list-style: none;
             display: flex; align-items: center;
             font-size: .88em; font-weight: 600; color: rgba(255,255,255,.9);
-            padding: 5px 8px; border-left: 3px solid #E33D78;
+            padding: 5px 8px; border-left: 3px solid rgba(255,255,255,.5);
             text-shadow: 0 1px 3px rgba(0,0,0,.25);
         }
         details.subsection > summary::-webkit-details-marker { display: none; }
@@ -89,75 +96,56 @@
         details.subsection[open] > summary::after { transform: rotate(90deg); }
         details.subsection[open] > summary { margin-bottom: 6px; }
 
+        /* Ссылка уровня подраздела (Сводный отчёт) */
+        .sub-link {
+            display: flex; align-items: center;
+            font-size: .88em; font-weight: 600; color: #fff;
+            padding: 5px 8px; margin: 6px 0;
+            border-left: 3px solid #E33D78;
+            border-radius: 0 8px 8px 0;
+            background: rgba(227, 61, 120, 0.18);
+            text-decoration: none;
+            text-shadow: 0 1px 3px rgba(0,0,0,.25);
+            transition: background .2s;
+        }
+        .sub-link:hover { background: rgba(227, 61, 120, 0.35); }
+
         .menu-item {
-            display: block; padding: 7px 10px 7px 14px; margin-bottom: 4px;
+            display: block; padding: 6px 10px 6px 14px; margin-bottom: 4px;
             background: rgba(255, 255, 255, 0.10);
             border: 1px solid rgba(255, 255, 255, 0.18);
             border-radius: 8px;
             text-decoration: none; color: #fff;
-            font-family: 'Forum', serif; font-size: .86em;
+            font-family: 'Forum', serif; font-size: .84em;
             text-shadow: 0 1px 3px rgba(0,0,0,.25);
             transition: background .2s, transform .2s;
         }
         .menu-item:hover { background: rgba(255, 255, 255, 0.25); transform: translateX(3px); }
         .menu-item:last-child { margin-bottom: 0; }
-        .menu-item.top-item {
-            background: rgba(227, 61, 120, 0.25);
-            border-color: rgba(227, 61, 120, 0.45);
-            margin: 8px 0;
-        }
-        .menu-item.top-item:hover { background: rgba(227, 61, 120, 0.4); }
 
-        /* === ПРАВАЯ ОБЛАСТЬ (полезные ссылки) === */
+        /* === ПРАВАЯ ОБЛАСТЬ (пустая, под будущее) === */
         .content-area {
-            background: white;
+            background: rgba(255, 255, 255, 0.10);
+            backdrop-filter: blur(20px) saturate(1.4); -webkit-backdrop-filter: blur(20px) saturate(1.4);
+            border: 1px solid rgba(255, 255, 255, 0.3);
             border-radius: 16px;
             padding: 30px;
-            box-shadow: 0 10px 30px rgba(28, 13, 46, 0.3);
-            border: 2px solid rgba(84, 66, 115, 0.2);
+            box-shadow: 0 8px 32px rgba(28, 13, 46, 0.2);
+            display: flex; align-items: center; justify-content: center;
+            min-height: 400px;
         }
-        .links-title {
-            font-size: 1.8em; font-weight: 400; color: #1C0D2E;
-            margin-bottom: 24px; padding-bottom: 14px;
-            border-bottom: 3px solid #78A6C7;
-            font-family: 'Forum', serif;
-            display: flex; align-items: center; gap: 10px;
-        }
-        .links-group { margin-bottom: 28px; }
-        .links-group:last-child { margin-bottom: 0; }
-        .links-group-title {
-            font-size: 1.2em; font-weight: 400; color: #544273;
-            margin-bottom: 14px; font-family: 'Forum', serif;
-            display: flex; align-items: center; gap: 8px;
-        }
-        .links-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-            gap: 12px;
-        }
-        .link-card {
-            display: block; padding: 14px 16px;
-            background: #f8f9fb; border-radius: 10px;
-            text-decoration: none; color: #333;
-            transition: all 0.2s ease; border: 2px solid transparent;
-            font-family: 'Forum', serif; font-size: 0.92em;
-        }
-        .link-card:hover {
-            background: white; border-color: #78A6C7;
-            transform: translateY(-3px);
-            box-shadow: 0 4px 12px rgba(120, 166, 199, 0.25);
-        }
-        .link-card .lc-name { display: block; color: #544273; font-weight: 600; margin-bottom: 4px; }
-        .link-card .lc-desc { display: block; color: #888; font-size: 0.85em; }
+        .placeholder { text-align: center; color: rgba(255,255,255,.75); font-family: 'Forum', serif; }
+        .placeholder-icon { font-size: 4em; margin-bottom: 16px; opacity: .4; }
+        .placeholder-text { font-size: 1.3em; margin-bottom: 8px; }
+        .placeholder-sub { font-size: .95em; opacity: .7; }
 
         /* === МОБИЛЬНАЯ АДАПТАЦИЯ === */
         @media (max-width: 900px) {
             .main-layout { grid-template-columns: 1fr; }
-            .sidebar { position: static; }
+            .sidebar { position: static; max-height: none; }
             body { padding: 10px; }
             .header { padding: 15px 20px; }
             .company-name { font-size: 1.6em; }
-            .links-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -174,16 +162,17 @@
         <div class="main-layout">
             <!-- ЛЕВОЕ МЕНЮ -->
             <aside class="sidebar">
-                <!-- ИП -->
-                <details class="menu-section" open>
-                    <summary>👤 ИП</summary>
+
+                <!-- ИП КОЛДОМОВ -->
+                <details class="menu-section">
+                    <summary>👤 ИП Колдомов</summary>
                     <div class="section-body">
-                        <details class="subsection" open>
+                        <a class="sub-link" href="https://maximsnz.github.io/beautyart/private.html" target="_blank">🔒 Сводный отчёт</a>
+                        <details class="subsection">
                             <summary>Управление продажами</summary>
                             <a class="menu-item" href="https://maximsnz.github.io/beautyart/weekly.html" target="_blank">Управление остатками</a>
                             <a class="menu-item" href="https://maximsnz.github.io/beautyart/plan.html" target="_blank">Реализация плана продаж</a>
                         </details>
-                        <a class="menu-item top-item" href="https://maximsnz.github.io/beautyart/private.html" target="_blank">🔒 Сводный отчёт</a>
                         <details class="subsection">
                             <summary>Управление закупками</summary>
                             <a class="menu-item" href="https://maximsnz.github.io/beautyart/products.html" target="_blank">База товаров</a>
@@ -191,16 +180,16 @@
                     </div>
                 </details>
 
-                <!-- ООО -->
+                <!-- ООО BEAUTY ART -->
                 <details class="menu-section">
-                    <summary>🏢 ООО</summary>
+                    <summary>🏢 ООО Beauty Art</summary>
                     <div class="section-body">
+                        <a class="sub-link" href="https://maximsnz.github.io/beautyart-ooo/private.html" target="_blank">🔒 Сводный отчёт</a>
                         <details class="subsection">
                             <summary>Управление продажами</summary>
                             <a class="menu-item" href="https://maximsnz.github.io/beautyart-ooo/weekly.html" target="_blank">Управление остатками</a>
                             <a class="menu-item" href="https://maximsnz.github.io/beautyart-ooo/plan.html" target="_blank">Реализация плана продаж</a>
                         </details>
-                        <a class="menu-item top-item" href="https://maximsnz.github.io/beautyart-ooo/private.html" target="_blank">🔒 Сводный отчёт</a>
                         <details class="subsection">
                             <summary>Управление закупками</summary>
                             <a class="menu-item" href="https://maximsnz.github.io/beautyart-ooo/products.html" target="_blank">База товаров</a>
@@ -229,96 +218,64 @@
                         </details>
                     </div>
                 </details>
+
+                <!-- КОММЕРЧЕСКАЯ ДЕЯТЕЛЬНОСТЬ -->
+                <details class="menu-section">
+                    <summary>💼 Коммерческая деятельность</summary>
+                    <div class="section-body">
+                        <details class="subsection">
+                            <summary>ИП</summary>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1QggOaNjI7y-i3xZIiZrdVH_q1xsmHYpMwVRH9n1wliY/edit?gid=203679960#gid=203679960" target="_blank">Маркетинговая стратегия</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1dKzV0kQJ2PADrCe96x8_pyL5-KhAITRqFV7jhxaonP0/edit?usp=sharing" target="_blank">Бюджет</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1SuU4fVKUs26E78qdnChItDIWAQkInPX_cK5l2UCTV78/edit?gid=360342603#gid=360342603" target="_blank">Реестр товаров СТМ</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1GwyVCyQQKBKnU67JPtECjiwYPUyzPQwCh3zIF1AtsaI/edit?usp=sharing" target="_blank">Отчет инфографика</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/110zZ6aGFr3LzqiZKfnfMQubTwGmztEmPN0n2AmRoXBw/edit?usp=sharing" target="_blank">Отчет реклама</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/18iaMB0iAT4fKAFd-tFfMopklFzAb8cKGXwqRSyxX7AQ/edit?gid=116615647#gid=116615647" target="_blank">Управленческая отчетность</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/144n5raWV8mKbBdRQ8pEEfcgc8T_WaNzQ7NDWhRLQnSw/edit?" target="_blank">Юнит-экономика для МП</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1cnkJ7KJQL-3PdwEJN0Shpr6MiVUNElAoYKbzigbrrsU/edit?usp=sharing" target="_blank">Таблица РНП by Александр</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1Rg4JiBIx0Znn-QJKvZ_sMCBrrOiXDLygExsfztJnlZ4/edit?gid=942743257#gid=942743257" target="_blank">Таблица РНП by Алекс</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1B9nOTn5kvCp4UMax5L9uE46TNc785onp/edit?gid=1415273616#gid=1415273616" target="_blank">Отчет менеджера</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1e9aBsZ4R_rC2ILQNB45bG3bQYaXL7Y3spiecBjl1QLw/edit?gid=1925528841#gid=1925528841" target="_blank">Маркетинговое обоснование товара</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1cRTfpp1U6B6pKtuikuR8BumBLZLd5KEskz_v50e90ys/edit?usp=sharing" target="_blank">Коммерческое обоснование товара</a>
+                        </details>
+                        <details class="subsection">
+                            <summary>ООО</summary>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1QggOaNjI7y-i3xZIiZrdVH_q1xsmHYpMwVRH9n1wliY/edit?gid=203679960#gid=203679960" target="_blank">Маркетинговая стратегия</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1dKzV0kQJ2PADrCe96x8_pyL5-KhAITRqFV7jhxaonP0/edit?usp=sharing" target="_blank">Бюджет</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1SuU4fVKUs26E78qdnChItDIWAQkInPX_cK5l2UCTV78/edit?gid=360342603#gid=360342603" target="_blank">Реестр товаров СТМ</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1GwyVCyQQKBKnU67JPtECjiwYPUyzPQwCh3zIF1AtsaI/edit?usp=sharing" target="_blank">Отчет инфографика</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/110zZ6aGFr3LzqiZKfnfMQubTwGmztEmPN0n2AmRoXBw/edit?usp=sharing" target="_blank">Отчет реклама</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/18iaMB0iAT4fKAFd-tFfMopklFzAb8cKGXwqRSyxX7AQ/edit?gid=116615647#gid=116615647" target="_blank">Управленческая отчетность</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/144n5raWV8mKbBdRQ8pEEfcgc8T_WaNzQ7NDWhRLQnSw/edit?" target="_blank">Юнит-экономика для МП</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1cnkJ7KJQL-3PdwEJN0Shpr6MiVUNElAoYKbzigbrrsU/edit?usp=sharing" target="_blank">Таблица РНП by Александр</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1Rg4JiBIx0Znn-QJKvZ_sMCBrrOiXDLygExsfztJnlZ4/edit?gid=942743257#gid=942743257" target="_blank">Таблица РНП by Алекс</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1B9nOTn5kvCp4UMax5L9uE46TNc785onp/edit?gid=1415273616#gid=1415273616" target="_blank">Отчет менеджера</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1e9aBsZ4R_rC2ILQNB45bG3bQYaXL7Y3spiecBjl1QLw/edit?gid=1925528841#gid=1925528841" target="_blank">Маркетинговое обоснование товара</a>
+                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1cRTfpp1U6B6pKtuikuR8BumBLZLd5KEskz_v50e90ys/edit?usp=sharing" target="_blank">Коммерческое обоснование товара</a>
+                        </details>
+                    </div>
+                </details>
+
+                <!-- УПРАВЛЕНИЕ КОМПАНИЕЙ -->
+                <details class="menu-section">
+                    <summary>🎯 Управление компанией</summary>
+                    <div class="section-body">
+                        <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1cJGvUwr0DC3f2bRh_5Q2VeivtDyhpmpqOWYbvPEWjgs/edit?usp=share_link" target="_blank">Функциональная стратегия</a>
+                        <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1iYyzAie6x3H5nWO0biFXoZp694YhS5Qp/edit?usp=sharing&ouid=111894160779270511410&rtpof=true&sd=true" target="_blank">Реестр платежей</a>
+                        <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1idpmes30UDhTsB_y4STfLmdXz-BXnhiS/edit?gid=207979019#gid=207979019" target="_blank">Реестр цен</a>
+                        <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1ysw0hr94GwfgEwpHswODbFGVoey311Xey-1RgGPpCkI/edit?gid=1040966828#gid=1040966828" target="_blank">План продаж Ozon</a>
+                        <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1dzhhdjCeNe4-cwU4_y-2caX6PvO9TG3yAxBH2OB_VEY/edit" target="_blank">Схема RACI</a>
+                        <a class="menu-item" href="https://stormbpmn.com/app/diagram/6a9c167a-c2fb-4bf3-b690-3253f7de3a7f?o=7ffd" target="_blank">BPMN</a>
+                    </div>
+                </details>
             </aside>
 
-            <!-- ПРАВАЯ ОБЛАСТЬ: ПОЛЕЗНЫЕ ССЫЛКИ -->
+            <!-- ПРАВАЯ ОБЛАСТЬ (пустая, под будущее) -->
             <div class="content-area">
-                <div class="links-title"><span>🔗</span>Полезные ссылки</div>
-
-                <!-- Группа: Управление компанией -->
-                <div class="links-group">
-                    <div class="links-group-title"><span>🎯</span>Управление компанией</div>
-                    <div class="links-grid">
-                        <a class="link-card" target="_blank" href="https://docs.google.com/spreadsheets/d/1cJGvUwr0DC3f2bRh_5Q2VeivtDyhpmpqOWYbvPEWjgs/edit?usp=share_link">
-                            <span class="lc-name">Функциональная стратегия</span>
-                            <span class="lc-desc">Стратегическое планирование</span>
-                        </a>
-                        <a class="link-card" target="_blank" href="https://docs.google.com/spreadsheets/d/1iYyzAie6x3H5nWO0biFXoZp694YhS5Qp/edit?usp=sharing&ouid=111894160779270511410&rtpof=true&sd=true">
-                            <span class="lc-name">Реестр платежей</span>
-                            <span class="lc-desc">Управление и отслеживание платежей</span>
-                        </a>
-                        <a class="link-card" target="_blank" href="https://docs.google.com/spreadsheets/d/1idpmes30UDhTsB_y4STfLmdXz-BXnhiS/edit?gid=207979019#gid=207979019">
-                            <span class="lc-name">Реестр цен</span>
-                            <span class="lc-desc">Актуальные цены на товары</span>
-                        </a>
-                        <a class="link-card" target="_blank" href="https://docs.google.com/spreadsheets/d/1ysw0hr94GwfgEwpHswODbFGVoey311Xey-1RgGPpCkI/edit?gid=1040966828#gid=1040966828">
-                            <span class="lc-name">План продаж Ozon</span>
-                            <span class="lc-desc">Планирование и анализ продаж</span>
-                        </a>
-                        <a class="link-card" target="_blank" href="https://docs.google.com/spreadsheets/d/1dzhhdjCeNe4-cwU4_y-2caX6PvO9TG3yAxBH2OB_VEY/edit">
-                            <span class="lc-name">Схема RACI</span>
-                            <span class="lc-desc">Матрица ответственности</span>
-                        </a>
-                        <a class="link-card" target="_blank" href="https://stormbpmn.com/app/diagram/6a9c167a-c2fb-4bf3-b690-3253f7de3a7f?o=7ffd">
-                            <span class="lc-name">BPMN</span>
-                            <span class="lc-desc">Моделирование бизнес-процессов</span>
-                        </a>
-                    </div>
-                </div>
-
-                <!-- Группа: Коммерческая деятельность -->
-                <div class="links-group">
-                    <div class="links-group-title"><span>💼</span>Коммерческая деятельность</div>
-                    <div class="links-grid">
-                        <a class="link-card" target="_blank" href="https://docs.google.com/spreadsheets/d/1QggOaNjI7y-i3xZIiZrdVH_q1xsmHYpMwVRH9n1wliY/edit?gid=203679960#gid=203679960">
-                            <span class="lc-name">Маркетинговая стратегия</span>
-                            <span class="lc-desc">План маркетинговых активностей</span>
-                        </a>
-                        <a class="link-card" target="_blank" href="https://docs.google.com/spreadsheets/d/1dKzV0kQJ2PADrCe96x8_pyL5-KhAITRqFV7jhxaonP0/edit?usp=sharing">
-                            <span class="lc-name">Бюджет</span>
-                            <span class="lc-desc">Финансовый расчёт и окупаемость</span>
-                        </a>
-                        <a class="link-card" target="_blank" href="https://docs.google.com/spreadsheets/d/1SuU4fVKUs26E78qdnChItDIWAQkInPX_cK5l2UCTV78/edit?gid=360342603#gid=360342603">
-                            <span class="lc-name">Реестр товаров СТМ</span>
-                            <span class="lc-desc">Товары собственной торговой марки</span>
-                        </a>
-                        <a class="link-card" target="_blank" href="https://docs.google.com/spreadsheets/d/1GwyVCyQQKBKnU67JPtECjiwYPUyzPQwCh3zIF1AtsaI/edit?usp=sharing">
-                            <span class="lc-name">Отчет инфографика</span>
-                            <span class="lc-desc">Отчёт по работе с инфографикой</span>
-                        </a>
-                        <a class="link-card" target="_blank" href="https://docs.google.com/spreadsheets/d/110zZ6aGFr3LzqiZKfnfMQubTwGmztEmPN0n2AmRoXBw/edit?usp=sharing">
-                            <span class="lc-name">Отчет реклама</span>
-                            <span class="lc-desc">Эффективность рекламных кампаний</span>
-                        </a>
-                        <a class="link-card" target="_blank" href="https://docs.google.com/spreadsheets/d/18iaMB0iAT4fKAFd-tFfMopklFzAb8cKGXwqRSyxX7AQ/edit?gid=116615647#gid=116615647">
-                            <span class="lc-name">Управленческая отчетность</span>
-                            <span class="lc-desc">Сводный, РНП, P&L для маркетплейсов</span>
-                        </a>
-                        <a class="link-card" target="_blank" href="https://docs.google.com/spreadsheets/d/144n5raWV8mKbBdRQ8pEEfcgc8T_WaNzQ7NDWhRLQnSw/edit?">
-                            <span class="lc-name">Юнит-экономика для МП</span>
-                            <span class="lc-desc">Доходы и расходы на единицу товара</span>
-                        </a>
-                        <a class="link-card" target="_blank" href="https://docs.google.com/spreadsheets/d/1cnkJ7KJQL-3PdwEJN0Shpr6MiVUNElAoYKbzigbrrsU/edit?usp=sharing">
-                            <span class="lc-name">Таблица РНП by Александр</span>
-                            <span class="lc-desc">Инструмент регулярного менеджмента</span>
-                        </a>
-                        <a class="link-card" target="_blank" href="https://docs.google.com/spreadsheets/d/1Rg4JiBIx0Znn-QJKvZ_sMCBrrOiXDLygExsfztJnlZ4/edit?gid=942743257#gid=942743257">
-                            <span class="lc-name">Таблица РНП by Алекс</span>
-                            <span class="lc-desc">Инструмент регулярного менеджмента</span>
-                        </a>
-                        <a class="link-card" target="_blank" href="https://docs.google.com/spreadsheets/d/1B9nOTn5kvCp4UMax5L9uE46TNc785onp/edit?gid=1415273616#gid=1415273616">
-                            <span class="lc-name">Отчет менеджера</span>
-                            <span class="lc-desc">Отчёт менеджера по деятельности</span>
-                        </a>
-                        <a class="link-card" target="_blank" href="https://docs.google.com/spreadsheets/d/1e9aBsZ4R_rC2ILQNB45bG3bQYaXL7Y3spiecBjl1QLw/edit?gid=1925528841#gid=1925528841">
-                            <span class="lc-name">Маркетинговое обоснование товара</span>
-                            <span class="lc-desc">Анализ спроса и обоснование</span>
-                        </a>
-                        <a class="link-card" target="_blank" href="https://docs.google.com/spreadsheets/d/1cRTfpp1U6B6pKtuikuR8BumBLZLd5KEskz_v50e90ys/edit?usp=sharing">
-                            <span class="lc-name">Коммерческое обоснование товара</span>
-                            <span class="lc-desc">Коммерческий анализ товара</span>
-                        </a>
-                    </div>
+                <div class="placeholder">
+                    <div class="placeholder-icon">📊</div>
+                    <div class="placeholder-text">Область для контента</div>
+                    <div class="placeholder-sub">Здесь будут размещены дашборды, метрики или другой контент</div>
                 </div>
             </div>
         </div>
