@@ -12,7 +12,7 @@
             font-family: 'Forum', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #78A6C7 0%, #E33D78 50%, #7D3673 100%);
             padding: 16px;
-            overflow: hidden; /* экран статичен, скроллятся только колонки */
+            overflow: hidden;
         }
         .container { max-width: 1700px; margin: 0 auto; height: 100%; display: flex; flex-direction: column; gap: 16px; }
 
@@ -34,7 +34,7 @@
             text-shadow: 0 2px 8px rgba(28, 13, 46, 0.4); letter-spacing: 2px;
         }
 
-        /* === LAYOUT: колонки тянутся под экран, скролл внутри === */
+        /* === LAYOUT === */
         .main-layout {
             flex: 1; min-height: 0;
             display: grid;
@@ -115,22 +115,20 @@
         .menu-item:hover { background: rgba(255, 255, 255, 0.25); transform: translateX(3px); }
         .menu-item:last-child { margin-bottom: 0; }
 
-        /* === ПРАВАЯ КОЛОНКА (скролл внутри, если не влезает) === */
-        .content-area { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 16px;
-            scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.4) transparent; }
-        .content-area::-webkit-scrollbar { width: 6px; }
-        .content-area::-webkit-scrollbar-thumb { background: rgba(255,255,255,.35); border-radius: 3px; }
-
+        /* === ПРАВАЯ КОЛОНКА: карточка ровно под высоту экрана === */
+        .content-area { min-height: 0; overflow: hidden; display: flex; }
         .glass-card {
+            flex: 1; min-height: 0;
+            display: flex; flex-direction: column;
             background: rgba(255, 255, 255, 0.12);
             backdrop-filter: blur(20px) saturate(1.4); -webkit-backdrop-filter: blur(20px) saturate(1.4);
             border: 1px solid rgba(255, 255, 255, 0.3);
-            border-radius: 16px; padding: 16px 20px;
+            border-radius: 16px; padding: 14px 18px;
             box-shadow: 0 8px 32px rgba(28, 13, 46, 0.2);
             color: #fff;
         }
-        .card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-family: 'Forum', serif; flex-wrap: wrap; }
-        .card-title { font-size: 1.1em; font-weight: 400; text-shadow: 0 1px 3px rgba(0,0,0,.3); }
+        .card-head { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-family: 'Forum', serif; flex-wrap: wrap; }
+        .card-title { font-size: 1.15em; font-weight: 400; text-shadow: 0 1px 3px rgba(0,0,0,.3); }
         .week-select-glass {
             margin-left: auto; padding: 5px 10px;
             border: 1px solid rgba(255,255,255,.4); border-radius: 8px;
@@ -140,14 +138,15 @@
         .week-select-glass:focus { outline: none; border-color: #E33D78; }
         .week-select-glass option { color: #333; background: #fff; }
 
-        /* график прямо на стекле */
+        /* график тянется под оставшуюся высоту карточки */
         .chart-box {
-            position: relative;
+            flex: 1; min-height: 0;
+            position: relative; display: flex;
             background: rgba(255, 255, 255, 0.08);
             border: 1px solid rgba(255, 255, 255, 0.22);
-            border-radius: 12px; padding: 8px 6px 4px;
+            border-radius: 12px; padding: 6px;
         }
-        .chart-box svg { width: 100%; height: auto; max-height: 62vh; display: block; }
+        .chart-box svg { width: 100%; height: 100%; display: block; }
         .chart-tooltip {
             position: absolute; display: none; pointer-events: none;
             background: rgba(28, 13, 46, 0.92); color: white; padding: 8px 12px; border-radius: 8px;
@@ -161,35 +160,33 @@
         .pulse-bad { animation: pulseBad 3s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
         @keyframes pulseBad { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.35); opacity: 0.7; } }
 
-        /* легенда как в private: 3 колонки, компактно */
-        .legend-bottom { display: flex; gap: 18px; flex-wrap: wrap; justify-content: space-between; margin-top: 10px; padding: 0 4px; }
+        /* легенда: 3 колонки, компактно */
+        .legend-bottom { flex: 0 0 auto; display: flex; gap: 18px; flex-wrap: wrap; justify-content: space-between; margin-top: 8px; padding: 0 4px; }
         .legend-col { display: flex; flex-direction: column; gap: 4px; }
         .legend-item { display: inline-flex; align-items: center; gap: 7px; font-family: 'Forum', serif; color: rgba(255,255,255,.9); font-size: .72em; text-shadow: 0 1px 3px rgba(0,0,0,.25); }
         .sw { width: 30px; height: 3px; display: inline-block; border-radius: 2px; flex: 0 0 auto; }
-        .sw.dash-pink { background: repeating-linear-gradient(90deg, #E33D78 0 6px, transparent 6px 10px); }
-        .sw.solid-pink { background: #E33D78; }
-        .sw.dash-amber { background: repeating-linear-gradient(90deg, #F59E0B 0 6px, transparent 6px 10px); }
-        .sw.solid-amber { background: #F59E0B; }
-        .sw.dash-teal { background: repeating-linear-gradient(90deg, #14b8a6 0 6px, transparent 6px 10px); }
-        .sw.solid-teal { background: #14b8a6; }
+        .sw.dash-white { background: repeating-linear-gradient(90deg, #ffffff 0 6px, transparent 6px 10px); }
+        .sw.solid-white { background: #ffffff; }
+        .sw.dash-yellow { background: repeating-linear-gradient(90deg, #fde047 0 6px, transparent 6px 10px); }
+        .sw.solid-yellow { background: #fde047; }
+        .sw.dash-teal { background: repeating-linear-gradient(90deg, #5eead4 0 6px, transparent 6px 10px); }
+        .sw.solid-teal { background: #5eead4; }
         .sw.solid-plum { background: #c084fc; }
-        .sw.pale-green { background: #22c55e; opacity: 0.45; }
+        .sw.pale-green { background: #86efac; opacity: 0.5; }
 
         /* === АДАПТАЦИЯ === */
-        @media (max-width: 1100px) {
-            .main-layout { grid-template-columns: 260px 1fr; }
-        }
+        @media (max-width: 1100px) { .main-layout { grid-template-columns: 260px 1fr; } }
         @media (max-width: 900px) {
             body { overflow: auto; height: auto; padding: 10px; }
             .container { height: auto; }
             .main-layout { display: flex; flex-direction: column; }
             .sidebar, .content-area { overflow: visible; min-height: auto; }
+            .content-area { display: block; }
+            .glass-card { display: block; }
+            .chart-box { display: block; min-height: 340px; }
+            .chart-box svg { height: auto; }
             .company-name { font-size: 1.5em; }
             .legend-bottom { flex-direction: column; gap: 8px; }
-            .chart-box svg { max-height: none; }
-        }
-        @media (min-height: 1200px) {
-            .chart-box svg { max-height: 70vh; }
         }
     </style>
 </head>
@@ -278,24 +275,23 @@
                 </details>
             </aside>
 
-            <!-- ПРАВАЯ КОЛОНКА: живой график на стекле -->
+            <!-- ПРАВАЯ КОЛОНКА -->
             <div class="content-area">
                 <div class="glass-card">
                     <div class="card-head">
-                        <span style="font-size:1.25em">📊</span>
-                        <span class="card-title">Сводные фин. показатели</span>
+                        <span class="card-title">Финансовое здоровье</span>
                         <select class="week-select-glass" id="weekSelect"></select>
                     </div>
                     <div class="chart-box" id="chartBoxRub"><div class="chart-tooltip" id="tooltipRub"></div></div>
                     <div class="legend-bottom">
                         <div class="legend-col">
-                            <div class="legend-item"><span class="sw dash-pink"></span>План маржи</div>
-                            <div class="legend-item"><span class="sw solid-pink"></span>Прогноз маржи</div>
+                            <div class="legend-item"><span class="sw dash-white"></span>План маржи</div>
+                            <div class="legend-item"><span class="sw solid-white"></span>Прогноз маржи</div>
                             <div class="legend-item"><span class="sw solid-plum"></span>Факт маржи накопит. итогом (отклонение от плана)</div>
                         </div>
                         <div class="legend-col">
-                            <div class="legend-item"><span class="sw dash-amber"></span>План маржинальности</div>
-                            <div class="legend-item"><span class="sw solid-amber"></span>Факт маржинальности</div>
+                            <div class="legend-item"><span class="sw dash-yellow"></span>План маржинальности</div>
+                            <div class="legend-item"><span class="sw solid-yellow"></span>Факт маржинальности</div>
                         </div>
                         <div class="legend-col">
                             <div class="legend-item"><span class="sw dash-teal"></span>План заказы</div>
@@ -310,7 +306,7 @@
     </div>
 
     <script>
-        // === движок графика из private.html, палитра адаптирована под glass ===
+        // === движок графика из private.html, палитра под glass ===
         const CHART_DATA = {};
         const GROUP_NAMES = ['Уход для волос','Уход для лица','Маникюр и педикюр','Парфюмерия','Инструменты','Краска для волос','Аксессуары','SPA-уход','Наборы','Уход для тела'];
         const C_UP = '#4ade80', C_DOWN = '#f87171';
@@ -376,10 +372,10 @@
             const scaleD = Math.max(...ordersDaily.map(o => o.rub), 1);
 
             const x = i => padL + inset + (n === 1 ? dataW / 2 : dataW * i / (n - 1));
-            // палитра под glass: яркие серии + светлый «plum» для накопительных фактов
-            const C_PCS = '#2dd4bf', C_MARGIN = '#f472b6', C_PCT = '#fbbf24', C_ORD = '#4ade80', C_FACT = '#c084fc';
+            // контрастная палитра под glass: маржа — белый, маржинальность — жёлтый
+            const C_PCS = '#5eead4', C_MARGIN = '#ffffff', C_PCT = '#fde047', C_ORD = '#86efac', C_FACT = '#c084fc';
 
-            let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
+            let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`;
             [1, 2].forEach(q => { svg += `<line x1="${padL}" y1="${qTop(q)}" x2="${plotRight}" y2="${qTop(q)}" stroke="${GRID}" stroke-width="1" stroke-dasharray="2 4"/>`; });
             svg += `<line x1="${padL}" y1="${baseY}" x2="${plotRight}" y2="${baseY}" stroke="${BASELINE}" stroke-width="1.5"/>`;
             weeks.forEach((w, i) => { svg += `<line x1="${x(i)}" y1="${padT}" x2="${x(i)}" y2="${baseY}" stroke="${GRID}" stroke-width="1" stroke-dasharray="2 4"/>`; });
@@ -421,7 +417,7 @@
                 let pl = fmtRubShort(v);
                 if (dW !== null) { const dp = dW / weekOrdPcs[i - 1] * 100; const col = dW >= 0 ? C_UP : C_DOWN; const sg = dW >= 0 ? '+' : '−'; pl += ` <tspan fill="${col}">(${sg}${Math.abs(dW).toLocaleString('ru-RU')} шт / ${sg}${Math.abs(dp).toLocaleString('ru-RU', { maximumFractionDigits: 1 })}%)</tspan>`; }
                 svg += `<circle class="chart-point${bad ? ' pulse-bad' : ''}" cx="${px}" cy="${py}" r="4" fill="${bad ? C_DOWN : C_FACT}" data-label="Факт заказов, ${weekLabels[i]}" data-value="${tip}"/>`;
-                svg += `<text x="${px}" y="${py + 16}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${bad ? C_DOWN : C_FACT}" font-family="Forum">${pl}</text>`;
+                svg += `<text class="vlbl" x="${px}" y="${py + 16}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${bad ? C_DOWN : C_FACT}" font-family="Forum">${pl}</text>`;
             });
             if (projPcs.length > 1) { let p = `M ${x(0)} ${yBand(0, projPcs[0], scaleA.max)}`; projPcs.forEach((v, i) => { if (i > 0) p += ` L ${x(i)} ${yBand(0, v, scaleA.max)}`; }); svg += `<path d="${p}" fill="none" stroke="${C_PCS}" stroke-width="2.5" stroke-linecap="round"/>`; }
             projPcs.forEach((v, i) => {
@@ -430,8 +426,8 @@
                 const bad = dev < 0;
                 const col = dev >= 0 ? C_UP : C_DOWN; const sg = dev >= 0 ? '+' : '−';
                 const paren = ` <tspan fill="${col}">(${sg}${fmtRubShort(Math.abs(dev))} / ${sg}${Math.abs(devP).toLocaleString('ru-RU', { maximumFractionDigits: 1 })}%)</tspan>`;
-                svg += `<circle class="chart-point${bad ? ' pulse-bad' : ''}" cx="${x(i)}" cy="${py}" r="4" fill="white" stroke="${bad ? C_DOWN : C_PCS}" stroke-width="2.5" data-label="Заказы (прогноз), ${weekLabels[i]}" data-value="${v.toLocaleString('ru-RU')} шт."/>`;
-                svg += `<text x="${x(i)}" y="${py - 9}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${bad ? C_DOWN : C_PCS}" font-family="Forum">${fmtRubShort(v)}${paren}</text>`;
+                svg += `<circle class="chart-point${bad ? ' pulse-bad' : ''}" cx="${x(i)}" cy="${py}" r="4" fill="rgba(28,13,46,0.85)" stroke="${bad ? C_DOWN : C_PCS}" stroke-width="2.5" data-label="Заказы (прогноз), ${weekLabels[i]}" data-value="${v.toLocaleString('ru-RU')} шт."/>`;
+                svg += `<text class="vlbl" x="${x(i)}" y="${py - 9}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${bad ? C_DOWN : C_PCS}" font-family="Forum">${fmtRubShort(v)}${paren}</text>`;
             });
 
             const planY = yBand(1, plan, scaleB.max);
@@ -449,7 +445,7 @@
                 svg += `<circle class="chart-point${bad ? ' pulse-bad' : ''}" cx="${px}" cy="${py}" r="4.5" fill="${bad ? C_DOWN : C_FACT}" data-label="Факт недели ${weekLabels[i]}" data-value="${tip}"/>`;
                 let ly = py - 11; if (ly < qTop(1) + 9) ly = py + 19;
                 if (typeof lineVals[i] === 'number' && Math.abs(py - yBand(1, lineVals[i], scaleB.max)) < 22) ly = py + 19;
-                svg += `<text x="${px}" y="${ly}" text-anchor="middle" font-size="10" font-weight="700" fill="${bad ? C_DOWN : C_FACT}" font-family="Forum">${pl}</text>`;
+                svg += `<text class="vlbl" x="${px}" y="${ly}" text-anchor="middle" font-size="10" font-weight="700" fill="${bad ? C_DOWN : C_FACT}" font-family="Forum">${pl}</text>`;
             });
             if (lineVals.length > 1) { let l = `M ${x(0)} ${yBand(1, lineVals[0], scaleB.max)}`; lineVals.forEach((v, i) => { if (i > 0) l += ` L ${x(i)} ${yBand(1, v, scaleB.max)}`; }); svg += `<path class="chart-line" d="${l}" fill="none" stroke="${C_MARGIN}" stroke-width="3" stroke-linecap="round"/>`; }
             lineVals.forEach((v, i) => {
@@ -458,9 +454,9 @@
                 const bad = dev < 0;
                 const col = dev >= 0 ? C_UP : C_DOWN; const sg = dev >= 0 ? '+' : '−';
                 const paren = ` <tspan fill="${col}">(${sg}${fmtMillions(Math.abs(dev))} млн / ${sg}${Math.abs(devP).toLocaleString('ru-RU', { maximumFractionDigits: 1 })}%)</tspan>`;
-                svg += `<circle class="chart-point${bad ? ' pulse-bad' : ''}" cx="${x(i)}" cy="${py}" r="6" fill="white" stroke="${bad ? C_DOWN : C_MARGIN}" stroke-width="3" data-label="Прогноз, ${weekLabels[i]}" data-value="${fmtRub(v)}"/>`;
+                svg += `<circle class="chart-point${bad ? ' pulse-bad' : ''}" cx="${x(i)}" cy="${py}" r="6" fill="rgba(28,13,46,0.85)" stroke="${bad ? C_DOWN : C_MARGIN}" stroke-width="3" data-label="Прогноз, ${weekLabels[i]}" data-value="${fmtRub(v)}"/>`;
                 let flY = py - 11; if (flY < qTop(1) + 9) flY = py + 19;
-                svg += `<text x="${x(i)}" y="${flY}" text-anchor="middle" font-size="10" font-weight="700" fill="${bad ? C_DOWN : C_MARGIN}" font-family="Forum">${fmtRubShort(v)}${paren}</text>`;
+                svg += `<text class="vlbl" x="${x(i)}" y="${flY}" text-anchor="middle" font-size="10" font-weight="700" fill="${bad ? C_DOWN : C_MARGIN}" font-family="Forum">${fmtRubShort(v)}${paren}</text>`;
             });
 
             const ppY = yBand(2, pctPlan, scaleC.max);
@@ -471,14 +467,29 @@
                 const dev = v - pctPlan; const bad = dev < 0;
                 const col = dev >= 0 ? C_UP : C_DOWN; const sg = dev >= 0 ? '+' : '−';
                 const paren = ` <tspan fill="${col}">(${sg}${Math.abs(dev).toLocaleString('ru-RU', { maximumFractionDigits: 1 })} п.п.)</tspan>`;
-                svg += `<circle class="chart-point${bad ? ' pulse-bad' : ''}" cx="${x(i)}" cy="${py}" r="4.5" fill="white" stroke="${bad ? C_DOWN : C_PCT}" stroke-width="2.5" data-label="Маржинальность, ${weekLabels[i]}" data-value="${fmtPct(v)}"/>`;
-                svg += `<text x="${x(i)}" y="${py - 9}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${bad ? C_DOWN : C_PCT}" font-family="Forum">${fmtPct(v)}${paren}</text>`;
+                svg += `<circle class="chart-point${bad ? ' pulse-bad' : ''}" cx="${x(i)}" cy="${py}" r="4.5" fill="rgba(28,13,46,0.85)" stroke="${bad ? C_DOWN : C_PCT}" stroke-width="2.5" data-label="Маржинальность, ${weekLabels[i]}" data-value="${fmtPct(v)}"/>`;
+                svg += `<text class="vlbl" x="${x(i)}" y="${py - 9}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${bad ? C_DOWN : C_PCT}" font-family="Forum">${fmtPct(v)}${paren}</text>`;
             });
 
             weeks.forEach((w, i) => { svg += `<text x="${x(i)}" y="${baseY + 18}" text-anchor="middle" font-size="12" font-weight="700" fill="${TXT_WEEK}" font-family="Forum">${weekLabels[i]}</text>`; svg += `<text x="${x(i)}" y="${baseY + 33}" text-anchor="middle" font-size="9" fill="${TXT_SUB}" font-family="Forum">${fmtShort(w.start)}–${fmtShort(w.end)}</text>`; });
             svg += `</svg>`;
             box.querySelectorAll('svg').forEach(el => el.remove());
             box.insertAdjacentHTML('beforeend', svg);
+
+            // стеклянные подложки-чипы под каждую подпись значения
+            box.querySelectorAll('text.vlbl').forEach(t => {
+                const b = t.getBBox();
+                const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                r.setAttribute('x', (b.x - 6).toFixed(1));
+                r.setAttribute('y', (b.y - 3).toFixed(1));
+                r.setAttribute('width', (b.width + 12).toFixed(1));
+                r.setAttribute('height', (b.height + 6).toFixed(1));
+                r.setAttribute('rx', 6);
+                r.setAttribute('fill', 'rgba(255,255,255,0.14)');
+                r.setAttribute('stroke', 'rgba(255,255,255,0.25)');
+                r.setAttribute('stroke-width', '1');
+                t.parentNode.insertBefore(r, t);
+            });
 
             const path = box.querySelector('.chart-line');
             if (path) { const len = path.getTotalLength(); path.style.strokeDasharray = len; path.style.strokeDashoffset = len; path.getBoundingClientRect(); path.style.transition = 'stroke-dashoffset 1s ease'; path.style.strokeDashoffset = '0'; }
