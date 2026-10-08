@@ -40,7 +40,7 @@
             align-items: start;
         }
 
-        /* === ЛЕВОЕ МЕНЮ (glass, сворачиваемое, со скроллом) === */
+        /* === ЛЕВОЕ МЕНЮ (glass) === */
         .sidebar {
             background: rgba(255, 255, 255, 0.15);
             backdrop-filter: blur(20px) saturate(1.4); -webkit-backdrop-filter: blur(20px) saturate(1.4);
@@ -96,13 +96,11 @@
         details.subsection[open] > summary::after { transform: rotate(90deg); }
         details.subsection[open] > summary { margin-bottom: 6px; }
 
-        /* вложенность третьего уровня */
         details.subsection .menu-item { margin-left: 8px; }
         details.subsection .sub-link { margin-left: 8px; }
         details.subsection details.subsection { margin-left: 8px; }
         details.subsection details.subsection > summary { font-size: .95em; color: rgba(255,255,255,.8); }
 
-        /* Ссылка уровня подраздела (Сводный отчёт, Калькулятор потребности) */
         .sub-link {
             display: flex; align-items: center;
             font-size: .88em; font-weight: 600; color: #fff;
@@ -129,52 +127,51 @@
         .menu-item:hover { background: rgba(255, 255, 255, 0.25); transform: translateX(3px); }
         .menu-item:last-child { margin-bottom: 0; }
 
-        /* === ПРАВАЯ ОБЛАСТЬ (графическая карточка) === */
-        .content-area {
-            display: flex; flex-direction: column; gap: 20px;
-        }
+        /* === ПРАВАЯ ОБЛАСТЬ: glass-карточка с графиком === */
+        .content-area { display: flex; flex-direction: column; gap: 20px; }
         .glass-card {
             background: rgba(255, 255, 255, 0.12);
             backdrop-filter: blur(20px) saturate(1.4); -webkit-backdrop-filter: blur(20px) saturate(1.4);
             border: 1px solid rgba(255, 255, 255, 0.3);
             border-radius: 16px;
-            padding: 24px;
+            padding: 22px 24px;
             box-shadow: 0 8px 32px rgba(28, 13, 46, 0.2);
             color: #fff;
         }
-        .card-head {
-            display: flex; align-items: center; gap: 10px;
-            margin-bottom: 18px; font-family: 'Forum', serif;
+        .card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; font-family: 'Forum', serif; flex-wrap: wrap; }
+        .card-title { font-size: 1.2em; font-weight: 400; text-shadow: 0 1px 3px rgba(0,0,0,.3); }
+        .card-badge {
+            margin-left: auto; font-size: .8em; padding: 4px 12px;
+            border: 1px solid rgba(255,255,255,.4); border-radius: 8px;
+            background: rgba(255,255,255,.12); white-space: nowrap;
         }
-        .card-title { font-size: 1.15em; font-weight: 400; text-shadow: 0 1px 3px rgba(0,0,0,.3); }
-        .card-subtitle { font-size: .85em; opacity: .75; margin-left: auto; }
 
+        /* светлая матовая подложка под SVG, чтобы цвета читались как в private.html */
         .chart-box {
-            background: rgba(255, 255, 255, 0.08);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid rgba(255, 255, 255, 0.5);
             border-radius: 12px;
-            padding: 16px 14px 10px;
-            margin-bottom: 14px;
+            padding: 10px 8px 6px;
         }
-        .chart-svg { width: 100%; height: auto; display: block; }
+        .chart-box svg { width: 100%; height: auto; display: block; }
 
-        .chart-legend {
-            display: flex; flex-wrap: wrap; gap: 18px;
-            padding: 4px 6px; font-size: .85em; font-family: 'Forum', serif;
+        .legend-bottom {
+            display: flex; gap: 26px; flex-wrap: wrap; justify-content: space-between;
+            margin-top: 14px; padding: 0 4px;
         }
-        .legend-item { display: inline-flex; align-items: center; gap: 7px; }
-        .legend-sw { width: 24px; height: 3px; border-radius: 2px; display: inline-block; }
-        .legend-sw-dashed {
-            width: 24px; height: 0;
-            border-top: 2.5px dashed;
-            display: inline-block;
-        }
+        .legend-col { display: flex; flex-direction: column; gap: 6px; }
+        .legend-item { display: inline-flex; align-items: center; gap: 8px; font-family: 'Forum', serif; color: rgba(255,255,255,.92); font-size: .82em; text-shadow: 0 1px 3px rgba(0,0,0,.25); }
+        .sw { width: 34px; height: 3px; display: inline-block; border-radius: 2px; flex: 0 0 auto; }
+        .sw.dash-pink { background: repeating-linear-gradient(90deg, #E33D78 0 6px, transparent 6px 10px); }
+        .sw.solid-pink { background: #E33D78; }
+        .sw.dash-amber { background: repeating-linear-gradient(90deg, #F59E0B 0 6px, transparent 6px 10px); }
+        .sw.solid-amber { background: #F59E0B; }
+        .sw.dash-teal { background: repeating-linear-gradient(90deg, #14b8a6 0 6px, transparent 6px 10px); }
+        .sw.solid-teal { background: #14b8a6; }
+        .sw.solid-plum { background: #7D3673; }
+        .sw.pale-green { background: #22c55e; opacity: 0.4; }
 
-        .placeholder {
-            text-align: center; color: rgba(255,255,255,.75);
-            font-family: 'Forum', serif; padding: 20px 0;
-        }
-        .placeholder-sub { font-size: .9em; opacity: .7; margin-top: 6px; }
+        .card-note { margin-top: 12px; font-size: .8em; color: rgba(255,255,255,.65); font-family: 'Forum', serif; }
 
         /* === МОБИЛЬНАЯ АДАПТАЦИЯ === */
         @media (max-width: 900px) {
@@ -183,6 +180,7 @@
             body { padding: 10px; }
             .header { padding: 15px 20px; }
             .company-name { font-size: 1.6em; }
+            .legend-bottom { flex-direction: column; gap: 10px; }
         }
     </style>
 </head>
@@ -200,7 +198,7 @@
             <!-- ЛЕВОЕ МЕНЮ -->
             <aside class="sidebar">
 
-                <!-- 1. УПРАВЛЕНИЕ КОМПАНИЕЙ (первый блок) -->
+                <!-- УПРАВЛЕНИЕ КОМПАНИЕЙ -->
                 <details class="menu-section">
                     <summary>🎯 Управление компанией</summary>
                     <div class="section-body">
@@ -212,28 +210,22 @@
                     </div>
                 </details>
 
-                <!-- 2. КОММЕРЧЕСКАЯ ДЕЯТЕЛЬНОСТЬ (раскрыта по умолчанию) -->
+                <!-- КОММЕРЧЕСКАЯ ДЕЯТЕЛЬНОСТЬ -->
                 <details class="menu-section" open>
                     <summary>💼 Коммерческая деятельность</summary>
                     <div class="section-body">
-
-                        <!-- Блок ИП (без «Управление продажами») -->
                         <details class="subsection">
                             <summary>👤 ИП Колдомов</summary>
                             <a class="sub-link" href="https://maximsnz.github.io/beautyart/private.html" target="_blank">🔒 Сводный отчёт</a>
                             <a class="menu-item" href="https://maximsnz.github.io/beautyart/weekly.html" target="_blank">Управление остатками</a>
                             <a class="menu-item" href="https://maximsnz.github.io/beautyart/plan.html" target="_blank">Реализация плана продаж</a>
                         </details>
-
-                        <!-- Блок ООО -->
                         <details class="subsection">
                             <summary>🏢 ООО Beauty Art</summary>
                             <a class="sub-link" href="https://maximsnz.github.io/beautyart-ooo/private.html" target="_blank">🔒 Сводный отчёт</a>
                             <a class="menu-item" href="https://maximsnz.github.io/beautyart-ooo/weekly.html" target="_blank">Управление остатками</a>
                             <a class="menu-item" href="https://maximsnz.github.io/beautyart-ooo/plan.html" target="_blank">Реализация плана продаж</a>
                         </details>
-
-                        <!-- Прочее -->
                         <details class="subsection">
                             <summary>Прочее</summary>
                             <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1dKzV0kQJ2PADrCe96x8_pyL5-KhAITRqFV7jhxaonP0/edit?usp=sharing" target="_blank">Бюджет</a>
@@ -251,7 +243,7 @@
                     </div>
                 </details>
 
-                <!-- 3. ЛОГИСТИКА И ДОСТАВКА -->
+                <!-- ЛОГИСТИКА И ДОСТАВКА -->
                 <details class="menu-section">
                     <summary>🚚 Логистика и доставка</summary>
                     <div class="section-body">
@@ -275,68 +267,152 @@
 
             </aside>
 
-            <!-- ПРАВАЯ ОБЛАСТЬ: glass-карточка с графиком -->
+            <!-- ПРАВАЯ ОБЛАСТЬ: график как в private.html, в glass-карточке -->
             <div class="content-area">
                 <div class="glass-card">
                     <div class="card-head">
-                        <span style="font-size:1.3em">📈</span>
-                        <span class="card-title">Сводные отклонения по рынкам</span>
-                        <span class="card-subtitle">шт/день за последние 30 дней</span>
+                        <span style="font-size:1.3em">📊</span>
+                        <span class="card-title">Сводные фин. показатели</span>
+                        <span class="card-badge">Нед 40 · 28.09–04.10</span>
                     </div>
 
                     <div class="chart-box">
-                        <svg class="chart-svg" viewBox="0 0 800 320" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
-                            <!-- Оси -->
-                            <line x1="50" y1="20" x2="50" y2="280" stroke="rgba(255,255,255,0.4)" stroke-width="1.2"/>
-                            <line x1="50" y1="150" x2="770" y2="150" stroke="rgba(255,255,255,0.3)" stroke-width="1" stroke-dasharray="3 4"/>
-                            <line x1="50" y1="280" x2="770" y2="280" stroke="rgba(255,255,255,0.4)" stroke-width="1.2"/>
+                        <svg viewBox="0 0 900 600" xmlns="http://www.w3.org/2000/svg">
+                            <!-- сетка -->
+                            <line x1="110" y1="206" x2="790" y2="206" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="2 4"/>
+                            <line x1="110" y1="378" x2="790" y2="378" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="2 4"/>
+                            <line x1="110" y1="550" x2="790" y2="550" stroke="#94a3b8" stroke-width="1.5"/>
+                            <line x1="145" y1="34" x2="145" y2="550" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="2 4"/>
+                            <line x1="348.3" y1="34" x2="348.3" y2="550" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="2 4"/>
+                            <line x1="551.7" y1="34" x2="551.7" y2="550" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="2 4"/>
+                            <line x1="755" y1="34" x2="755" y2="550" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="2 4"/>
 
-                            <!-- Горизонтальные сетки -->
-                            <line x1="50" y1="85" x2="770" y2="85" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
-                            <line x1="50" y1="215" x2="770" y2="215" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+                            <!-- === ЛЕНТА 0: Заказы === -->
+                            <text x="6" y="40" font-size="12" font-weight="700" fill="#14b8a6" font-family="Forum">Заказы, шт</text>
+                            <text x="894" y="40" text-anchor="end" font-size="12" font-weight="700" fill="#22c55e" font-family="Forum">Заказы, млн. руб.</text>
+                            <line x1="96" y1="47.8" x2="96" y2="192.2" stroke="#14b8a6" stroke-width="1.5"/>
+                            <line x1="92" y1="192.2" x2="96" y2="192.2" stroke="#14b8a6" stroke-width="1.5"/>
+                            <line x1="92" y1="47.8" x2="96" y2="47.8" stroke="#14b8a6" stroke-width="1.5"/>
+                            <text x="89" y="196" text-anchor="end" font-size="10.5" fill="#14b8a6" opacity="0.7" font-family="Forum">0 тыс</text>
+                            <text x="89" y="52" text-anchor="end" font-size="10.5" fill="#14b8a6" opacity="0.7" font-family="Forum">80 тыс</text>
+                            <line x1="91" y1="80.3" x2="96" y2="80.3" stroke="#14b8a6" stroke-width="2.5"/>
+                            <text x="89" y="84" text-anchor="end" font-size="11.5" font-weight="700" fill="#14b8a6" font-family="Forum">62 тыс</text>
+                            <line x1="804" y1="47.8" x2="804" y2="192.2" stroke="#22c55e" stroke-width="1.5"/>
+                            <text x="811" y="196" font-size="10.5" fill="#22c55e" opacity="0.7" font-family="Forum">0</text>
+                            <text x="811" y="52" font-size="10.5" fill="#22c55e" opacity="0.7" font-family="Forum">6,08</text>
 
-                            <!-- Метки оси Y -->
-                            <text x="44" y="24" text-anchor="end" fill="rgba(255,255,255,0.7)" font-family="Forum" font-size="11">+40</text>
-                            <text x="44" y="89" text-anchor="end" fill="rgba(255,255,255,0.6)" font-family="Forum" font-size="11">+20</text>
-                            <text x="44" y="154" text-anchor="end" fill="rgba(255,255,255,0.8)" font-family="Forum" font-size="11">0</text>
-                            <text x="44" y="219" text-anchor="end" fill="rgba(255,255,255,0.6)" font-family="Forum" font-size="11">−20</text>
-                            <text x="44" y="284" text-anchor="end" fill="rgba(255,255,255,0.7)" font-family="Forum" font-size="11">−40</text>
+                            <!-- дневной ряд (бледно-зелёный) -->
+                            <polyline fill="none" stroke="#22c55e" stroke-width="1.5" opacity="0.3" stroke-linecap="round" stroke-linejoin="round"
+                                points="145,65.8 185.7,60.4 226.3,67.6 267,56.8 307.7,111 348.3,112.8 389,62.2 429.7,55 470.3,51.4 511,109.2 551.7,111 592.3,49.6 633,53.2 673.7,47.8 714.3,112.8 755,114.6"/>
+                            <!-- план заказы (пунктир) -->
+                            <line x1="110" y1="80.3" x2="790" y2="80.3" stroke="#14b8a6" stroke-width="2" stroke-dasharray="6 6"/>
+                            <!-- факт накопительно (plum) -->
+                            <polyline fill="none" stroke="#7D3673" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+                                points="145,161.5 348.3,129 551.7,100.1 755,67.6"/>
+                            <circle cx="145" cy="161.5" r="4" fill="#7D3673"/>
+                            <circle cx="348.3" cy="129" r="4" fill="#7D3673"/>
+                            <circle cx="551.7" cy="100.1" r="4" fill="#dc2626"/>
+                            <circle cx="755" cy="67.6" r="4" fill="#7D3673"/>
+                            <text x="145" y="179.5" text-anchor="middle" font-size="10" font-weight="700" fill="#7D3673" font-family="Forum">17 тыс</text>
+                            <text x="348.3" y="147" text-anchor="middle" font-size="10" font-weight="700" fill="#7D3673" font-family="Forum">35 тыс <tspan fill="#16a34a">(+609 шт / +3,6%)</tspan></text>
+                            <text x="551.7" y="118.1" text-anchor="middle" font-size="10" font-weight="700" fill="#dc2626" font-family="Forum">51 тыс <tspan fill="#dc2626">(−1 082 шт / −6,1%)</tspan></text>
+                            <text x="755" y="85.6" text-anchor="middle" font-size="10" font-weight="700" fill="#7D3673" font-family="Forum">69 тыс <tspan fill="#16a34a">(+990 шт / +6%)</tspan></text>
+                            <!-- прогноз заказы (teal) -->
+                            <polyline fill="none" stroke="#14b8a6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+                                points="145,65.8 348.3,60.4 551.7,73.1 755,67.6"/>
+                            <circle cx="145" cy="65.8" r="4" fill="white" stroke="#14b8a6" stroke-width="2.5"/>
+                            <circle cx="348.3" cy="60.4" r="4" fill="white" stroke="#14b8a6" stroke-width="2.5"/>
+                            <circle cx="551.7" cy="73.1" r="4" fill="white" stroke="#14b8a6" stroke-width="2.5"/>
+                            <circle cx="755" cy="67.6" r="4" fill="white" stroke="#14b8a6" stroke-width="2.5"/>
+                            <text x="145" y="55.8" text-anchor="middle" font-size="10" font-weight="700" fill="#14b8a6" font-family="Forum">70 тыс <tspan fill="#16a34a">(+8 тыс / +12,8%)</tspan></text>
+                            <text x="348.3" y="50.4" text-anchor="middle" font-size="10" font-weight="700" fill="#14b8a6" font-family="Forum">73 тыс <tspan fill="#16a34a">(+11 тыс / +18%)</tspan></text>
+                            <text x="551.7" y="63.1" text-anchor="middle" font-size="10" font-weight="700" fill="#14b8a6" font-family="Forum">66 тыс <tspan fill="#16a34a">(+4 тыс / +7,1%)</tspan></text>
+                            <text x="755" y="57.6" text-anchor="middle" font-size="10" font-weight="700" fill="#14b8a6" font-family="Forum">69 тыс <tspan fill="#16a34a">(+7 тыс / +11,4%)</tspan></text>
 
-                            <!-- Линии Ильи -->
-                            <!-- увеличить продажи (сплошная) -->
-                            <polyline fill="none" stroke="#E33D78" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
-                                points="60,170 100,155 140,130 180,110 220,95 260,120 300,140 340,125 380,105 420,85 460,70 500,90 540,115 580,100 620,80 660,95 700,110 740,95"/>
-                            <!-- снизить продажи (пунктирная) -->
-                            <polyline fill="none" stroke="#E33D78" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="6 5" opacity="0.85"
-                                points="60,140 100,155 140,170 180,190 220,210 260,195 300,180 340,200 380,215 420,230 460,215 500,200 540,185 580,205 620,220 660,205 700,190 740,205"/>
+                            <!-- === ЛЕНТА 1: Маржа === -->
+                            <text x="894" y="212" text-anchor="end" font-size="12" font-weight="700" fill="#E33D78" font-family="Forum">Маржа, млн. руб.</text>
+                            <line x1="804" y1="219.8" x2="804" y2="364.2" stroke="#E33D78" stroke-width="1.5"/>
+                            <text x="811" y="368" font-size="10.5" fill="#E33D78" opacity="0.7" font-family="Forum">0</text>
+                            <text x="811" y="224" font-size="10.5" fill="#E33D78" opacity="0.7" font-family="Forum">2</text>
+                            <line x1="804" y1="262.4" x2="809" y2="262.4" stroke="#E33D78" stroke-width="2.5"/>
+                            <text x="811" y="266" font-size="11.5" font-weight="700" fill="#E33D78" font-family="Forum">1,41</text>
+                            <!-- план маржи (пунктир) -->
+                            <line x1="110" y1="262.4" x2="790" y2="262.4" stroke="#E33D78" stroke-width="2.5" stroke-dasharray="8 6"/>
+                            <!-- факт маржи накопительно (plum) -->
+                            <polyline fill="none" stroke="#7D3673" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+                                points="145,343.3 348.3,313.7 551.7,292 755,260.9"/>
+                            <circle cx="145" cy="343.3" r="4.5" fill="#7D3673"/>
+                            <circle cx="348.3" cy="313.7" r="4.5" fill="#7D3673"/>
+                            <circle cx="551.7" cy="292" r="4.5" fill="#dc2626"/>
+                            <circle cx="755" cy="260.9" r="4.5" fill="#7D3673"/>
+                            <text x="145" y="331.3" text-anchor="middle" font-size="10.5" font-weight="700" fill="#7D3673" font-family="Forum">290 тыс</text>
+                            <text x="348.3" y="301.7" text-anchor="middle" font-size="10.5" font-weight="700" fill="#7D3673" font-family="Forum">700 тыс <tspan fill="#16a34a">(+120 тыс / +41,4%)</tspan></text>
+                            <text x="551.7" y="280" text-anchor="middle" font-size="10.5" font-weight="700" fill="#dc2626" font-family="Forum">1 млн <tspan fill="#dc2626">(−110 тыс / −26,8%)</tspan></text>
+                            <text x="755" y="282.9" text-anchor="middle" font-size="10.5" font-weight="700" fill="#7D3673" font-family="Forum">1,43 млн <tspan fill="#16a34a">(+130 тыс / +43,3%)</tspan></text>
+                            <!-- прогноз маржи (pink) -->
+                            <polyline fill="none" stroke="#E33D78" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"
+                                points="145,284.1 348.3,263.1 551.7,266 755,260.9"/>
+                            <circle cx="145" cy="284.1" r="6" fill="white" stroke="#dc2626" stroke-width="3"/>
+                            <circle cx="348.3" cy="263.1" r="6" fill="white" stroke="#dc2626" stroke-width="3"/>
+                            <circle cx="551.7" cy="266" r="6" fill="white" stroke="#dc2626" stroke-width="3"/>
+                            <circle cx="755" cy="260.9" r="6" fill="white" stroke="#dc2626" stroke-width="3"/>
+                            <text x="145" y="272.1" text-anchor="middle" font-size="10.5" font-weight="700" fill="#E33D78" font-family="Forum">1,11 млн <tspan fill="#dc2626">(−0,52 млн / −31,7%)</tspan></text>
+                            <text x="348.3" y="251.1" text-anchor="middle" font-size="10.5" font-weight="700" fill="#E33D78" font-family="Forum">1,4 млн <tspan fill="#dc2626">(−0,22 млн / −13,4%)</tspan></text>
+                            <text x="551.7" y="254" text-anchor="middle" font-size="10.5" font-weight="700" fill="#E33D78" font-family="Forum">1,36 млн <tspan fill="#dc2626">(−0,27 млн / −16,4%)</tspan></text>
+                            <text x="755" y="248.9" text-anchor="middle" font-size="10.5" font-weight="700" fill="#E33D78" font-family="Forum">1,43 млн <tspan fill="#dc2626">(−0,2 млн / −12,3%)</tspan></text>
 
-                            <!-- Линии Ольги -->
-                            <!-- увеличить продажи (сплошная) -->
-                            <polyline fill="none" stroke="#78A6C7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
-                                points="60,160 100,180 140,175 180,155 220,140 260,130 300,115 340,135 380,155 420,140 460,125 500,110 540,130 580,145 620,130 660,115 700,130 740,120"/>
-                            <!-- снизить продажи (пунктирная) -->
-                            <polyline fill="none" stroke="#78A6C7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="6 5" opacity="0.85"
-                                points="60,155 100,140 140,145 180,165 220,180 260,175 300,190 340,185 380,170 420,180 460,195 500,210 540,195 580,180 620,195 660,205 700,190 740,200"/>
+                            <!-- === ЛЕНТА 2: Маржинальность === -->
+                            <text x="6" y="384" font-size="12" font-weight="700" fill="#d97706" font-family="Forum">Маржинальность, %</text>
+                            <line x1="96" y1="391.8" x2="96" y2="536.2" stroke="#d97706" stroke-width="1.5"/>
+                            <text x="89" y="540" text-anchor="end" font-size="10.5" fill="#d97706" opacity="0.7" font-family="Forum">0</text>
+                            <text x="89" y="396" text-anchor="end" font-size="10.5" fill="#d97706" opacity="0.7" font-family="Forum">30</text>
+                            <line x1="91" y1="425" x2="96" y2="425" stroke="#d97706" stroke-width="2.5"/>
+                            <text x="89" y="429" text-anchor="end" font-size="11.5" font-weight="700" fill="#d97706" font-family="Forum">23,1</text>
+                            <!-- план маржинальности (пунктир) -->
+                            <line x1="110" y1="425" x2="790" y2="425" stroke="#F59E0B" stroke-width="2" stroke-dasharray="6 6"/>
+                            <!-- факт маржинальности (amber) -->
+                            <polyline fill="none" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+                                points="145,408.6 348.3,429.3 551.7,443.3 755,413.9"/>
+                            <circle cx="145" cy="408.6" r="4.5" fill="white" stroke="#F59E0B" stroke-width="2.5"/>
+                            <circle cx="348.3" cy="429.3" r="4.5" fill="white" stroke="#dc2626" stroke-width="2.5"/>
+                            <circle cx="551.7" cy="443.3" r="4.5" fill="white" stroke="#dc2626" stroke-width="2.5"/>
+                            <circle cx="755" cy="413.9" r="4.5" fill="white" stroke="#F59E0B" stroke-width="2.5"/>
+                            <text x="145" y="398.6" text-anchor="middle" font-size="10" font-weight="700" fill="#d97706" font-family="Forum">26,5% <tspan fill="#16a34a">(+3,4 п.п.)</tspan></text>
+                            <text x="348.3" y="419.3" text-anchor="middle" font-size="10" font-weight="700" fill="#dc2626" font-family="Forum">22,2% <tspan fill="#dc2626">(−0,9 п.п.)</tspan></text>
+                            <text x="551.7" y="433.3" text-anchor="middle" font-size="10" font-weight="700" fill="#dc2626" font-family="Forum">19,3% <tspan fill="#dc2626">(−3,8 п.п.)</tspan></text>
+                            <text x="755" y="403.9" text-anchor="middle" font-size="10" font-weight="700" fill="#d97706" font-family="Forum">25,4% <tspan fill="#16a34a">(+2,3 п.п.)</tspan></text>
 
-                            <!-- Подписи дат по оси X -->
-                            <text x="60"  y="300" text-anchor="middle" fill="rgba(255,255,255,0.55)" font-family="Forum" font-size="10">07.09</text>
-                            <text x="240" y="300" text-anchor="middle" fill="rgba(255,255,255,0.55)" font-family="Forum" font-size="10">14.09</text>
-                            <text x="420" y="300" text-anchor="middle" fill="rgba(255,255,255,0.55)" font-family="Forum" font-size="10">21.09</text>
-                            <text x="600" y="300" text-anchor="middle" fill="rgba(255,255,255,0.55)" font-family="Forum" font-size="10">28.09</text>
-                            <text x="740" y="300" text-anchor="middle" fill="rgba(255,255,255,0.75)" font-family="Forum" font-size="10" font-weight="700">07.10</text>
+                            <!-- ось X -->
+                            <text x="145" y="572" text-anchor="middle" font-size="13" font-weight="700" fill="#544273" font-family="Forum">Нед 37</text>
+                            <text x="145" y="590" text-anchor="middle" font-size="10" fill="#94a3b8" font-family="Forum">07.09–13.09</text>
+                            <text x="348.3" y="572" text-anchor="middle" font-size="13" font-weight="700" fill="#544273" font-family="Forum">Нед 38</text>
+                            <text x="348.3" y="590" text-anchor="middle" font-size="10" fill="#94a3b8" font-family="Forum">14.09–20.09</text>
+                            <text x="551.7" y="572" text-anchor="middle" font-size="13" font-weight="700" fill="#544273" font-family="Forum">Нед 39</text>
+                            <text x="551.7" y="590" text-anchor="middle" font-size="10" fill="#94a3b8" font-family="Forum">21.09–27.09</text>
+                            <text x="755" y="572" text-anchor="middle" font-size="13" font-weight="700" fill="#544273" font-family="Forum">Нед 40</text>
+                            <text x="755" y="590" text-anchor="middle" font-size="10" fill="#94a3b8" font-family="Forum">28.09–04.10</text>
                         </svg>
                     </div>
 
-                    <div class="chart-legend">
-                        <span class="legend-item"><span class="legend-sw" style="background:#E33D78"></span>Илья — увеличить продажи</span>
-                        <span class="legend-item"><span class="legend-sw-dashed" style="border-color:#E33D78"></span>Илья — снизить продажи</span>
-                        <span class="legend-item"><span class="legend-sw" style="background:#78A6C7"></span>Ольга — увеличить продажи</span>
-                        <span class="legend-item"><span class="legend-sw-dashed" style="border-color:#78A6C7"></span>Ольга — снизить продажи</span>
+                    <div class="legend-bottom">
+                        <div class="legend-col">
+                            <div class="legend-item"><span class="sw dash-pink"></span>План маржи</div>
+                            <div class="legend-item"><span class="sw solid-pink"></span>Прогноз маржи</div>
+                            <div class="legend-item"><span class="sw solid-plum"></span>Факт маржи накопит. итогом (отклонение от плана)</div>
+                        </div>
+                        <div class="legend-col">
+                            <div class="legend-item"><span class="sw dash-amber"></span>План маржинальности</div>
+                            <div class="legend-item"><span class="sw solid-amber"></span>Факт маржинальности</div>
+                        </div>
+                        <div class="legend-col">
+                            <div class="legend-item"><span class="sw dash-teal"></span>План заказы</div>
+                            <div class="legend-item"><span class="sw solid-teal"></span>Прогноз заказы</div>
+                            <div class="legend-item"><span class="sw solid-plum"></span>Факт заказы накопит. итогом (динамика от прошлого периода)</div>
+                            <div class="legend-item"><span class="sw pale-green"></span>Заказы, млн (день)</div>
+                        </div>
                     </div>
 
-                    <div class="placeholder" style="margin-top:14px;padding:0">
-                        <div class="placeholder-sub">Нажмите на «Сводный отчёт» в меню, чтобы открыть полную аналитику</div>
-                    </div>
+                    <div class="card-note">* Данные демонстрационные. Живой график с выбором недели, разбивкой по группам товаров и протоколом планёрки — в разделе «🔒 Сводный отчёт».</div>
                 </div>
             </div>
         </div>
