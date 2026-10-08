@@ -33,27 +33,18 @@
         }
 
         /* === LAYOUT === */
-        .main-layout {
-            display: grid;
-            grid-template-columns: 300px 1fr;
-            gap: 20px;
-            align-items: start;
-        }
+        .main-layout { display: grid; grid-template-columns: 300px 1fr; gap: 20px; align-items: start; }
 
         /* === ЛЕВОЕ МЕНЮ (glass) === */
         .sidebar {
             background: rgba(255, 255, 255, 0.15);
             backdrop-filter: blur(20px) saturate(1.4); -webkit-backdrop-filter: blur(20px) saturate(1.4);
             border: 1px solid rgba(255, 255, 255, 0.3);
-            border-radius: 16px;
-            padding: 14px;
+            border-radius: 16px; padding: 14px;
             box-shadow: 0 8px 32px rgba(28, 13, 46, 0.2);
-            position: sticky; top: 20px;
-            color: #fff;
-            max-height: calc(100vh - 40px);
-            overflow-y: auto;
-            scrollbar-width: thin;
-            scrollbar-color: rgba(255,255,255,.4) transparent;
+            position: sticky; top: 20px; color: #fff;
+            max-height: calc(100vh - 40px); overflow-y: auto;
+            scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.4) transparent;
         }
         .sidebar::-webkit-scrollbar { width: 6px; }
         .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,.35); border-radius: 3px; }
@@ -68,17 +59,13 @@
             padding: 9px 12px; border-radius: 10px;
             background: rgba(255, 255, 255, 0.12);
             border: 1px solid rgba(255, 255, 255, 0.25);
-            text-shadow: 0 1px 3px rgba(0,0,0,.25);
-            transition: background .2s;
+            text-shadow: 0 1px 3px rgba(0,0,0,.25); transition: background .2s;
         }
         details.menu-section > summary:hover { background: rgba(255, 255, 255, 0.22); }
         details.menu-section > summary::-webkit-details-marker { display: none; }
-        details.menu-section > summary::after {
-            content: '▸'; margin-left: auto; font-size: .8em; transition: transform .2s;
-        }
+        details.menu-section > summary::after { content: '▸'; margin-left: auto; font-size: .8em; transition: transform .2s; }
         details.menu-section[open] > summary::after { transform: rotate(90deg); }
         details.menu-section[open] > summary { margin-bottom: 8px; }
-
         .section-body { padding: 0 4px 4px; }
 
         details.subsection { margin: 6px 0; }
@@ -90,12 +77,9 @@
             text-shadow: 0 1px 3px rgba(0,0,0,.25);
         }
         details.subsection > summary::-webkit-details-marker { display: none; }
-        details.subsection > summary::after {
-            content: '▸'; margin-left: auto; font-size: .75em; transition: transform .2s;
-        }
+        details.subsection > summary::after { content: '▸'; margin-left: auto; font-size: .75em; transition: transform .2s; }
         details.subsection[open] > summary::after { transform: rotate(90deg); }
         details.subsection[open] > summary { margin-bottom: 6px; }
-
         details.subsection .menu-item { margin-left: 8px; }
         details.subsection .sub-link { margin-left: 8px; }
         details.subsection details.subsection { margin-left: 8px; }
@@ -105,60 +89,65 @@
             display: flex; align-items: center;
             font-size: .88em; font-weight: 600; color: #fff;
             padding: 5px 8px; margin: 6px 0;
-            border-left: 3px solid #E33D78;
-            border-radius: 0 8px 8px 0;
+            border-left: 3px solid #E33D78; border-radius: 0 8px 8px 0;
             background: rgba(227, 61, 120, 0.18);
-            text-decoration: none;
-            text-shadow: 0 1px 3px rgba(0,0,0,.25);
-            transition: background .2s;
+            text-decoration: none; text-shadow: 0 1px 3px rgba(0,0,0,.25); transition: background .2s;
         }
         .sub-link:hover { background: rgba(227, 61, 120, 0.35); }
 
         .menu-item {
             display: block; padding: 6px 10px 6px 14px; margin-bottom: 4px;
             background: rgba(255, 255, 255, 0.10);
-            border: 1px solid rgba(255, 255, 255, 0.18);
-            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 8px;
             text-decoration: none; color: #fff;
             font-family: 'Forum', serif; font-size: .84em;
-            text-shadow: 0 1px 3px rgba(0,0,0,.25);
-            transition: background .2s, transform .2s;
+            text-shadow: 0 1px 3px rgba(0,0,0,.25); transition: background .2s, transform .2s;
         }
         .menu-item:hover { background: rgba(255, 255, 255, 0.25); transform: translateX(3px); }
         .menu-item:last-child { margin-bottom: 0; }
 
-        /* === ПРАВАЯ ОБЛАСТЬ: glass-карточка с графиком === */
+        /* === ПРАВАЯ ОБЛАСТЬ: glass-карточка с ЖИВЫМ графиком === */
         .content-area { display: flex; flex-direction: column; gap: 20px; }
         .glass-card {
             background: rgba(255, 255, 255, 0.12);
             backdrop-filter: blur(20px) saturate(1.4); -webkit-backdrop-filter: blur(20px) saturate(1.4);
             border: 1px solid rgba(255, 255, 255, 0.3);
-            border-radius: 16px;
-            padding: 22px 24px;
+            border-radius: 16px; padding: 20px 22px;
             box-shadow: 0 8px 32px rgba(28, 13, 46, 0.2);
             color: #fff;
         }
-        .card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; font-family: 'Forum', serif; flex-wrap: wrap; }
-        .card-title { font-size: 1.2em; font-weight: 400; text-shadow: 0 1px 3px rgba(0,0,0,.3); }
-        .card-badge {
-            margin-left: auto; font-size: .8em; padding: 4px 12px;
+        .card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; font-family: 'Forum', serif; flex-wrap: wrap; }
+        .card-title { font-size: 1.15em; font-weight: 400; text-shadow: 0 1px 3px rgba(0,0,0,.3); }
+        .week-select-glass {
+            margin-left: auto; padding: 6px 10px;
             border: 1px solid rgba(255,255,255,.4); border-radius: 8px;
-            background: rgba(255,255,255,.12); white-space: nowrap;
+            font-family: 'Forum', serif; font-size: .85em; color: #fff;
+            background: rgba(255,255,255,.15); cursor: pointer; max-width: 240px;
         }
+        .week-select-glass:focus { outline: none; border-color: #E33D78; }
+        .week-select-glass option { color: #333; background: #fff; }
 
-        /* светлая матовая подложка под SVG, чтобы цвета читались как в private.html */
+        /* светлая матовая подложка: цветные подписи читаются как в private.html */
         .chart-box {
+            position: relative;
             background: rgba(255, 255, 255, 0.92);
             border: 1px solid rgba(255, 255, 255, 0.5);
-            border-radius: 12px;
-            padding: 10px 8px 6px;
+            border-radius: 12px; padding: 8px 6px 4px;
         }
         .chart-box svg { width: 100%; height: auto; display: block; }
-
-        .legend-bottom {
-            display: flex; gap: 26px; flex-wrap: wrap; justify-content: space-between;
-            margin-top: 14px; padding: 0 4px;
+        .chart-tooltip {
+            position: absolute; display: none; pointer-events: none;
+            background: #1C0D2E; color: white; padding: 8px 12px; border-radius: 8px;
+            font-family: 'Forum', serif; font-size: 0.85em; line-height: 1.4;
+            transform: translate(-50%, -100%); white-space: nowrap;
+            box-shadow: 0 4px 12px rgba(28, 13, 46, 0.4); z-index: 5;
         }
+        .chart-tooltip strong { color: #E33D78; display: block; }
+        .chart-point { cursor: pointer; }
+        .pulse-bad { animation: pulseBad 3s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+        @keyframes pulseBad { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.35); opacity: 0.7; } }
+
+        .legend-bottom { display: flex; gap: 26px; flex-wrap: wrap; justify-content: space-between; margin-top: 14px; padding: 0 4px; }
         .legend-col { display: flex; flex-direction: column; gap: 6px; }
         .legend-item { display: inline-flex; align-items: center; gap: 8px; font-family: 'Forum', serif; color: rgba(255,255,255,.92); font-size: .82em; text-shadow: 0 1px 3px rgba(0,0,0,.25); }
         .sw { width: 34px; height: 3px; display: inline-block; border-radius: 2px; flex: 0 0 auto; }
@@ -170,10 +159,8 @@
         .sw.solid-teal { background: #14b8a6; }
         .sw.solid-plum { background: #7D3673; }
         .sw.pale-green { background: #22c55e; opacity: 0.4; }
-
         .card-note { margin-top: 12px; font-size: .8em; color: rgba(255,255,255,.65); font-family: 'Forum', serif; }
 
-        /* === МОБИЛЬНАЯ АДАПТАЦИЯ === */
         @media (max-width: 900px) {
             .main-layout { grid-template-columns: 1fr; }
             .sidebar { position: static; max-height: none; }
@@ -186,7 +173,6 @@
 </head>
 <body>
     <div class="container">
-        <!-- ШАПКА -->
         <div class="header">
             <a href="index.html" class="logo-link" title="На главную">
                 <img src="https://i.ibb.co/ZzbPQmQt/IMG-8031.png" alt="Beauty Art Logo" class="logo">
@@ -197,8 +183,6 @@
         <div class="main-layout">
             <!-- ЛЕВОЕ МЕНЮ -->
             <aside class="sidebar">
-
-                <!-- УПРАВЛЕНИЕ КОМПАНИЕЙ -->
                 <details class="menu-section">
                     <summary>🎯 Управление компанией</summary>
                     <div class="section-body">
@@ -210,7 +194,6 @@
                     </div>
                 </details>
 
-                <!-- КОММЕРЧЕСКАЯ ДЕЯТЕЛЬНОСТЬ -->
                 <details class="menu-section" open>
                     <summary>💼 Коммерческая деятельность</summary>
                     <div class="section-body">
@@ -243,7 +226,6 @@
                     </div>
                 </details>
 
-                <!-- ЛОГИСТИКА И ДОСТАВКА -->
                 <details class="menu-section">
                     <summary>🚚 Логистика и доставка</summary>
                     <div class="section-body">
@@ -264,136 +246,17 @@
                         </details>
                     </div>
                 </details>
-
             </aside>
 
-            <!-- ПРАВАЯ ОБЛАСТЬ: график как в private.html, в glass-карточке -->
+            <!-- ПРАВАЯ ОБЛАСТЬ: живой график -->
             <div class="content-area">
                 <div class="glass-card">
                     <div class="card-head">
-                        <span style="font-size:1.3em">📊</span>
+                        <span style="font-size:1.25em">📊</span>
                         <span class="card-title">Сводные фин. показатели</span>
-                        <span class="card-badge">Нед 40 · 28.09–04.10</span>
+                        <select class="week-select-glass" id="weekSelect"></select>
                     </div>
-
-                    <div class="chart-box">
-                        <svg viewBox="0 0 900 600" xmlns="http://www.w3.org/2000/svg">
-                            <!-- сетка -->
-                            <line x1="110" y1="206" x2="790" y2="206" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="2 4"/>
-                            <line x1="110" y1="378" x2="790" y2="378" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="2 4"/>
-                            <line x1="110" y1="550" x2="790" y2="550" stroke="#94a3b8" stroke-width="1.5"/>
-                            <line x1="145" y1="34" x2="145" y2="550" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="2 4"/>
-                            <line x1="348.3" y1="34" x2="348.3" y2="550" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="2 4"/>
-                            <line x1="551.7" y1="34" x2="551.7" y2="550" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="2 4"/>
-                            <line x1="755" y1="34" x2="755" y2="550" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="2 4"/>
-
-                            <!-- === ЛЕНТА 0: Заказы === -->
-                            <text x="6" y="40" font-size="12" font-weight="700" fill="#14b8a6" font-family="Forum">Заказы, шт</text>
-                            <text x="894" y="40" text-anchor="end" font-size="12" font-weight="700" fill="#22c55e" font-family="Forum">Заказы, млн. руб.</text>
-                            <line x1="96" y1="47.8" x2="96" y2="192.2" stroke="#14b8a6" stroke-width="1.5"/>
-                            <line x1="92" y1="192.2" x2="96" y2="192.2" stroke="#14b8a6" stroke-width="1.5"/>
-                            <line x1="92" y1="47.8" x2="96" y2="47.8" stroke="#14b8a6" stroke-width="1.5"/>
-                            <text x="89" y="196" text-anchor="end" font-size="10.5" fill="#14b8a6" opacity="0.7" font-family="Forum">0 тыс</text>
-                            <text x="89" y="52" text-anchor="end" font-size="10.5" fill="#14b8a6" opacity="0.7" font-family="Forum">80 тыс</text>
-                            <line x1="91" y1="80.3" x2="96" y2="80.3" stroke="#14b8a6" stroke-width="2.5"/>
-                            <text x="89" y="84" text-anchor="end" font-size="11.5" font-weight="700" fill="#14b8a6" font-family="Forum">62 тыс</text>
-                            <line x1="804" y1="47.8" x2="804" y2="192.2" stroke="#22c55e" stroke-width="1.5"/>
-                            <text x="811" y="196" font-size="10.5" fill="#22c55e" opacity="0.7" font-family="Forum">0</text>
-                            <text x="811" y="52" font-size="10.5" fill="#22c55e" opacity="0.7" font-family="Forum">6,08</text>
-
-                            <!-- дневной ряд (бледно-зелёный) -->
-                            <polyline fill="none" stroke="#22c55e" stroke-width="1.5" opacity="0.3" stroke-linecap="round" stroke-linejoin="round"
-                                points="145,65.8 185.7,60.4 226.3,67.6 267,56.8 307.7,111 348.3,112.8 389,62.2 429.7,55 470.3,51.4 511,109.2 551.7,111 592.3,49.6 633,53.2 673.7,47.8 714.3,112.8 755,114.6"/>
-                            <!-- план заказы (пунктир) -->
-                            <line x1="110" y1="80.3" x2="790" y2="80.3" stroke="#14b8a6" stroke-width="2" stroke-dasharray="6 6"/>
-                            <!-- факт накопительно (plum) -->
-                            <polyline fill="none" stroke="#7D3673" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
-                                points="145,161.5 348.3,129 551.7,100.1 755,67.6"/>
-                            <circle cx="145" cy="161.5" r="4" fill="#7D3673"/>
-                            <circle cx="348.3" cy="129" r="4" fill="#7D3673"/>
-                            <circle cx="551.7" cy="100.1" r="4" fill="#dc2626"/>
-                            <circle cx="755" cy="67.6" r="4" fill="#7D3673"/>
-                            <text x="145" y="179.5" text-anchor="middle" font-size="10" font-weight="700" fill="#7D3673" font-family="Forum">17 тыс</text>
-                            <text x="348.3" y="147" text-anchor="middle" font-size="10" font-weight="700" fill="#7D3673" font-family="Forum">35 тыс <tspan fill="#16a34a">(+609 шт / +3,6%)</tspan></text>
-                            <text x="551.7" y="118.1" text-anchor="middle" font-size="10" font-weight="700" fill="#dc2626" font-family="Forum">51 тыс <tspan fill="#dc2626">(−1 082 шт / −6,1%)</tspan></text>
-                            <text x="755" y="85.6" text-anchor="middle" font-size="10" font-weight="700" fill="#7D3673" font-family="Forum">69 тыс <tspan fill="#16a34a">(+990 шт / +6%)</tspan></text>
-                            <!-- прогноз заказы (teal) -->
-                            <polyline fill="none" stroke="#14b8a6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
-                                points="145,65.8 348.3,60.4 551.7,73.1 755,67.6"/>
-                            <circle cx="145" cy="65.8" r="4" fill="white" stroke="#14b8a6" stroke-width="2.5"/>
-                            <circle cx="348.3" cy="60.4" r="4" fill="white" stroke="#14b8a6" stroke-width="2.5"/>
-                            <circle cx="551.7" cy="73.1" r="4" fill="white" stroke="#14b8a6" stroke-width="2.5"/>
-                            <circle cx="755" cy="67.6" r="4" fill="white" stroke="#14b8a6" stroke-width="2.5"/>
-                            <text x="145" y="55.8" text-anchor="middle" font-size="10" font-weight="700" fill="#14b8a6" font-family="Forum">70 тыс <tspan fill="#16a34a">(+8 тыс / +12,8%)</tspan></text>
-                            <text x="348.3" y="50.4" text-anchor="middle" font-size="10" font-weight="700" fill="#14b8a6" font-family="Forum">73 тыс <tspan fill="#16a34a">(+11 тыс / +18%)</tspan></text>
-                            <text x="551.7" y="63.1" text-anchor="middle" font-size="10" font-weight="700" fill="#14b8a6" font-family="Forum">66 тыс <tspan fill="#16a34a">(+4 тыс / +7,1%)</tspan></text>
-                            <text x="755" y="57.6" text-anchor="middle" font-size="10" font-weight="700" fill="#14b8a6" font-family="Forum">69 тыс <tspan fill="#16a34a">(+7 тыс / +11,4%)</tspan></text>
-
-                            <!-- === ЛЕНТА 1: Маржа === -->
-                            <text x="894" y="212" text-anchor="end" font-size="12" font-weight="700" fill="#E33D78" font-family="Forum">Маржа, млн. руб.</text>
-                            <line x1="804" y1="219.8" x2="804" y2="364.2" stroke="#E33D78" stroke-width="1.5"/>
-                            <text x="811" y="368" font-size="10.5" fill="#E33D78" opacity="0.7" font-family="Forum">0</text>
-                            <text x="811" y="224" font-size="10.5" fill="#E33D78" opacity="0.7" font-family="Forum">2</text>
-                            <line x1="804" y1="262.4" x2="809" y2="262.4" stroke="#E33D78" stroke-width="2.5"/>
-                            <text x="811" y="266" font-size="11.5" font-weight="700" fill="#E33D78" font-family="Forum">1,41</text>
-                            <!-- план маржи (пунктир) -->
-                            <line x1="110" y1="262.4" x2="790" y2="262.4" stroke="#E33D78" stroke-width="2.5" stroke-dasharray="8 6"/>
-                            <!-- факт маржи накопительно (plum) -->
-                            <polyline fill="none" stroke="#7D3673" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
-                                points="145,343.3 348.3,313.7 551.7,292 755,260.9"/>
-                            <circle cx="145" cy="343.3" r="4.5" fill="#7D3673"/>
-                            <circle cx="348.3" cy="313.7" r="4.5" fill="#7D3673"/>
-                            <circle cx="551.7" cy="292" r="4.5" fill="#dc2626"/>
-                            <circle cx="755" cy="260.9" r="4.5" fill="#7D3673"/>
-                            <text x="145" y="331.3" text-anchor="middle" font-size="10.5" font-weight="700" fill="#7D3673" font-family="Forum">290 тыс</text>
-                            <text x="348.3" y="301.7" text-anchor="middle" font-size="10.5" font-weight="700" fill="#7D3673" font-family="Forum">700 тыс <tspan fill="#16a34a">(+120 тыс / +41,4%)</tspan></text>
-                            <text x="551.7" y="280" text-anchor="middle" font-size="10.5" font-weight="700" fill="#dc2626" font-family="Forum">1 млн <tspan fill="#dc2626">(−110 тыс / −26,8%)</tspan></text>
-                            <text x="755" y="282.9" text-anchor="middle" font-size="10.5" font-weight="700" fill="#7D3673" font-family="Forum">1,43 млн <tspan fill="#16a34a">(+130 тыс / +43,3%)</tspan></text>
-                            <!-- прогноз маржи (pink) -->
-                            <polyline fill="none" stroke="#E33D78" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"
-                                points="145,284.1 348.3,263.1 551.7,266 755,260.9"/>
-                            <circle cx="145" cy="284.1" r="6" fill="white" stroke="#dc2626" stroke-width="3"/>
-                            <circle cx="348.3" cy="263.1" r="6" fill="white" stroke="#dc2626" stroke-width="3"/>
-                            <circle cx="551.7" cy="266" r="6" fill="white" stroke="#dc2626" stroke-width="3"/>
-                            <circle cx="755" cy="260.9" r="6" fill="white" stroke="#dc2626" stroke-width="3"/>
-                            <text x="145" y="272.1" text-anchor="middle" font-size="10.5" font-weight="700" fill="#E33D78" font-family="Forum">1,11 млн <tspan fill="#dc2626">(−0,52 млн / −31,7%)</tspan></text>
-                            <text x="348.3" y="251.1" text-anchor="middle" font-size="10.5" font-weight="700" fill="#E33D78" font-family="Forum">1,4 млн <tspan fill="#dc2626">(−0,22 млн / −13,4%)</tspan></text>
-                            <text x="551.7" y="254" text-anchor="middle" font-size="10.5" font-weight="700" fill="#E33D78" font-family="Forum">1,36 млн <tspan fill="#dc2626">(−0,27 млн / −16,4%)</tspan></text>
-                            <text x="755" y="248.9" text-anchor="middle" font-size="10.5" font-weight="700" fill="#E33D78" font-family="Forum">1,43 млн <tspan fill="#dc2626">(−0,2 млн / −12,3%)</tspan></text>
-
-                            <!-- === ЛЕНТА 2: Маржинальность === -->
-                            <text x="6" y="384" font-size="12" font-weight="700" fill="#d97706" font-family="Forum">Маржинальность, %</text>
-                            <line x1="96" y1="391.8" x2="96" y2="536.2" stroke="#d97706" stroke-width="1.5"/>
-                            <text x="89" y="540" text-anchor="end" font-size="10.5" fill="#d97706" opacity="0.7" font-family="Forum">0</text>
-                            <text x="89" y="396" text-anchor="end" font-size="10.5" fill="#d97706" opacity="0.7" font-family="Forum">30</text>
-                            <line x1="91" y1="425" x2="96" y2="425" stroke="#d97706" stroke-width="2.5"/>
-                            <text x="89" y="429" text-anchor="end" font-size="11.5" font-weight="700" fill="#d97706" font-family="Forum">23,1</text>
-                            <!-- план маржинальности (пунктир) -->
-                            <line x1="110" y1="425" x2="790" y2="425" stroke="#F59E0B" stroke-width="2" stroke-dasharray="6 6"/>
-                            <!-- факт маржинальности (amber) -->
-                            <polyline fill="none" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
-                                points="145,408.6 348.3,429.3 551.7,443.3 755,413.9"/>
-                            <circle cx="145" cy="408.6" r="4.5" fill="white" stroke="#F59E0B" stroke-width="2.5"/>
-                            <circle cx="348.3" cy="429.3" r="4.5" fill="white" stroke="#dc2626" stroke-width="2.5"/>
-                            <circle cx="551.7" cy="443.3" r="4.5" fill="white" stroke="#dc2626" stroke-width="2.5"/>
-                            <circle cx="755" cy="413.9" r="4.5" fill="white" stroke="#F59E0B" stroke-width="2.5"/>
-                            <text x="145" y="398.6" text-anchor="middle" font-size="10" font-weight="700" fill="#d97706" font-family="Forum">26,5% <tspan fill="#16a34a">(+3,4 п.п.)</tspan></text>
-                            <text x="348.3" y="419.3" text-anchor="middle" font-size="10" font-weight="700" fill="#dc2626" font-family="Forum">22,2% <tspan fill="#dc2626">(−0,9 п.п.)</tspan></text>
-                            <text x="551.7" y="433.3" text-anchor="middle" font-size="10" font-weight="700" fill="#dc2626" font-family="Forum">19,3% <tspan fill="#dc2626">(−3,8 п.п.)</tspan></text>
-                            <text x="755" y="403.9" text-anchor="middle" font-size="10" font-weight="700" fill="#d97706" font-family="Forum">25,4% <tspan fill="#16a34a">(+2,3 п.п.)</tspan></text>
-
-                            <!-- ось X -->
-                            <text x="145" y="572" text-anchor="middle" font-size="13" font-weight="700" fill="#544273" font-family="Forum">Нед 37</text>
-                            <text x="145" y="590" text-anchor="middle" font-size="10" fill="#94a3b8" font-family="Forum">07.09–13.09</text>
-                            <text x="348.3" y="572" text-anchor="middle" font-size="13" font-weight="700" fill="#544273" font-family="Forum">Нед 38</text>
-                            <text x="348.3" y="590" text-anchor="middle" font-size="10" fill="#94a3b8" font-family="Forum">14.09–20.09</text>
-                            <text x="551.7" y="572" text-anchor="middle" font-size="13" font-weight="700" fill="#544273" font-family="Forum">Нед 39</text>
-                            <text x="551.7" y="590" text-anchor="middle" font-size="10" fill="#94a3b8" font-family="Forum">21.09–27.09</text>
-                            <text x="755" y="572" text-anchor="middle" font-size="13" font-weight="700" fill="#544273" font-family="Forum">Нед 40</text>
-                            <text x="755" y="590" text-anchor="middle" font-size="10" fill="#94a3b8" font-family="Forum">28.09–04.10</text>
-                        </svg>
-                    </div>
-
+                    <div class="chart-box" id="chartBoxRub"><div class="chart-tooltip" id="tooltipRub"></div></div>
                     <div class="legend-bottom">
                         <div class="legend-col">
                             <div class="legend-item"><span class="sw dash-pink"></span>План маржи</div>
@@ -411,11 +274,238 @@
                             <div class="legend-item"><span class="sw pale-green"></span>Заказы, млн (день)</div>
                         </div>
                     </div>
-
-                    <div class="card-note">* Данные демонстрационные. Живой график с выбором недели, разбивкой по группам товаров и протоколом планёрки — в разделе «🔒 Сводный отчёт».</div>
+                    <div class="card-note">* Данные демонстрационные. Полная версия с группами товаров, динамикой и протоколом планёрки — в разделе «🔒 Сводный отчёт».</div>
                 </div>
             </div>
         </div>
     </div>
+
+    <script>
+        // === движок графика, перенесён из private.html ===
+        const CHART_DATA = {};
+        const GROUP_NAMES = ['Уход для волос','Уход для лица','Маникюр и педикюр','Парфюмерия','Инструменты','Краска для волос','Аксессуары','SPA-уход','Наборы','Уход для тела'];
+        const C_UP = '#16a34a', C_DOWN = '#dc2626';
+
+        function getWeeksInMonth(year, monthIdx) { const weeks = []; const d = new Date(year, monthIdx, 1); d.setDate(d.getDate() + ((4 - d.getDay() + 7) % 7)); while (d.getMonth() === monthIdx && d.getFullYear() === year) { const monday = new Date(d); monday.setDate(monday.getDate() - 3); const sunday = new Date(d); sunday.setDate(sunday.getDate() + 3); weeks.push({ start: monday, end: sunday }); d.setDate(d.getDate() + 7); } return weeks; }
+        function getISOWeek(date) { const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())); const dayNum = d.getUTCDay() || 7; d.setUTCDate(d.getUTCDate() + 4 - dayNum); const ys = new Date(Date.UTC(d.getUTCFullYear(), 0, 1)); return Math.ceil((((d - ys) / 86400000) + 1) / 7); }
+        function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
+        function keyOfMonday(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+        function seededRandom(seed) { let s = seed; return function() { s = (s * 9301 + 49297) % 233280; return s / 233280; }; }
+
+        function generateDemoMonth(monthKey, weeksCount) {
+            const [year, m] = monthKey.split('-').map(Number);
+            const rnd = seededRandom(year * 100 + m);
+            const planRub = Math.round((1500000 + rnd() * 600000) / 10000) * 10000;
+            const weekPlan = planRub / weeksCount;
+            const factRub = []; for (let w = 0; w < weeksCount; w++) factRub.push(Math.round(weekPlan * (0.7 + rnd() * 0.6) / 10000) * 10000);
+            const planPct = Math.round((22 + rnd() * 8) * 10) / 10;
+            const factPct = []; for (let w = 0; w < weeksCount; w++) factPct.push(Math.round(Math.max(5, planPct + (rnd() * 2 - 1) * 7) * 10) / 10);
+            const gPlan = GROUP_NAMES.map(() => Math.round((150000 + rnd() * 350000) / 10000) * 10000);
+            const gBase = GROUP_NAMES.map(() => (rnd() * 2 - 1) * 0.25);
+            const snapshots = [];
+            for (let i = 0; i < weeksCount; i++) { const rs = seededRandom(year * 10000 + m * 100 + i); snapshots.push({ groups: GROUP_NAMES.map((name, gi) => { const dev = gBase[gi] + (rs() - 0.5) * 0.15; return { name, plan: gPlan[gi], forecast: Math.round(gPlan[gi] * (1 + dev) / 1000) * 1000 }; }) }); }
+            const weeks = getWeeksInMonth(year, m - 1);
+            const spanStart = new Date(weeks[0].start), spanEnd = new Date(weeks[weeks.length - 1].end);
+            const ordersDaily = []; let obase = 5.2 + rnd() * 1.6;
+            const totalDays = Math.round((spanEnd - spanStart) / 86400000) + 1;
+            for (let i = 0; i < totalDays; i++) { const d = addDays(spanStart, i); const dow = d.getDay(); const weekend = (dow === 0 || dow === 6) ? 0.55 : 1; obase += (rnd() - 0.5) * 0.4; obase = Math.min(7.8, Math.max(4.2, obase)); const rub = Math.round(obase * weekend * 1000000 / 1000) * 1000; ordersDaily.push({ t: d.getTime(), rub, pcs: Math.round(rub / (1700 + rnd() * 800)) }); }
+            const ordersPcsPlan = Math.round(weeksCount * 16000 * (0.9 + rnd() * 0.2));
+            return { planRub, factRub, planPct, factPct, snapshots, ordersDaily, ordersPcsPlan };
+        }
+
+        const fmtShort = d => `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}`;
+        const fmtMillions = v => (v / 1e6).toLocaleString('ru-RU', { maximumFractionDigits: 2 });
+        const fmtRub = v => v.toLocaleString('ru-RU') + ' ₽';
+        const fmtRubShort = v => v >= 1e6 ? fmtMillions(v) + ' млн' : Math.round(v / 1000).toLocaleString('ru-RU') + ' тыс';
+        const fmtPct = v => v.toLocaleString('ru-RU', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+        const fmtDevRub = v => (v >= 0 ? '+' : '−') + Math.abs(v).toLocaleString('ru-RU') + ' ₽';
+        const fmt1 = v => v.toLocaleString('ru-RU', { maximumFractionDigits: 1 });
+        function niceScale(maxValue, tickCount = 4) { if (maxValue <= 0) maxValue = 1; const rawStep = maxValue / tickCount; const mag = Math.pow(10, Math.floor(Math.log10(rawStep))); const norm = rawStep / mag; let step; if (norm <= 1) step = mag; else if (norm <= 2) step = 2 * mag; else if (norm <= 2.5) step = 2.5 * mag; else if (norm <= 5) step = 5 * mag; else step = 10 * mag; return { step, max: Math.ceil(maxValue / step) * step }; }
+
+        // === СЖАТЫЕ ГАБАРИТЫ: 900x470 вместо 900x600 ===
+        function drawChart(boxId, tooltipId, cfg) {
+            const box = document.getElementById(boxId), tooltip = document.getElementById(tooltipId);
+            const weeks = cfg.weeks, weekLabels = cfg.weekLabels, n = weeks.length;
+            const lineVals = cfg.lineValues, factVals = cfg.factValues, factWeekly = cfg.factWeekly;
+            const pctVals = cfg.pctValues, ordersDaily = cfg.ordersDaily || [];
+            const projPcs = cfg.projPcs || [], factPcs = cfg.factPcs || [], weekOrdPcs = cfg.weekOrdPcs || [];
+            const plan = cfg.plan, pctPlan = cfg.pctPlan, pcsPlan = cfg.pcsPlan || 0;
+
+            const W = 900, H = 470, padL = 100, padR = 100, padT = 28, padB = 42;
+            const inset = 30;
+            const innerW = W - padL - padR, innerH = H - padT - padB;
+            const baseY = padT + innerH, plotRight = W - padR;
+            const dataW = innerW - 2 * inset;
+            const bandH = innerH / 3;
+            const qTop = q => padT + bandH * q;
+            const yBand = (q, v, max) => qTop(q + 1) - bandH * 0.08 - (v / max) * (bandH * 0.84);
+
+            const scaleB = niceScale(Math.max(plan, ...lineVals, ...factVals));
+            const scaleC = niceScale(Math.max(pctPlan, ...pctVals));
+            const scaleA = niceScale(Math.max(pcsPlan, ...projPcs, ...factPcs));
+            const scaleD = Math.max(...ordersDaily.map(o => o.rub), 1);
+
+            const x = i => padL + inset + (n === 1 ? dataW / 2 : dataW * i / (n - 1));
+            const C_PCS = '#14b8a6', C_MARGIN = '#E33D78', C_PCT = '#d97706', C_ORD = '#22c55e', C_FACT = '#7D3673';
+
+            let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
+            [1, 2].forEach(q => { svg += `<line x1="${padL}" y1="${qTop(q)}" x2="${plotRight}" y2="${qTop(q)}" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="2 4"/>`; });
+            svg += `<line x1="${padL}" y1="${baseY}" x2="${plotRight}" y2="${baseY}" stroke="#94a3b8" stroke-width="1.5"/>`;
+            weeks.forEach((w, i) => { svg += `<line x1="${x(i)}" y1="${padT}" x2="${x(i)}" y2="${baseY}" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="2 4"/>`; });
+
+            function bandAxis(q, side, color, max, fmt, title, planVal) {
+                const ax = side === 'left' ? padL - 12 : plotRight + 12;
+                const top = qTop(q) + bandH * 0.08, bottom = qTop(q + 1) - bandH * 0.08;
+                const anchor = side === 'left' ? 'end' : 'start';
+                const lx = side === 'left' ? ax - 6 : ax + 6;
+                svg += `<line x1="${ax}" y1="${top}" x2="${ax}" y2="${bottom}" stroke="${color}" stroke-width="1.5"/>`;
+                [0, 1].forEach(f => { const v = max * f, yy = yBand(q, v, max); svg += `<line x1="${ax}" y1="${yy}" x2="${side === 'left' ? ax - 4 : ax + 4}" y2="${yy}" stroke="${color}" stroke-width="1.5"/>`; svg += `<text x="${lx}" y="${yy + 4}" text-anchor="${anchor}" font-size="9.5" fill="${color}" opacity="0.75" font-family="Forum">${fmt(v)}</text>`; });
+                if (planVal != null) { const py = yBand(q, planVal, max); const midY = yBand(q, max / 2, max); const ly = (Math.abs(py - midY) < 10) ? py - 11 : py; svg += `<line x1="${ax}" y1="${py}" x2="${side === 'left' ? ax - 5 : ax + 5}" y2="${py}" stroke="${color}" stroke-width="2.5"/>`; svg += `<text x="${lx}" y="${ly + 4}" text-anchor="${anchor}" font-size="10.5" font-weight="700" fill="${color}" font-family="Forum">${fmt(planVal)}</text>`; }
+                const tX = side === 'left' ? 4 : W - 4;
+                const tAnchor = side === 'left' ? 'start' : 'end';
+                svg += `<text x="${tX}" y="${qTop(q) + 5}" text-anchor="${tAnchor}" font-size="11" font-weight="700" fill="${color}" font-family="Forum">${title}</text>`;
+            }
+
+            bandAxis(0, 'left', C_PCS, scaleA.max, v => fmtRubShort(v), 'Заказы, шт', pcsPlan);
+            bandAxis(0, 'right', C_ORD, scaleD, v => fmtMillions(v), 'Заказы, млн. руб.', null);
+            bandAxis(1, 'right', C_MARGIN, scaleB.max, v => fmtMillions(v), 'Маржа, млн. руб.', plan);
+            bandAxis(2, 'left', C_PCT, scaleC.max, v => fmt1(v), 'Маржинальность, %', pctPlan);
+
+            // дневной ряд заказов + ТОЧКИ по дням (с тултипами)
+            if (ordersDaily.length > 1) {
+                const spanStartMs = weeks[0].start.getTime(), spanEndMs = weeks[n - 1].end.getTime() + 86400000;
+                const xDay = t => padL + inset + dataW * ((t - spanStartMs) / (spanEndMs - spanStartMs));
+                let o = ''; ordersDaily.forEach((od, i) => { o += (i === 0 ? 'M ' : ' L ') + xDay(od.t) + ' ' + yBand(0, od.rub, scaleD); });
+                svg += `<path d="${o}" fill="none" stroke="${C_ORD}" stroke-width="1.5" stroke-linecap="round" opacity="0.3"/>`;
+                ordersDaily.forEach(od => { const d = new Date(od.t); svg += `<circle class="chart-point" cx="${xDay(od.t)}" cy="${yBand(0, od.rub, scaleD)}" r="2" fill="${C_ORD}" opacity="0.35" data-label="${fmtShort(d)}" data-value="Заказы: ${fmtMillions(od.rub)} млн руб • ${od.pcs.toLocaleString('ru-RU')} шт."/>`; });
+            }
+            if (pcsPlan) { const py = yBand(0, pcsPlan, scaleA.max); svg += `<line x1="${padL}" y1="${py}" x2="${plotRight}" y2="${py}" stroke="${C_PCS}" stroke-width="2" stroke-dasharray="6 6"/>`; }
+            if (factPcs.length > 1) { let f = `M ${x(0)} ${yBand(0, factPcs[0], scaleA.max)}`; factPcs.forEach((v, i) => { if (i > 0) f += ` L ${x(i)} ${yBand(0, v, scaleA.max)}`; }); svg += `<path d="${f}" fill="none" stroke="${C_FACT}" stroke-width="2.5" stroke-linecap="round"/>`; }
+            factPcs.forEach((v, i) => {
+                const px = x(i), py = yBand(0, v, scaleA.max);
+                const weekly = weekOrdPcs[i] || 0;
+                const dW = (i > 0 && weekOrdPcs[i - 1]) ? weekly - weekOrdPcs[i - 1] : null;
+                const bad = dW !== null && dW < 0;
+                let tip = `Заказы: ${weekly.toLocaleString('ru-RU')} шт.`;
+                if (dW !== null) { const dp = dW / weekOrdPcs[i - 1] * 100; tip += • Динамика: ${dW >= 0 ? '+' : '−'}${Math.abs(dW).toLocaleString('ru-RU')} шт. (${dp >= 0 ? '+' : '−'}${Math.abs(dp).toLocaleString('ru-RU', { maximumFractionDigits: 1 })}%)`; }
+                let pl = fmtRubShort(v);
+                if (dW !== null) { const dp = dW / weekOrdPcs[i - 1] * 100; const col = dW >= 0 ? C_UP : C_DOWN; const sg = dW >= 0 ? '+' : '−'; pl += ` <tspan fill="${col}">(${sg}${Math.abs(dW).toLocaleString('ru-RU')} шт / ${sg}${Math.abs(dp).toLocaleString('ru-RU', { maximumFractionDigits: 1 })}%)</tspan>`; }
+                svg += `<circle class="chart-point${bad ? ' pulse-bad' : ''}" cx="${px}" cy="${py}" r="4" fill="${bad ? C_DOWN : C_FACT}" data-label="Факт заказов, ${weekLabels[i]}" data-value="${tip}"/>`;
+                svg += `<text x="${px}" y="${py + 16}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${bad ? C_DOWN : C_FACT}" font-family="Forum">${pl}</text>`;
+            });
+            if (projPcs.length > 1) { let p = `M ${x(0)} ${yBand(0, projPcs[0], scaleA.max)}`; projPcs.forEach((v, i) => { if (i > 0) p += ` L ${x(i)} ${yBand(0, v, scaleA.max)}`; }); svg += `<path d="${p}" fill="none" stroke="${C_PCS}" stroke-width="2.5" stroke-linecap="round"/>`; }
+            projPcs.forEach((v, i) => {
+                const py = yBand(0, v, scaleA.max);
+                const dev = v - pcsPlan; const devP = pcsPlan ? dev / pcsPlan * 100 : 0;
+                const bad = dev < 0;
+                const col = dev >= 0 ? C_UP : C_DOWN; const sg = dev >= 0 ? '+' : '−';
+                const paren = ` <tspan fill="${col}">(${sg}${fmtRubShort(Math.abs(dev))} / ${sg}${Math.abs(devP).toLocaleString('ru-RU', { maximumFractionDigits: 1 })}%)</tspan>`;
+                svg += `<circle class="chart-point${bad ? ' pulse-bad' : ''}" cx="${x(i)}" cy="${py}" r="4" fill="white" stroke="${bad ? C_DOWN : C_PCS}" stroke-width="2.5" data-label="Заказы (прогноз), ${weekLabels[i]}" data-value="${v.toLocaleString('ru-RU')} шт."/>`;
+                svg += `<text x="${x(i)}" y="${py - 9}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${bad ? C_DOWN : C_PCS}" font-family="Forum">${fmtRubShort(v)}${paren}</text>`;
+            });
+
+            const planY = yBand(1, plan, scaleB.max);
+            svg += `<line x1="${padL}" y1="${planY}" x2="${plotRight}" y2="${planY}" stroke="${C_MARGIN}" stroke-width="2.5" stroke-dasharray="8 6"/>`;
+            if (factVals.length > 1) { let f = `M ${x(0)} ${yBand(1, factVals[0], scaleB.max)}`; factVals.forEach((v, i) => { if (i > 0) f += ` L ${x(i)} ${yBand(1, v, scaleB.max)}`; }); svg += `<path d="${f}" fill="none" stroke="${C_FACT}" stroke-width="2.5" stroke-linecap="round"/>`; }
+            factVals.forEach((v, i) => {
+                const px = x(i), py = yBand(1, v, scaleB.max);
+                const weekly = factWeekly[i];
+                const dW = (i > 0 && factWeekly[i - 1]) ? weekly - factWeekly[i - 1] : null;
+                const bad = dW !== null && dW < 0;
+                let tip = `Маржа: ${fmtRub(weekly)}`;
+                if (dW !== null) { const dp = dW / factWeekly[i - 1] * 100; tip += ` • Динамика: ${fmtDevRub(dW)} (${dp >= 0 ? '+' : '−'}${Math.abs(dp).toLocaleString('ru-RU', { maximumFractionDigits: 1 })}%)`; }
+                let pl = fmtRubShort(v);
+                if (dW !== null) { const dp = dW / factWeekly[i - 1] * 100; const col = dW >= 0 ? C_UP : C_DOWN; const sg = dW >= 0 ? '+' : '−'; pl += ` <tspan fill="${col}">(${sg}${Math.round(Math.abs(dW) / 1000).toLocaleString('ru-RU')} тыс / ${sg}${Math.abs(dp).toLocaleString('ru-RU', { maximumFractionDigits: 1 })}%)</tspan>`; }
+                svg += `<circle class="chart-point${bad ? ' pulse-bad' : ''}" cx="${px}" cy="${py}" r="4.5" fill="${bad ? C_DOWN : C_FACT}" data-label="Факт недели ${weekLabels[i]}" data-value="${tip}"/>`;
+                let ly = py - 11; if (ly < qTop(1) + 9) ly = py + 19;
+                if (typeof lineVals[i] === 'number' && Math.abs(py - yBand(1, lineVals[i], scaleB.max)) < 22) ly = py + 19;
+                svg += `<text x="${px}" y="${ly}" text-anchor="middle" font-size="10" font-weight="700" fill="${bad ? C_DOWN : C_FACT}" font-family="Forum">${pl}</text>`;
+            });
+            if (lineVals.length > 1) { let l = `M ${x(0)} ${yBand(1, lineVals[0], scaleB.max)}`; lineVals.forEach((v, i) => { if (i > 0) l += ` L ${x(i)} ${yBand(1, v, scaleB.max)}`; }); svg += `<path class="chart-line" d="${l}" fill="none" stroke="${C_MARGIN}" stroke-width="3" stroke-linecap="round"/>`; }
+            lineVals.forEach((v, i) => {
+                const py = yBand(1, v, scaleB.max);
+                const dev = v - plan; const devP = plan ? dev / plan * 100 : 0;
+                const bad = dev < 0;
+                const col = dev >= 0 ? C_UP : C_DOWN; const sg = dev >= 0 ? '+' : '−';
+                const paren = ` <tspan fill="${col}">(${sg}${fmtMillions(Math.abs(dev))} млн / ${sg}${Math.abs(devP).toLocaleString('ru-RU', { maximumFractionDigits: 1 })}%)</tspan>`;
+                svg += `<circle class="chart-point${bad ? ' pulse-bad' : ''}" cx="${x(i)}" cy="${py}" r="6" fill="white" stroke="${bad ? C_DOWN : C_MARGIN}" stroke-width="3" data-label="Прогноз, ${weekLabels[i]}" data-value="${fmtRub(v)}"/>`;
+                let flY = py - 11; if (flY < qTop(1) + 9) flY = py + 19;
+                svg += `<text x="${x(i)}" y="${flY}" text-anchor="middle" font-size="10" font-weight="700" fill="${bad ? C_DOWN : C_MARGIN}" font-family="Forum">${fmtRubShort(v)}${paren}</text>`;
+            });
+
+            const ppY = yBand(2, pctPlan, scaleC.max);
+            svg += `<line x1="${padL}" y1="${ppY}" x2="${plotRight}" y2="${ppY}" stroke="#F59E0B" stroke-width="2" stroke-dasharray="6 6"/>`;
+            if (pctVals.length > 1) { let p = `M ${x(0)} ${yBand(2, pctVals[0], scaleC.max)}`; pctVals.forEach((v, i) => { if (i > 0) p += ` L ${x(i)} ${yBand(2, v, scaleC.max)}`; }); svg += `<path d="${p}" fill="none" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round"/>`; }
+            pctVals.forEach((v, i) => {
+                const py = yBand(2, v, scaleC.max);
+                const dev = v - pctPlan; const bad = dev < 0;
+                const col = dev >= 0 ? C_UP : C_DOWN; const sg = dev >= 0 ? '+' : '−';
+                const paren = ` <tspan fill="${col}">(${sg}${Math.abs(dev).toLocaleString('ru-RU', { maximumFractionDigits: 1 })} п.п.)</tspan>`;
+                svg += `<circle class="chart-point${bad ? ' pulse-bad' : ''}" cx="${x(i)}" cy="${py}" r="4.5" fill="white" stroke="${bad ? C_DOWN : '#F59E0B'}" stroke-width="2.5" data-label="Маржинальность, ${weekLabels[i]}" data-value="${fmtPct(v)}"/>`;
+                svg += `<text x="${x(i)}" y="${py - 9}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${bad ? C_DOWN : '#d97706'}" font-family="Forum">${fmtPct(v)}${paren}</text>`;
+            });
+
+            weeks.forEach((w, i) => { svg += `<text x="${x(i)}" y="${baseY + 18}" text-anchor="middle" font-size="12" font-weight="700" fill="#544273" font-family="Forum">${weekLabels[i]}</text>`; svg += `<text x="${x(i)}" y="${baseY + 33}" text-anchor="middle" font-size="9" fill="#94a3b8" font-family="Forum">${fmtShort(w.start)}–${fmtShort(w.end)}</text>`; });
+            svg += `</svg>`;
+            box.querySelectorAll('svg').forEach(el => el.remove());
+            box.insertAdjacentHTML('beforeend', svg);
+
+            const path = box.querySelector('.chart-line');
+            if (path) { const len = path.getTotalLength(); path.style.strokeDasharray = len; path.style.strokeDashoffset = len; path.getBoundingClientRect(); path.style.transition = 'stroke-dashoffset 1s ease'; path.style.strokeDashoffset = '0'; }
+
+            // живые тултипы на всех точках
+            box.querySelectorAll('.chart-point').forEach(pt => {
+                pt.dataset.r0 = pt.getAttribute('r');
+                const show = () => { const b = box.getBoundingClientRect(), r = pt.getBoundingClientRect(); tooltip.innerHTML = `<strong>${pt.dataset.label}</strong>${pt.dataset.value}`; tooltip.style.display = 'block'; tooltip.style.left = (r.left - b.left + r.width / 2) + 'px'; tooltip.style.top = (r.top - b.top - 8) + 'px'; pt.setAttribute('r', String(parseFloat(pt.dataset.r0) + 2)); };
+                const hide = () => { tooltip.style.display = 'none'; pt.setAttribute('r', pt.dataset.r0); };
+                pt.addEventListener('mouseenter', show); pt.addEventListener('mouseleave', hide);
+                pt.addEventListener('touchstart', e => { e.preventDefault(); show(); });
+            });
+        }
+
+        function buildForecast(cum, weeksCount, factCount, uptoIdx, seedBase) { const out = []; for (let i = 0; i <= uptoIdx; i++) { const closed = i < factCount; const lastClosed = Math.max(0, factCount - 1); const cumI = closed ? cum[i] : cum[lastClosed]; const used = closed ? (i + 1) : factCount; const avg = used ? cumI / used : 0; const remaining = weeksCount - (closed ? (i + 1) : factCount); const k = 0.85 + seededRandom(seedBase + i * 31)() * 0.3; out.push(Math.round(cumI + remaining * avg * k)); } return out; }
+
+        function renderWeek(weekKey) {
+            const [y, m, d] = weekKey.split('-').map(Number);
+            const monday = new Date(y, m - 1, d); const th = addDays(monday, 3);
+            const mk = `${th.getFullYear()}-${String(th.getMonth() + 1).padStart(2, '0')}`;
+            const weeks = getWeeksInMonth(th.getFullYear(), th.getMonth());
+            const idx = Math.max(0, weeks.findIndex(w => w.start.getTime() === monday.getTime()));
+            const weekLabels = weeks.map(w => `Нед ${getISOWeek(w.start)}`);
+            const n = weeks.length;
+            const data = CHART_DATA[mk] || generateDemoMonth(mk, n);
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            const selEnd = new Date(weeks[idx].end);
+            const ref = selEnd < today ? selEnd : new Date();
+            const factCount = weeks.filter(w => w.end <= ref).length;
+            const factWeekly = (data.factRub || []).slice(0, factCount);
+            const cum = []; let s = 0; factWeekly.forEach(v => { s += v; cum.push(s); });
+            const weekOrdPcs = weeks.map(w => { const a = w.start.getTime(), b = w.end.getTime(); return (data.ordersDaily || []).filter(o => o.t >= a && o.t <= b).reduce((t, o) => t + o.pcs, 0); });
+            const seedBase = y * 1000 + m * 10;
+            const fc = cum.length ? buildForecast(cum, n, factCount, idx, seedBase) : [];
+            const cumPcs = []; let sp = 0; weekOrdPcs.slice(0, factCount).forEach(v => { sp += v; cumPcs.push(sp); });
+            const projPcs = cumPcs.length ? buildForecast(cumPcs, n, factCount, idx, seedBase + 7) : [];
+            const ordersDaily = (data.ordersDaily || []).filter(o => o.t <= ref.getTime());
+            drawChart('chartBoxRub', 'tooltipRub', { weeks, weekLabels, plan: data.planRub, pctPlan: data.planPct, pcsPlan: data.ordersPcsPlan, lineValues: fc, factValues: cum, factWeekly, pctValues: (data.factPct || []).slice(0, factCount), ordersDaily, projPcs, factPcs: cumPcs, weekOrdPcs });
+        }
+
+        function buildWeekOptions() {
+            const s = document.getElementById('weekSelect');
+            const now = new Date();
+            const curMonday = new Date(now); curMonday.setDate(now.getDate() - ((now.getDay() + 6) % 7)); curMonday.setHours(0, 0, 0, 0);
+            for (let i = 15; i >= 0; i--) {
+                const monday = new Date(curMonday); monday.setDate(monday.getDate() - 7 * i);
+                const sunday = addDays(monday, 6);
+                const o = document.createElement('option');
+                o.value = keyOfMonday(monday);
+                o.textContent = `Нед ${getISOWeek(monday)} • ${fmtShort(monday)}–${fmtShort(sunday)}`;
+                s.appendChild(o);
+            }
+            s.addEventListener('change', e => renderWeek(e.target.value));
+            renderWeek(s.value);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => { buildWeekOptions(); });
+    </script>
 </body>
 </html>
