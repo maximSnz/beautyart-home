@@ -137,6 +137,22 @@
         }
         .week-select-glass:focus { outline: none; border-color: #E33D78; }
         .week-select-glass option { color: #333; background: #fff; }
+                .anno-toggle {
+            padding: 5px 10px;
+            border: 1px solid rgba(255,255,255,.4);
+            border-radius: 8px;
+            font-family: 'Forum', serif;
+            font-size: .82em;
+            color: #fff;
+            background: rgba(255,255,255,.15);
+            cursor: pointer;
+            transition: all .2s;
+            white-space: nowrap;
+        }
+        .anno-toggle:hover { background: rgba(255,255,255,.25); }
+        .anno-toggle.off { opacity: .55; border-color: rgba(255,255,255,.25); }
+        .hide-annotations .vlbl,
+        .hide-annotations .vlbl-bg { display: none; }
 
         .chart-box {
             flex: 1; min-height: 0;
@@ -288,6 +304,7 @@
                 <div class="glass-card hide" id="finCard">
                     <div class="card-head">
                         <span class="card-title">Финансовое здоровье</span>
+                        <button id="annoToggle" class="anno-toggle" onclick="toggleAnnotations()" title="Показывать подписи значений у точек графика">🏷 Аннотации: Вкл</button>
                         <select class="week-select-glass" id="monthSelect"></select>
                     </div>
                     <div class="chart-box" id="chartBoxRub"><div class="chart-tooltip" id="tooltipRub"></div></div>
@@ -556,6 +573,7 @@ function drawChart(boxId,tooltipId,cfg){
     r.setAttribute('width',(b.width+12).toFixed(1));
     r.setAttribute('height',(b.height+6).toFixed(1));
     r.setAttribute('rx',6);
+      r.setAttribute('class','vlbl-bg');
     r.setAttribute('fill','rgba(28,13,46,0.75)');
     r.setAttribute('stroke','rgba(255,255,255,0.30)');
     r.setAttribute('stroke-width','1');
@@ -631,6 +649,26 @@ function showFin(){
   document.getElementById('loginCard').classList.add('hide');
   document.getElementById('finCard').classList.remove('hide');
   buildMonthOptions();
+      restoreAnnotations();
+}
+function toggleAnnotations(){
+  const box=document.getElementById('chartBoxRub');
+  const btn=document.getElementById('annoToggle');
+  if(!box||!btn)return;
+  const willHide=!box.classList.contains('hide-annotations');
+  box.classList.toggle('hide-annotations',willHide);
+  btn.classList.toggle('off',willHide);
+  localStorage.setItem('ba_annotations',willHide?'0':'1');
+  btn.textContent=willHide?'🏷 Аннотации: Выкл':'🏷 Аннотации: Вкл';
+}
+function restoreAnnotations(){
+  const box=document.getElementById('chartBoxRub');
+  const btn=document.getElementById('annoToggle');
+  if(!box||!btn)return;
+  const on=localStorage.getItem('ba_annotations')!=='0';
+  box.classList.toggle('hide-annotations',!on);
+  btn.classList.toggle('off',!on);
+  btn.textContent=on?'🏷 Аннотации: Вкл':'🏷 Аннотации: Выкл';
 }
 document.addEventListener('DOMContentLoaded',()=>{
   if(sessionStorage.getItem('ba_home_access')==='1')showFin();
