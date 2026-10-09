@@ -137,6 +137,18 @@
         }
         .week-select-glass:focus { outline: none; border-color: #E33D78; }
         .week-select-glass option { color: #333; background: #fff; }
+                .chip-glass {
+            display: inline-flex; align-items: center; justify-content: center;
+            height: 34px; padding: 0 12px;
+            border: 1px solid rgba(255,255,255,.4); border-radius: 8px;
+            font-family: 'Forum', serif; font-size: .85em; line-height: 1;
+            color: #fff; background: rgba(255,255,255,.15);
+            white-space: nowrap;
+        }
+        button.chip-glass { cursor: pointer; }
+        button.chip-glass:hover { background: rgba(255,255,255,.25); }
+        select.chip-glass { cursor: pointer; }
+        select.chip-glass option { color: #333; background: #fff; }
                 .anno-toggle {
             padding: 5px 10px;
             border: 1px solid rgba(255,255,255,.4);
@@ -304,8 +316,8 @@
                 <div class="glass-card hide" id="finCard">
                     <div class="card-head">
                         <span class="card-title">Финансовое здоровье</span>
-                        <button id="annoToggle" class="anno-toggle" onclick="toggleAnnotations()" title="Показывать подписи значений у точек графика">🏷 Аннотации: Вкл</button>
-                        <select class="week-select-glass" id="monthSelect"></select>
+                        <button id="annotToggle" class="chip-glass" onclick="toggleAnnotations()" title="Показать / скрыть подписи недельных точек">Аннотации: вкл</button>
+                        <select class="chip-glass" id="monthSelect"></select>
                     </div>
                     <div class="chart-box" id="chartBoxRub"><div class="chart-tooltip" id="tooltipRub"></div></div>
                     <div class="legend-bottom">
@@ -542,10 +554,10 @@ function drawChart(boxId,tooltipId,cfg){
     const dev=v-plan;const devP=plan?dev/plan*100:0;
     const bad=dev<0;
     const col=dev>=0?C_UP:C_DOWN;const sg=dev>=0?'+':'−';
-    const paren=`(${sg}${fmtMillions(Math.abs(dev))} млн / ${sg}${Math.abs(devP).toLocaleString('ru-RU',{maximumFractionDigits:1})}%)`;
+    const paren=plan?`(${sg}${fmtMillions(Math.abs(dev))} млн / ${sg}${Math.abs(devP).toLocaleString('ru-RU',{maximumFractionDigits:1})}%)`:'';
     svg+=`<circle class="chart-point${bad?' pulse-bad':''}" cx="${x(i)}" cy="${py}" r="6" fill="rgba(28,13,46,0.85)" stroke="${bad?C_DOWN:C_MARGIN}" stroke-width="3" data-label="Прогноз, ${weekLabels[i]}" data-value="${fmtRub(v)}"/>`;
     let flY=py-20;if(flY<qTop(1)+9)flY=py+16;
-    svg+=`<text class="vlbl" x="${x(i)}" y="${flY}" text-anchor="middle" font-size="9" font-weight="700" fill="${C_MARGIN}" font-family="Forum">${fmtRubShort(v)}<tspan x="${x(i)}" dy="10" font-size="8.5" fill="${col}">${paren}</tspan></text>`;
+    svg+=`<text class="vlbl" x="${x(i)}" y="${flY}" text-anchor="middle" font-size="9" font-weight="700" fill="${C_MARGIN}" font-family="Forum">${fmtRubShort(v)}${paren?`<tspan x="${x(i)}" dy="10" font-size="8.5" fill="${col}">${paren}</tspan>`:''}</text>`;
   });
 
   if(pctPlan>0){const ppY=yBand(2,pctPlan,scaleC.max);svg+=`<line x1="${padL}" y1="${ppY}" x2="${plotRight}" y2="${ppY}" stroke="${C_PCT}" stroke-width="2" stroke-dasharray="6 6"/>`;}
@@ -555,9 +567,9 @@ function drawChart(boxId,tooltipId,cfg){
     const py=yBand(2,v,scaleC.max);
     const dev=v-pctPlan;const bad=dev<0;
     const col=dev>=0?C_UP:C_DOWN;const sg=dev>=0?'+':'−';
-    const paren=`(${sg}${Math.abs(dev).toLocaleString('ru-RU',{maximumFractionDigits:1})} п.п.)`;
+    const paren=pctPlan?`(${sg}${Math.abs(dev).toLocaleString('ru-RU',{maximumFractionDigits:1})} п.п.)`:'';
     svg+=`<circle class="chart-point${bad?' pulse-bad':''}" cx="${x(i)}" cy="${py}" r="4.5" fill="rgba(28,13,46,0.85)" stroke="${bad?C_DOWN:C_PCT}" stroke-width="2.5" data-label="Маржинальность, ${weekLabels[i]}" data-value="${fmtPct(v)}"/>`;
-    svg+=`<text class="vlbl" x="${x(i)}" y="${py-18}" text-anchor="middle" font-size="9" font-weight="700" fill="${C_PCT}" font-family="Forum">${fmtPct(v)}<tspan x="${x(i)}" dy="10" font-size="8.5" fill="${col}">${paren}</tspan></text>`;
+    svg+=`<text class="vlbl" x="${x(i)}" y="${py-18}" text-anchor="middle" font-size="9" font-weight="700" fill="${C_PCT}" font-family="Forum">${fmtPct(v)}${paren?`<tspan x="${x(i)}" dy="10" font-size="8.5" fill="${col}">${paren}</tspan>`:''}</text>`;
   });
 
   weeks.forEach((w,i)=>{svg+=`<text x="${x(i)}" y="${baseY+18}" text-anchor="middle" font-size="12" font-weight="700" fill="${TXT_WEEK}" font-family="Forum">${weekLabels[i]}</text>`;svg+=`<text x="${x(i)}" y="${baseY+33}" text-anchor="middle" font-size="9" fill="${TXT_SUB}" font-family="Forum">${fmtShort(w.start)}–${fmtShort(w.end)}</text>`;});
@@ -653,22 +665,22 @@ function showFin(){
 }
 function toggleAnnotations(){
   const box=document.getElementById('chartBoxRub');
-  const btn=document.getElementById('annoToggle');
+  const btn=document.getElementById('annotToggle');
   if(!box||!btn)return;
   const willHide=!box.classList.contains('hide-annotations');
   box.classList.toggle('hide-annotations',willHide);
   btn.classList.toggle('off',willHide);
   localStorage.setItem('ba_annotations',willHide?'0':'1');
-  btn.textContent=willHide?'🏷 Аннотации: Выкл':'🏷 Аннотации: Вкл';
+  btn.textContent=willHide?'Аннотации: Выкл':'Аннотации: Вкл';
 }
 function restoreAnnotations(){
   const box=document.getElementById('chartBoxRub');
-  const btn=document.getElementById('annoToggle');
+  const btn=document.getElementById('annotToggle');
   if(!box||!btn)return;
   const on=localStorage.getItem('ba_annotations')!=='0';
   box.classList.toggle('hide-annotations',!on);
   btn.classList.toggle('off',!on);
-  btn.textContent=on?'🏷 Аннотации: Вкл':'🏷 Аннотации: Выкл';
+  btn.textContent=on?'Аннотации: Вкл':'Аннотации: Выкл';
 }
 document.addEventListener('DOMContentLoaded',()=>{
   if(sessionStorage.getItem('ba_home_access')==='1')showFin();
