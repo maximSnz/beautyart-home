@@ -302,10 +302,10 @@
                             <div class="legend-item"><span class="sw solid-yellow"></span>Факт маржинальности (CF)</div>
                         </div>
                         <div class="legend-col">
-                            <div class="legend-item"><span class="sw dash-teal"></span>План заказы</div>
-                            <div class="legend-item"><span class="sw solid-teal"></span>Прогноз заказы (PNL)</div>
-                            <div class="legend-item"><span class="sw solid-plum"></span>Факт заказы накопит. итогом (PNL)</div>
-                            <div class="legend-item"><span class="sw pale-green"></span>Выручка, млн ₽ (PNL, день)</div>
+                            <div class="legend-item"><span class="sw dash-teal"></span>План выручки (PNL)</div>
+                            <div class="legend-item"><span class="sw solid-teal"></span>Прогноз выручки (PNL)</div>
+                            <div class="legend-item"><span class="sw solid-plum"></span>Факт выручки накопит. итогом (PNL)</div>
+                            <div class="legend-item"><span class="sw pale-green"></span>Заказы, шт (PNL, день)</div>
                         </div>
                     </div>
                 </div>
@@ -346,7 +346,9 @@ function generateDemoMonth(monthKey,weeksCount){
   const totalDays=Math.round((spanEnd-spanStart)/86400000)+1;
   for(let i=0;i<totalDays;i++){const d=addDays(spanStart,i);const dow=d.getDay();const weekend=(dow===0||dow===6)?0.55:1;obase+=(rnd()-0.5)*0.4;obase=Math.min(7.8,Math.max(4.2,obase));const rub=Math.round(obase*weekend*1000000/1000)*1000;ordersDaily.push({t:d.getTime(),rub,pcs:Math.round(rub/(1700+rnd()*800))});}
   const ordersPcsPlan=Math.round(weeksCount*16000*(0.9+rnd()*0.2));
-  return {planRub,factRub,planPct,factPct,ordersDaily,ordersPcsPlan};
+  const planRev=planPct>0?planRub/(planPct/100):0;
+  const weekRev=weeks.map(w=>{const a=w.start.getTime(),b=w.end.getTime();let s=0;ordersDaily.forEach(o=>{if(o.t>=a&&o.t<=b)s+=o.rub;});return s;});
+  return {planRub,planRev,planPct,factRub,factPct,weekRev,ordersDaily,ordersPcsPlan};
 }
 
 // === реальные данные ИП: план месяца + CF-факты недель + PNL-дни ===
@@ -379,10 +381,10 @@ async function loadRealMonth(mk){
     if(j.length<1000)break;off+=1000;
   }
   const ordersDaily=[...dayMap.entries()].sort((a,b)=>a[0]<b[0]?-1:1).map(([d,g])=>{const [yy,mm,dd]=d.split('-').map(Number);return {t:new Date(yy,mm-1,dd).getTime(),rub:g.rub,pcs:g.pcs};});
-  const weekPcs=weeks.map(w=>{const a=w.start.getTime(),b=w.end.getTime();let s=0,any=false;ordersDaily.forEach(o=>{if(o.t>=a&&o.t<=b){s+=o.pcs;any=true;}});return any?s:null;});
-  let lastW=weekPcs.length-1;while(lastW>=0&&weekPcs[lastW]==null)lastW--;
-  const factPcs=weekPcs.slice(0,lastW+1).map(v=>v||0);
-  const out={planRub,planPct,factRub,factPct,factPcs,ordersDaily,ordersPcsPlan:pcsPlan,real:true};
+  const weekRaw=weeks.map(w=>{const a=w.start.getTime(),b=w.end.getTime();let s=0,any=false;ordersDaily.forEach(o=>{if(o.t>=a&&o.t<=b){s+=o.rub;any=true;}});return any?s:null;});
+  let lastW=weekRaw.length-1;while(lastW>=0&&weekRaw[lastW]==null)lastW--;
+  const weekRev=weekRaw.slice(0,lastW+1).map(v=>v||0);
+  const out={planRub,planRev,planPct,factRub,factPct,weekRev,ordersDaily,ordersPcsPlan:pcsPlan,real:true};
   REAL_CACHE[mk]=out;
   return out;
 }
@@ -394,6 +396,7 @@ const fmtRubShort=v=>v>=1e6?fmtMillions(v)+' млн':Math.round(v/1000).toLocale
 const fmtPct=v=>v.toLocaleString('ru-RU',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';
 const fmtDevRub=v=>(v>=0?'+':'−')+Math.abs(v).toLocaleString('ru-RU')+' ₽';
 const fmt1=v=>v.toLocaleString('ru-RU',{maximumFractionDigits:1});
+const fmt0=v=>Math.round(v).toLocaleString('ru-RU');
 function niceScale(maxValue,tickCount=4){if(maxValue<=0)maxValue=1;const rawStep=maxValue/tickCount;const mag=Math.pow(10,Math.floor(Math.log10(rawStep)));const norm=rawStep/mag;let step;if(norm<=1)step=mag;else if(norm<=2)step=2*mag;else if(norm<=2.5)step=2.5*mag;else if(norm<=5)step=5*mag;else step=10*mag;return {step,max:Math.ceil(maxValue/step)*step};}
 
 function drawChart(boxId,tooltipId,cfg){
@@ -401,8 +404,8 @@ function drawChart(boxId,tooltipId,cfg){
   const weeks=cfg.weeks,weekLabels=cfg.weekLabels,n=weeks.length;
   const lineVals=cfg.lineValues,factVals=cfg.factValues,factWeekly=cfg.factWeekly;
   const pctVals=cfg.pctValues,ordersDaily=cfg.ordersDaily||[];
-  const projPcs=cfg.projPcs||[],factPcs=cfg.factPcs||[],weekOrdPcs=cfg.weekOrdPcs||[];
-  const plan=cfg.plan||0,pctPlan=cfg.pctPlan||0,pcsPlan=cfg.pcsPlan||0;
+  const revForecast=cfg.revForecast||[],revFact=cfg.revFact||[],revWeekly=cfg.revWeekly||[];
+  const plan=cfg.plan||0,pctPlan=cfg.pctPlan||0,planRev=cfg.planRev||0;
 
   const W=900,H=470,padL=100,padR=100,padT=28,padB=42;
   const inset=30;
@@ -415,8 +418,8 @@ function drawChart(boxId,tooltipId,cfg){
 
   const scaleB=niceScale(Math.max(plan,...lineVals,...factVals));
   const scaleC=niceScale(Math.max(pctPlan,...pctVals));
-  const scaleA=niceScale(Math.max(pcsPlan,...projPcs,...factPcs));
-  const scaleD=Math.max(...ordersDaily.map(o=>o.rub),1);
+  const scaleA=niceScale(Math.max(planRev,...revForecast,...revFact));
+  const scaleD=Math.max(...ordersDaily.map(o=>o.pcs),1);
 
   const x=i=>padL+inset+(n===1?dataW/2:dataW*i/(n-1));
   const C_PCS='#5eead4',C_MARGIN='#ffffff',C_PCT='#fde047',C_ORD='#86efac',C_FACT='#c084fc';
@@ -439,8 +442,8 @@ function drawChart(boxId,tooltipId,cfg){
     svg+=`<text x="${tX}" y="${qTop(q)+5}" text-anchor="${tAnchor}" font-size="11" font-weight="700" fill="${color}" font-family="Forum">${title}</text>`;
   }
 
-  bandAxis(0,'left',C_PCS,scaleA.max,v=>fmtRubShort(v),'Заказы, шт (PNL)',pcsPlan);
-  bandAxis(0,'right',C_ORD,scaleD,v=>fmtMillions(v),'Выручка, млн ₽ (PNL)',null);
+  bandAxis(0,'left',C_PCS,scaleA.max,v=>fmtMillions(v),'Выручка, млн ₽ (PNL)',planRev);
+  bandAxis(0,'right',C_ORD,scaleD,v=>fmt0(v),'Заказы, шт (PNL, день)',null);
   bandAxis(1,'right',C_MARGIN,scaleB.max,v=>fmtMillions(v),'Маржа, млн ₽ (CF)',plan);
   bandAxis(2,'left',C_PCT,scaleC.max,v=>fmt1(v),'Маржинальность, % (CF)',pctPlan);
 
@@ -462,34 +465,34 @@ function drawChart(boxId,tooltipId,cfg){
   };
 
   if(ordersDaily.length>1){
-    let o='';ordersDaily.forEach((od,i)=>{o+=(i===0?'M ':' L ')+xDay(od.t)+' '+yBand(0,od.rub,scaleD);});
+    let o='';ordersDaily.forEach((od,i)=>{o+=(i===0?'M ':' L ')+xDay(od.t)+' '+yBand(0,od.pcs,scaleD);});
     svg+=`<path d="${o}" fill="none" stroke="${C_ORD}" stroke-width="1.5" stroke-linecap="round" opacity="0.35"/>`;
-    ordersDaily.forEach(od=>{const d=new Date(od.t);svg+=`<circle class="chart-point" cx="${xDay(od.t)}" cy="${yBand(0,od.rub,scaleD)}" r="2" fill="${C_ORD}" opacity="0.45" data-label="${fmtShort(d)}" data-value="Выручка: ${fmtMillions(od.rub)} млн руб • ${od.pcs.toLocaleString('ru-RU')} шт."/>`;});
+    ordersDaily.forEach(od=>{const d=new Date(od.t);svg+=`<circle class="chart-point" cx="${xDay(od.t)}" cy="${yBand(0,od.pcs,scaleD)}" r="2" fill="${C_ORD}" opacity="0.45" data-label="${fmtShort(d)}" data-value="Заказы: ${od.pcs.toLocaleString('ru-RU')} шт • Выручка: ${fmtMillions(od.rub)} млн руб"/>`;});
   }
-  if(pcsPlan>0){const py=yBand(0,pcsPlan,scaleA.max);svg+=`<line x1="${padL}" y1="${py}" x2="${plotRight}" y2="${py}" stroke="${C_PCS}" stroke-width="2" stroke-dasharray="6 6"/>`;}
-  if(factPcs.length>1){let f=`M ${x(0)} ${yBand(0,factPcs[0],scaleA.max)}`;factPcs.forEach((v,i)=>{if(i>0)f+=` L ${x(i)} ${yBand(0,v,scaleA.max)}`;});svg+=`<path d="${f}" fill="none" stroke="${C_FACT}" stroke-width="2.5" stroke-linecap="round"/>`;}
-  svg+=dailyPointsOnLine(factPcs,scaleA.max,0,C_FACT,'Факт заказы (накопит., PNL)',v=>Math.round(v).toLocaleString('ru-RU')+' шт');
-  factPcs.forEach((v,i)=>{
+  if(planRev>0){const py=yBand(0,planRev,scaleA.max);svg+=`<line x1="${padL}" y1="${py}" x2="${plotRight}" y2="${py}" stroke="${C_PCS}" stroke-width="2" stroke-dasharray="6 6"/>`;}
+  if(revFact.length>1){let f=`M ${x(0)} ${yBand(0,revFact[0],scaleA.max)}`;revFact.forEach((v,i)=>{if(i>0)f+=` L ${x(i)} ${yBand(0,v,scaleA.max)}`;});svg+=`<path d="${f}" fill="none" stroke="${C_FACT}" stroke-width="2.5" stroke-linecap="round"/>`;}
+  svg+=dailyPointsOnLine(revFact,scaleA.max,0,C_FACT,'Факт выручки (накопит., PNL)',fmtRubShort);
+  revFact.forEach((v,i)=>{
     const px=x(i),py=yBand(0,v,scaleA.max);
-    const weekly=weekOrdPcs[i]||0;
-    const dW=(i>0&&weekOrdPcs[i-1])?weekly-weekOrdPcs[i-1]:null;
+    const weekly=revWeekly[i]||0;
+    const dW=(i>0&&revWeekly[i-1])?weekly-revWeekly[i-1]:null;
     const bad=dW!==null&&dW<0;
-    let tip=`Заказы: ${weekly.toLocaleString('ru-RU')} шт.`;
-    if(dW!==null){const dp=dW/weekOrdPcs[i-1]*100;tip+=` • Динамика: ${dW>=0?'+':'−'}${Math.abs(dW).toLocaleString('ru-RU')} шт. (${dp>=0?'+':'−'}${Math.abs(dp).toLocaleString('ru-RU',{maximumFractionDigits:1})}%)`;}
+    let tip=`Выручка за неделю: ${fmtRub(weekly)} • Накопительно: ${fmtRub(v)}`;
+    if(dW!==null){const dp=dW/revWeekly[i-1]*100;tip+=` • Динамика: ${fmtDevRub(dW)} (${dp>=0?'+':'−'}${Math.abs(dp).toLocaleString('ru-RU',{maximumFractionDigits:1})}%)`;}
     let pl=fmtRubShort(v);
-    if(dW!==null){const dp=dW/weekOrdPcs[i-1]*100;const col=dW>=0?C_UP:C_DOWN;const sg=dW>=0?'+':'−';pl+=` <tspan fill="${col}">(${sg}${Math.abs(dW).toLocaleString('ru-RU')} шт / ${sg}${Math.abs(dp).toLocaleString('ru-RU',{maximumFractionDigits:1})}%)</tspan>`;}
-    svg+=`<circle class="chart-point${bad?' pulse-bad':''}" cx="${px}" cy="${py}" r="4" fill="${bad?C_DOWN:C_FACT}" data-label="Факт заказов, ${weekLabels[i]}" data-value="${tip}"/>`;
+    if(dW!==null){const dp=dW/revWeekly[i-1]*100;const col=dW>=0?C_UP:C_DOWN;const sg=dW>=0?'+':'−';pl+=` <tspan fill="${col}">(${sg}${fmtRubShort(Math.abs(dW))} / ${sg}${Math.abs(dp).toLocaleString('ru-RU',{maximumFractionDigits:1})}%)</tspan>`;}
+    svg+=`<circle class="chart-point${bad?' pulse-bad':''}" cx="${px}" cy="${py}" r="4" fill="${bad?C_DOWN:C_FACT}" data-label="Факт выручки, ${weekLabels[i]}" data-value="${tip}"/>`;
     svg+=`<text class="vlbl" x="${px}" y="${py+16}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${bad?C_DOWN:C_FACT}" font-family="Forum">${pl}</text>`;
   });
-  if(projPcs.length>1){let p=`M ${x(0)} ${yBand(0,projPcs[0],scaleA.max)}`;projPcs.forEach((v,i)=>{if(i>0)p+=` L ${x(i)} ${yBand(0,v,scaleA.max)}`;});svg+=`<path d="${p}" fill="none" stroke="${C_PCS}" stroke-width="2.5" stroke-linecap="round"/>`;}
-  svg+=dailyPointsOnLine(projPcs,scaleA.max,0,C_PCS,'Прогноз заказы (PNL)',v=>Math.round(v).toLocaleString('ru-RU')+' шт');
-  projPcs.forEach((v,i)=>{
+  if(revForecast.length>1){let p=`M ${x(0)} ${yBand(0,revForecast[0],scaleA.max)}`;revForecast.forEach((v,i)=>{if(i>0)p+=` L ${x(i)} ${yBand(0,v,scaleA.max)}`;});svg+=`<path d="${p}" fill="none" stroke="${C_PCS}" stroke-width="2.5" stroke-linecap="round"/>`;}
+  svg+=dailyPointsOnLine(revForecast,scaleA.max,0,C_PCS,'Прогноз выручки (PNL)',fmtRubShort);
+  revForecast.forEach((v,i)=>{
     const py=yBand(0,v,scaleA.max);
-    const dev=v-pcsPlan;const devP=pcsPlan?dev/pcsPlan*100:0;
+    const dev=v-planRev;const devP=planRev?dev/planRev*100:0;
     const bad=dev<0;
     const col=dev>=0?C_UP:C_DOWN;const sg=dev>=0?'+':'−';
-    const paren=` <tspan fill="${col}">(${sg}${fmtRubShort(Math.abs(dev))} / ${sg}${Math.abs(devP).toLocaleString('ru-RU',{maximumFractionDigits:1})}%)</tspan>`;
-    svg+=`<circle class="chart-point${bad?' pulse-bad':''}" cx="${x(i)}" cy="${py}" r="4" fill="rgba(28,13,46,0.85)" stroke="${bad?C_DOWN:C_PCS}" stroke-width="2.5" data-label="Заказы (прогноз), ${weekLabels[i]}" data-value="${v.toLocaleString('ru-RU')} шт."/>`;
+    const paren=planRev?` <tspan fill="${col}">(${sg}${fmtRubShort(Math.abs(dev))} / ${sg}${Math.abs(devP).toLocaleString('ru-RU',{maximumFractionDigits:1})}%)</tspan>`:'';
+    svg+=`<circle class="chart-point${bad?' pulse-bad':''}" cx="${x(i)}" cy="${py}" r="4" fill="rgba(28,13,46,0.85)" stroke="${bad?C_DOWN:C_PCS}" stroke-width="2.5" data-label="Выручка (прогноз), ${weekLabels[i]}" data-value="Прогноз закрытия месяца: ${fmtRub(v)}"/>`;
     svg+=`<text class="vlbl" x="${x(i)}" y="${py-9}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${bad?C_DOWN:C_PCS}" font-family="Forum">${fmtRubShort(v)}${paren}</text>`;
   });
 
@@ -581,15 +584,15 @@ async function renderMonth(mk){
   const factCount=data.real?(data.factRub||[]).length:weeks.filter(w=>w.end<=today).length;
   const factWeekly=(data.factRub||[]).slice(0,factCount);
   const cum=[];let s=0;factWeekly.forEach(v=>{s+=v;cum.push(s);});
-  const weekOrdPcs=data.real?(data.factPcs||[]):weeks.map(w=>{const a=w.start.getTime(),b=w.end.getTime();return (data.ordersDaily||[]).filter(o=>o.t>=a&&o.t<=b).reduce((t,o)=>t+o.pcs,0);}).slice(0,factCount);
-  const pcsCount=weekOrdPcs.length;
+  const weekRev=(data.real?(data.weekRev||[]):weeks.map(w=>{const a=w.start.getTime(),b=w.end.getTime();return (data.ordersDaily||[]).filter(o=>o.t>=a&&o.t<=b).reduce((t,o)=>t+o.rub,0);}).slice(0,factCount))||[];
+  const revCount=weekRev.length;
+  const cumRev=[];let sr=0;weekRev.forEach(v=>{sr+=v;cumRev.push(sr);});
   const seedBase=y*1000+m*10;
   const fc=cum.length?buildForecast(cum,n,factCount,factCount-1,seedBase):[];
-  const cumPcs=[];let sp=0;weekOrdPcs.forEach(v=>{sp+=v;cumPcs.push(sp);});
-  const projPcs=cumPcs.length?buildForecast(cumPcs,n,pcsCount,pcsCount-1,seedBase+7):[];
+  const fcRev=cumRev.length?buildForecast(cumRev,n,revCount,revCount-1,seedBase+7):[];
   const ordersDaily=(data.ordersDaily||[]).filter(o=>o.t<=today.getTime());
   const pctCount=data.real?(data.factPct||[]).length:factCount;
-  drawChart('chartBoxRub','tooltipRub',{weeks,weekLabels,plan:data.planRub,pctPlan:data.planPct,pcsPlan:data.ordersPcsPlan,lineValues:fc,factValues:cum,factWeekly,pctValues:(data.factPct||[]).slice(0,pctCount),ordersDaily,projPcs,factPcs:cumPcs,weekOrdPcs});
+  drawChart('chartBoxRub','tooltipRub',{weeks,weekLabels,plan:data.planRub,pctPlan:data.planPct,planRev:data.planRev||0,lineValues:fc,factValues:cum,factWeekly,pctValues:(data.factPct||[]).slice(0,pctCount),ordersDaily,revForecast:fcRev,revFact:cumRev,revWeekly:weekRev});
 }
 
 function buildMonthOptions(){
