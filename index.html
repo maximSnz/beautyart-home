@@ -400,6 +400,7 @@ function niceScale(maxValue,tickCount=4){if(maxValue<=0)maxValue=1;const rawStep
 
 function drawChart(boxId,tooltipId,cfg){
   const box=document.getElementById(boxId),tooltip=document.getElementById(tooltipId);
+      box.querySelectorAll('svg').forEach(el=>el.remove());
   const weeks=cfg.weeks,weekLabels=cfg.weekLabels,n=weeks.length;
   const lineVals=cfg.lineValues,factVals=cfg.factValues,factWeekly=cfg.factWeekly;
   const pctVals=cfg.pctValues,ordersDaily=cfg.ordersDaily||[];
@@ -598,15 +599,21 @@ async function renderMonth(mk){
   const factCount=data.real?(data.factRub||[]).length:weeks.filter(w=>w.end<=today).length;
   const factWeekly=(data.factRub||[]).slice(0,factCount);
   const cum=[];let s=0;factWeekly.forEach(v=>{s+=v;cum.push(s);});
-  const weekRev=data.real?(data.weekRev||[]):weeks.map(w=>{const a=w.start.getTime(),b=w.end.getTime();return (data.ordersDaily||[]).filter(o=>o.t>=a&&o.t<=b).reduce((t,o)=>t+o.rub,0);}).slice(0,factCount);
-  const revCount=weekRev.length;
-  const cumRev=[];let sr=0;weekRev.forEach(v=>{sr+=v;cumRev.push(sr);});
+  const pctCount=data.real?(data.factPct||[]).length:factCount;
+  const sumRev=()=>{const out=[];for(let i=0;i<factCount;i++){const w=weeks[i];if(!w){out.push(0);continue;}const a=w.start.getTime(),b=w.end.getTime();let s2=0;(data.ordersDaily||[]).forEach(o=>{if(o.t>=a&&o.t<=b)s2+=o.rub;});out.push(s2);}return out;};
+  const revWeekly=data.real?(data.weekRev||[]):sumRev();
+  const cumRev=[];let sr=0;revWeekly.forEach(v=>{sr+=v;cumRev.push(sr);});
   const seedBase=y*1000+m*10;
   const fc=cum.length?buildForecast(cum,n,factCount,factCount-1,seedBase):[];
-  const fcRev=cumRev.length?buildForecast(cumRev,n,revCount,revCount-1,seedBase+13):[];
+  const fcRev=cumRev.length?buildForecast(cumRev,n,revWeekly.length,revWeekly.length-1,seedBase+7):[];
   const ordersDaily=(data.ordersDaily||[]).filter(o=>o.t<=today.getTime());
-  const pctCount=data.real?(data.factPct||[]).length:factCount;
-  drawChart('chartBoxRub','tooltipRub',{weeks,weekLabels,plan:data.planRub,pctPlan:data.planPct,planRev:data.planRev||0,lineValues:fc,factValues:cum,factWeekly,pctValues:(data.factPct||[]).slice(0,pctCount),ordersDaily,revForecast:fcRev,revFact:cumRev,revWeekly:weekRev});
+  const box=document.getElementById('chartBoxRub');
+  try{
+    drawChart('chartBoxRub','tooltipRub',{weeks,weekLabels,plan:data.planRub,pctPlan:data.pctPlan,planRev:data.planRev||0,lineValues:fc,factValues:cum,factWeekly,pctValues:(data.factPct||[]).slice(0,pctCount),ordersDaily,revForecast:fcRev,revFact:cumRev,revWeekly});
+  }catch(e){
+    console.error('drawChart:',e);
+    if(box)box.innerHTML='<div style="margin:auto;padding:20px;color:#ffd7dd;font-family:Forum,serif">Ошибка отрисовки: '+e.message+' (подробности в консоли F12)</div>';
+  }
 }
 
 function buildMonthOptions(){
