@@ -449,6 +449,8 @@ const fmtPct=v=>v.toLocaleString('ru-RU',{minimumFractionDigits:1,maximumFractio
 const fmtDevRub=v=>(v>=0?'+':'−')+Math.abs(v).toLocaleString('ru-RU')+' ₽';
 const fmt1=v=>v.toLocaleString('ru-RU',{maximumFractionDigits:1});
 const fmt0=v=>Math.round(v).toLocaleString('ru-RU');
+    const fmt0=v=>Math.round(v).toLocaleString('ru-RU');
+const fmt=v=>Number(v||0).toLocaleString('ru-RU',{maximumFractionDigits:0});
 function niceScale(maxValue,tickCount=4){if(maxValue<=0)maxValue=1;const rawStep=maxValue/tickCount;const mag=Math.pow(10,Math.floor(Math.log10(rawStep)));const norm=rawStep/mag;let step;if(norm<=1)step=mag;else if(norm<=2)step=2*mag;else if(norm<=2.5)step=2.5*mag;else if(norm<=5)step=5*mag;else step=10*mag;return {step,max:Math.ceil(maxValue/step)*step};}
 const tipDev=(dev,fmtAbs,pct)=>{const col=dev>=0?C_UP:C_DOWN;const sg=dev>=0?'+':'−';return ` <span style="color:${col}">(${sg}${fmtAbs(Math.abs(dev))} / ${sg}${Math.abs(pct).toLocaleString('ru-RU',{maximumFractionDigits:1})}%)</span>`;};
 const tipDevPp=dev=>{const col=dev>=0?C_UP:C_DOWN;const sg=dev>=0?'+':'−';return ` <span style="color:${col}">(${sg}${Math.abs(dev).toLocaleString('ru-RU',{maximumFractionDigits:1})} п.п.)</span>`;};
@@ -654,22 +656,24 @@ async function renderMonth(mk){
   const [y,m]=mk.split('-').map(Number);
   const weeksISO=getWeeksInMonth(y,m-1);
   if(!weeksISO.length)return;
-  const n=weeksISO.length;
   let data=CHART_DATA[mk];
   if(!data){try{data=await loadRealMonth(mk);}catch(e){console.warn('данные ИП недоступны:',e);}}
-  if(!data)data=generateDemoMonth(mk,n);
+  if(!data)data=generateDemoMonth(mk,weeksISO.length);
   const today=new Date();today.setHours(0,0,0,0);
-  // недели-бакеты, обрезанные по границам месяца: первый день месяца .. последний день месяца
   const mStartMs=new Date(y,m-1,1).getTime(),mEndMs=new Date(y,m,0).getTime();
-  const weeks=weeksISO.map(w=>({start:new Date(Math.max(w.start.getTime(),mStartMs)),end:new Date(Math.min(w.end.getTime(),mEndMs))}));
-  const weekLabels=weeksISO.map(w=>`Нед ${getISOWeek(w.start)}`);
+  // бакеты: ISO-недели, обрезанные по месяцу, + хвостовой бакет до конца месяца
+  const buckets=weeksISO.map(w=>({start:new Date(Math.max(w.start.getTime(),mStartMs)),end:new Date(Math.min(w.end.getTime(),mEndMs))}));
+  const lastEnd=buckets[buckets.length-1].end.getTime();
+  if(lastEnd<mEndMs)buckets.push({start:new Date(lastEnd+86400000),end:new Date(mEndMs)});
+  const n=buckets.length;
+  const weekLabels=buckets.map((b,i)=>`Нед ${getISOWeek(b.start)}`);
   // CF-контур
-  const factCount=data.real?(data.factRub||[]).length:weeks.filter(w=>w.end<=today).length;
+  const factCount=data.real?(data.factRub||[]).length:buckets.filter(w=>w.end<=today).length;
   const factWeekly=(data.factRub||[]).slice(0,factCount);
   const cum=[];let s=0;factWeekly.forEach(v=>{s+=v;cum.push(s);});
   const pctCount=data.real?(data.factPct||[]).length:factCount;
-  // PNL-контур: недельная выручка по бакетам
-  const weekRaw=weeks.map(w=>{const a=w.start.getTime(),b=w.end.getTime();let s2=0,any=false;(data.ordersDaily||[]).forEach(o=>{if(o.t>=a&&o.t<=b){s2+=o.rub;any=true;}});return any?s2:null;});
+  // PNL-контур: недельная выручка строго из бакетов (единственный источник)
+  const weekRaw=buckets.map(b=>{const a=b.start.getTime(),e=b.end.getTime();let s2=0,any=false;(data.ordersDaily||[]).forEach(o=>{if(o.t>=a&&o.t<=e){s2+=o.rub;any=true;}});return any?s2:null;});
   let lastIdx=weekRaw.length-1;while(lastIdx>=0&&weekRaw[lastIdx]==null)lastIdx--;
   const weekRev=weekRaw.slice(0,lastIdx+1).map(v=>v||0);
   const cumRev=[];let sr=0;weekRev.forEach(v=>{sr+=v;cumRev.push(sr);});
@@ -677,9 +681,10 @@ async function renderMonth(mk){
   const fc=cum.length?buildForecast(cum,n,factCount,factCount-1,seedBase):[];
   const fcRev=cumRev.length?buildForecast(cumRev,n,weekRev.length,weekRev.length-1,seedBase+7):[];
   const ordersDaily=(data.ordersDaily||[]).filter(o=>o.t<=today.getTime());
+  console.log('[renderMonth]',mk,{buckets:n,weekRev:weekRev.length,cumRevLast:cumRev.length?cumRev[cumRev.length-1]:0,factRub:factCount,ordersDaily:ordersDaily.length,planRev:data.planRev||0});
   const box=document.getElementById('chartBoxRub');
   try{
-    drawChart('chartBoxRub','tooltipRub',{weeks,weekLabels,plan:data.planRub,pctPlan:data.planPct,planRev:data.planRev||0,lineValues:fc,factValues:cum,factWeekly,pctValues:(data.factPct||[]).slice(0,pctCount),ordersDaily,revForecast:fcRev,revFact:cumRev,revWeekly:weekRev});
+    drawChart('chartBoxRub','tooltipRub',{weeks:buckets,weekLabels,plan:data.planRub,pctPlan:data.planPct,planRev:data.planRev||0,lineValues:fc,factValues:cum,factWeekly,pctValues:(data.factPct||[]).slice(0,pctCount),ordersDaily,revForecast:fcRev,revFact:cumRev,revWeekly:weekRev});
   }catch(e){
     console.error('drawChart:',e);
     if(box)box.innerHTML='<div style="margin:auto;padding:20px;color:#ffd7dd;font-family:Forum,serif">Ошибка отрисовки: '+e.message+' (подробности в консоли F12)</div>';
