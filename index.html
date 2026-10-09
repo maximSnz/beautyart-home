@@ -449,7 +449,6 @@ const fmtPct=v=>v.toLocaleString('ru-RU',{minimumFractionDigits:1,maximumFractio
 const fmtDevRub=v=>(v>=0?'+':'−')+Math.abs(v).toLocaleString('ru-RU')+' ₽';
 const fmt1=v=>v.toLocaleString('ru-RU',{maximumFractionDigits:1});
 const fmt0=v=>Math.round(v).toLocaleString('ru-RU');
-    const fmt0=v=>Math.round(v).toLocaleString('ru-RU');
 const fmt=v=>Number(v||0).toLocaleString('ru-RU',{maximumFractionDigits:0});
 function niceScale(maxValue,tickCount=4){if(maxValue<=0)maxValue=1;const rawStep=maxValue/tickCount;const mag=Math.pow(10,Math.floor(Math.log10(rawStep)));const norm=rawStep/mag;let step;if(norm<=1)step=mag;else if(norm<=2)step=2*mag;else if(norm<=2.5)step=2.5*mag;else if(norm<=5)step=5*mag;else step=10*mag;return {step,max:Math.ceil(maxValue/step)*step};}
 const tipDev=(dev,fmtAbs,pct)=>{const col=dev>=0?C_UP:C_DOWN;const sg=dev>=0?'+':'−';return ` <span style="color:${col}">(${sg}${fmtAbs(Math.abs(dev))} / ${sg}${Math.abs(pct).toLocaleString('ru-RU',{maximumFractionDigits:1})}%)</span>`;};
