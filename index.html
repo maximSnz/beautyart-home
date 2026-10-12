@@ -393,6 +393,7 @@ function seededRandom(seed){let s=seed;return function(){s=(s*9301+49297)%233280
 const isWeekendD=d=>d.getDay()===0||d.getDay()===6;
 function effDaysOfMonth(y,m){const last=new Date(y,m,0).getDate();let B=0,W=0;for(let dd=1;dd<=last;dd++){const wd=new Date(y,m-1,dd).getDay();if(wd===0||wd===6)W++;else B++;}return B+0.7*W;}
 function getBaseDays(){const today=new Date();today.setHours(0,0,0,0);const yD=addDays(today,-1);const yIsWe=isWeekendD(yD);let baseDays=[];let d;if(yIsWe){const curWeStart=(yD.getDay()===0)?addDays(yD,-1):yD;d=addDays(curWeStart,-1);while(baseDays.length<4){if(isWeekendD(d))baseDays.unshift(d);d=addDays(d,-1);}}else{d=addDays(yD,-1);while(baseDays.length<3){if(!isWeekendD(d))baseDays.unshift(d);d=addDays(d,-1);}}return {baseDays,yD,yIsWe};}
+function calWeeksOfMonth(y,m){const first=new Date(y,m-1,1),last=new Date(y,m,0);let d=addDays(first,-((first.getDay()+6)%7));const out=[];while(d<=last){out.push(new Date(d));d=addDays(d,7);}return out;}
 async function fetchPages(q){let out=[],off=0;while(true){const r=await fetch(SUPABASE_URL+'/rest/v1/'+q+`&order=id&limit=1000&offset=${off}`,{headers:HD});if(!r.ok)throw new Error(`HTTP ${r.status} ${q.split('?')[0]}`);const j=await r.json();out=out.concat(j);if(j.length<1000)break;off+=1000;}return out;}
 
 function generateDemoMonth(mk,weeksCount){
@@ -416,36 +417,27 @@ function generateDemoMonth(mk,weeksCount){
 async function loadRealMonth(mk){
   if(REAL_CACHE[mk])return REAL_CACHE[mk];
   const [y,m]=mk.split('-').map(Number);
-  const weeks=getWeeksInMonth(y,m-1);
-  if(!weeks.length)return null;
-  const weekKeys=weeks.map(w=>keyOfMonday(w.start));
+  const mondays=calWeeksOfMonth(y,m);
+  const weekKeys=mondays.map(keyOfMonday);
   let planRub=0,planRev=0;
   const rp=await fetch(SUPABASE_URL+`/rest/v1/sales_plan?month=eq.${mk}&select=plan_qty,price,margin_pct`,{headers:HD});
   if(!rp.ok)throw new Error('sales_plan HTTP '+rp.status);
   (await rp.json()).forEach(r=>{const q=Number(r.plan_qty||0),pr=Number(r.price||0),pc=Number(r.margin_pct||0);planRev+=q*pr;planRub+=q*pr*pc/100;});
   const planPct=planRev>0?planRub/planRev*100:0;
   const inList='('+weekKeys.map(w=>`"${w}"`).join(',')+')';
-  const factRub=[],factPct=[];
-  {
-    const agg={};
-    (await fetchPages(`sales_plan_weeks?week=in.${inList}&metric=in.(mar,revn)&fact=not.is.null&select=week,metric,fact`)).forEach(r=>{
-      const g=agg[r.week]=agg[r.week]||{mar:0,revn:0};
-      g[r.metric]=(g[r.metric]||0)+Number(r.fact||0);
-    });
-    weekKeys.forEach(w=>{
-      const g=agg[w];
-      if(!g)return;
-      factRub.push(g.mar);
-      factPct.push(g.revn?g.mar/g.revn*100:0);
-    });
-  }
-  const dFrom=keyOfMonday(weeks[0].start);
-  const lastDay=new Date(y,m,0),wEnd=addDays(weeks[weeks.length-1].start,6);
-  const dTo=keyOfMonday(wEnd>lastDay?wEnd:lastDay);
+  // CF-факты недель: СУММА по товарам, ключ — понедельник недели
+  const cfWeeks={};
+  (await fetchPages(`sales_plan_weeks?week=in.${inList}&metric=in.(mar,revn)&fact=not.is.null&select=week,metric,fact`)).forEach(r=>{
+    const g=cfWeeks[r.week]=cfWeeks[r.week]||{mar:0,revn:0};
+    g[r.metric]=(g[r.metric]||0)+Number(r.fact||0);
+  });
+  // PNL-дни за полные крайние недели — нужны для деления стыковых недель между месяцами
+  const dFrom=weekKeys[0];
+  const dTo=keyOfMonday(addDays(mondays[mondays.length-1],6));
   const dayMap=new Map();
   (await fetchPages(`product_sales?sale_date=gte.${dFrom}&sale_date=lte.${dTo}&select=sale_date,qty,revenue`)).forEach(x=>{const g=dayMap.get(x.sale_date)||{rub:0,pcs:0};g.rub+=Number(x.revenue||0);g.pcs+=Number(x.qty||0);dayMap.set(x.sale_date,g);});
   const ordersDaily=[...dayMap.entries()].sort((a,b)=>a[0]<b[0]?-1:1).map(([d,g])=>{const [yy,mm,dd]=d.split('-').map(Number);return {t:new Date(yy,mm-1,dd).getTime(),rub:g.rub,pcs:g.pcs};});
-  const out={planRub,planRev,planPct,factRub,factPct,ordersDaily,real:true};
+  const out={planRub,planRev,planPct,cfWeeks,ordersDaily,real:true};
   REAL_CACHE[mk]=out;
   return out;
 }
@@ -675,24 +667,33 @@ function buildForecast(cum,weeksCount,factCount,uptoIdx,seedBase){
 
 async function renderMonth(mk){
   const [y,m]=mk.split('-').map(Number);
-  const weeksISO=getWeeksInMonth(y,m-1);
-  if(!weeksISO.length)return;
-  const isoLabels=weeksISO.map(w=>`Нед ${getISOWeek(w.start)}`);
+  const mondays=calWeeksOfMonth(y,m);
   let data=CHART_DATA[mk];
   if(!data){try{data=await loadRealMonth(mk);}catch(e){console.error('данные ИП недоступны:',e);document.getElementById('chartBoxRub').querySelectorAll('svg').forEach(el=>el.remove());const cap=document.getElementById('diagCap');if(cap)cap.textContent='Ошибка загрузки: '+e.message;return;}}
-  if(!data)data=generateDemoMonth(mk,weeksISO.length);
+  if(!data)data=generateDemoMonth(mk,getWeeksInMonth(y,m-1).length);
   const today=new Date();today.setHours(0,0,0,0);
   const mStartMs=new Date(y,m-1,1).getTime(),mEndMs=new Date(y,m,0).getTime();
-  const weeks=weeksISO.map((w,i)=>({start:new Date(Math.max(w.start.getTime(),mStartMs)),end:new Date(Math.min(w.end.getTime(),mEndMs)),label:isoLabels[i]}));
-  if(weeks[weeks.length-1].end.getTime()<mEndMs)weeks.push({start:new Date(weeks[weeks.length-1].end.getTime()+86400000),end:new Date(mEndMs),label:null});
-  const weekLabels=weeks.map(w=>w.label||(`Нед ${getISOWeek(w.start)}`));
+  const weeks=mondays.map(mo=>({mo,start:new Date(Math.max(mo.getTime(),mStartMs)),end:new Date(Math.min(addDays(mo,6).getTime(),mEndMs))}));
+  const weekLabels=weeks.map(w=>`Нед ${getISOWeek(w.mo)}`);
   const n=weeks.length;
   const sane=a=>(a||[]).filter(v=>Number.isFinite(v));
-  // CF: только то, что реально пришло из базы
-  const factWeekly=sane(data.factRub);
+  // CF: только то, что реально пришло из базы. Неделя на стыке месяцев делится
+  // пропорционально выручке PNL по дням (нет выручки — по числу дней)
+  let factWeekly=[],pctVals=[];
+  if(data.cfWeeks){
+    const revBetween=(a,b)=>(data.ordersDaily||[]).reduce((t,o)=>o.t>=a&&o.t<=b?t+o.rub:t,0);
+    for(const w of weeks){
+      const g=data.cfWeeks[keyOfMonday(w.mo)];
+      if(!g)break;
+      const full=revBetween(w.mo.getTime(),addDays(w.mo,6).getTime());
+      const days=Math.round((w.end-w.start)/86400000)+1;
+      const share=days===7?1:(full>0?revBetween(w.start.getTime(),w.end.getTime())/full:days/7);
+      factWeekly.push(Math.round(g.mar*share));
+      pctVals.push(g.revn?g.mar/g.revn*100:0);
+    }
+  }else{factWeekly=sane(data.factRub);pctVals=sane(data.factPct).slice(0,factWeekly.length);}
   const factCount=factWeekly.length;
   const cum=[];let s=0;factWeekly.forEach(v=>{s+=v;cum.push(s);});
-  const pctVals=sane(data.factPct).slice(0,factCount);
   // PNL: недельная выручка считаем ЗДЕСЬ из дневных сумм по бакетам месяца
   const weekRaw=weeks.map(w=>{const a=w.start.getTime(),b=w.end.getTime();let s2=0,any=false;(data.ordersDaily||[]).forEach(o=>{if(o.t>=a&&o.t<=b){s2+=o.rub;any=true;}});return any?s2:null;});
   let lastIdx=weekRaw.length-1;while(lastIdx>=0&&weekRaw[lastIdx]==null)lastIdx--;
@@ -701,7 +702,7 @@ async function renderMonth(mk){
   const seedBase=y*1000+m*10;
   const fc=cum.length?buildForecast(cum,n,factCount,factCount-1,seedBase):[];
   const fcRev=cumRev.length?buildForecast(cumRev,n,weekRev.length,weekRev.length-1,seedBase+7):[];
-  const ordersDaily=(data.ordersDaily||[]).filter(o=>o.t>=mStartMs&&o.t<=today.getTime());
+  const ordersDaily=(data.ordersDaily||[]).filter(o=>o.t>=mStartMs&&o.t<=mEndMs&&o.t<=today.getTime());
   // видимая диагностика под графиком
   const diag=`[diag] ${mk}: недель=${n} • выручка недель=${weekRev.length} (итог ${fmtRubShort(cumRev[cumRev.length-1]||0)}) • CF маржа недель=${factCount} • маржин.=${pctVals.length} • дней PNL=${ordersDaily.length} • планВыр=${fmtRubShort(data.planRev||0)}`;
   console.log(diag);
