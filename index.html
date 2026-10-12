@@ -424,20 +424,21 @@ async function loadRealMonth(mk){
   if(rp.ok)(await rp.json()).forEach(r=>{const q=Number(r.plan_qty||0),pr=Number(r.price||0),pc=Number(r.margin_pct||0);planRev+=q*pr;planRub+=q*pr*pc/100;});
   const planPct=planRev>0?planRub/planRev*100:0;
   const inList='('+weekKeys.map(w=>`"${w}"`).join(',')+')';
-const rw=await fetch(SUPABASE_URL+`/rest/v1/sales_plan_weeks?week=in.${inList}&metric=in.(mar,revn)&fact=not.is.null&select=week,metric,fact&limit=1000`,{headers:HD});
-if(rw.ok){
-  const agg={};
-  (await rw.json()).forEach(r=>{
-    const g=agg[r.week]=agg[r.week]||{mar:0,revn:0};
-    g[r.metric]=(g[r.metric]||0)+Number(r.fact||0);
-  });
-  weekKeys.forEach(w=>{
-    const g=agg[w];
-    if(!g)return;
-    factRub.push(g.mar);
-    factPct.push(g.revn?g.mar/g.revn*100:0);
-  });
-}
+  const factRub=[],factPct=[];
+  const rw=await fetch(SUPABASE_URL+`/rest/v1/sales_plan_weeks?week=in.${inList}&metric=in.(mar,revn)&fact=not.is.null&select=week,metric,fact&limit=1000`,{headers:HD});
+  if(rw.ok){
+    const agg={};
+    (await rw.json()).forEach(r=>{
+      const g=agg[r.week]=agg[r.week]||{mar:0,revn:0};
+      g[r.metric]=(g[r.metric]||0)+Number(r.fact||0);
+    });
+    weekKeys.forEach(w=>{
+      const g=agg[w];
+      if(!g)return;
+      factRub.push(g.mar);
+      factPct.push(g.revn?g.mar/g.revn*100:0);
+    });
+  }
   const dFrom=keyOfMonday(weeks[0].start);
   const dTo=keyOfMonday(addDays(weeks[weeks.length-1].start,6));
   const dayMap=new Map();
