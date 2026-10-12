@@ -424,13 +424,20 @@ async function loadRealMonth(mk){
   if(rp.ok)(await rp.json()).forEach(r=>{const q=Number(r.plan_qty||0),pr=Number(r.price||0),pc=Number(r.margin_pct||0);planRev+=q*pr;planRub+=q*pr*pc/100;});
   const planPct=planRev>0?planRub/planRev*100:0;
   const inList='('+weekKeys.map(w=>`"${w}"`).join(',')+')';
-  const factRub=[],factPct=[];
-const rw=await fetch(SUPABASE_URL+`/rest/v1/sales_plan_weeks?week=in.${inList}&metric=in.(mar,pct)&fact=not.is.null&select=week,metric,fact&limit=1000`,{headers:HD});
-  if(rw.ok){
-    const byWeek={};
-    (await rw.json()).forEach(r=>{(byWeek[r.week]=byWeek[r.week]||{})[r.metric]=Number(r.fact);});
-    weekKeys.forEach(w=>{const g=byWeek[w];if(!g)return;if(g.mar!=null)factRub.push(g.mar);if(g.pct!=null)factPct.push(g.pct);});
-  }
+const rw=await fetch(SUPABASE_URL+`/rest/v1/sales_plan_weeks?week=in.${inList}&metric=in.(mar,revn)&fact=not.is.null&select=week,metric,fact&limit=1000`,{headers:HD});
+if(rw.ok){
+  const agg={};
+  (await rw.json()).forEach(r=>{
+    const g=agg[r.week]=agg[r.week]||{mar:0,revn:0};
+    g[r.metric]=(g[r.metric]||0)+Number(r.fact||0);
+  });
+  weekKeys.forEach(w=>{
+    const g=agg[w];
+    if(!g)return;
+    factRub.push(g.mar);
+    factPct.push(g.revn?g.mar/g.revn*100:0);
+  });
+}
   const dFrom=keyOfMonday(weeks[0].start);
   const dTo=keyOfMonday(addDays(weeks[weeks.length-1].start,6));
   const dayMap=new Map();
@@ -472,9 +479,10 @@ function drawChart(boxId,tooltipId,cfg){
   const qTop=q=>padT+bandH*q;
   const yBand=(q,v,max)=>qTop(q+1)-bandH*0.08-(v/max)*(bandH*0.84);
 
-  const scaleB=niceScale(Math.max(plan,...lineVals,...factVals));
-  const scaleC=niceScale(Math.max(pctPlan,...pctVals));
-  const scaleA=niceScale(Math.max(planRev,...revForecast,...revFact));
+  const fin=a=>a.filter(v=>Number.isFinite(v));
+  const scaleB=niceScale(Math.max(plan,...fin(lineVals),...fin(factVals)));
+  const scaleC=niceScale(Math.max(pctPlan,...fin(pctVals)));
+  const scaleA=niceScale(Math.max(planRev,...fin(revForecast),...fin(revFact)));
   const avgPcs=ordersDaily.length?ordersDaily.reduce((s,o)=>s+o.pcs,0)/ordersDaily.length:0;
   const scaleD=Math.max(...ordersDaily.map(o=>o.pcs),avgPcs,1);
 
@@ -649,7 +657,22 @@ function drawChart(boxId,tooltipId,cfg){
   applyAnnotations();
 }
 
-function buildForecast(cum,weeksCount,factCount,uptoIdx,seedBase){const out=[];for(let i=0;i<=uptoIdx;i++){const closed=i<factCount;const lastClosed=Math.max(0,factCount-1);const cumI=closed?cum[i]:cum[lastClosed];const used=closed?(i+1):factCount;const avg=used?cumI/used:0;const remaining=weeksCount-(closed?(i+1):factCount);const k=0.85+seededRandom(seedBase+i*31)()*0.3;out.push(Math.round(cumI+remaining*avg*k));}return out;}
+function buildForecast(cum,weeksCount,factCount,uptoIdx,seedBase){
+  const out=[];
+  if(!cum.length)return out;
+  const lastIdx=cum.length-1;
+  for(let i=0;i<=uptoIdx;i++){
+    const closed=i<factCount;
+    const lastClosed=Math.min(Math.max(0,factCount-1),lastIdx);
+    const cumI=closed?(cum[i]!==undefined?cum[i]:cum[lastIdx]):cum[lastClosed];
+    const used=closed?(i+1):factCount;
+    const avg=used?cumI/used:0;
+    const remaining=weeksCount-(closed?(i+1):factCount);
+    const k=0.85+seededRandom(seedBase+i*31)()*0.3;
+    out.push(Math.round(cumI+remaining*avg*k));
+  }
+  return out;
+}
 
 async function renderMonth(mk){
   const [y,m]=mk.split('-').map(Number);
@@ -665,7 +688,7 @@ async function renderMonth(mk){
   if(weeks[weeks.length-1].end.getTime()<mEndMs)weeks.push({start:new Date(weeks[weeks.length-1].end.getTime()+86400000),end:new Date(mEndMs),label:null});
   const weekLabels=weeks.map(w=>w.label||(`Нед ${getISOWeek(w.start)}`));
   const n=weeks.length;
-  const factCount=data.real?(data.factRub||[]).length:weeks.filter(w=>w.end<=today).length;
+ const factCount=data.real?(data.factRub||[]).length:Math.min((data.factRub||[]).length,weeks.filter(w=>w.end<=today).length);
   const factWeekly=(data.factRub||[]).slice(0,factCount);
   const cum=[];let s=0;factWeekly.forEach(v=>{s+=v;cum.push(s);});
   const pctCount=data.real?(data.factPct||[]).length:factCount;
