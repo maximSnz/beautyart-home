@@ -539,7 +539,6 @@ function drawChart(boxId,tooltipId,cfg){
     return out;
   };
 
-  // бледная дневная линия — штуки PNL
   if(ordersDaily.length>1){
     let o='';ordersDaily.forEach((od,i)=>{o+=(i===0?'M ':' L ')+xDay(od.t)+' '+yBand(0,od.pcs,scaleD);});
     svg+=`<path d="${o}" fill="none" stroke="${C_ORD}" stroke-width="1.2" stroke-linecap="round" opacity="0.4"/>`;
@@ -580,7 +579,6 @@ function drawChart(boxId,tooltipId,cfg){
     svg+=`<text class="vlbl" x="${x(i)}" y="${py-19}" text-anchor="middle" font-size="9" font-weight="700" fill="${C_PCS}" font-family="Forum">${fmtRubShort(v)}${paren?`<tspan x="${x(i)}" dy="10" font-size="8.5" fill="${col}">${paren}</tspan>`:''}</text>`;
   });
 
-  // полоса 1: маржа CF
   if(plan>0){const planY=yBand(1,plan,scaleB.max);svg+=`<line x1="${padL}" y1="${planY}" x2="${plotRight}" y2="${planY}" stroke="${C_MARGIN}" stroke-width="2.2" stroke-dasharray="8 6"/>`;}
   if(factVals.length>1){let f=`M ${x(0)} ${yBand(1,factVals[0],scaleB.max)}`;factVals.forEach((v,i)=>{if(i>0)f+=` L ${x(i)} ${yBand(1,v,scaleB.max)}`;});svg+=`<path d="${f}" fill="none" stroke="${C_FACT}" stroke-width="2" stroke-linecap="round"/>`;}
   svg+=dailyPointsOnLine(factVals,scaleB.max,1,C_FACT,'Факт маржи (накопит.)',fmtRubShort,'day');
@@ -612,7 +610,6 @@ function drawChart(boxId,tooltipId,cfg){
     svg+=`<text class="vlbl" x="${x(i)}" y="${flY}" text-anchor="middle" font-size="9" font-weight="700" fill="${C_MARGIN}" font-family="Forum">${fmtRubShort(v)}${paren?`<tspan x="${x(i)}" dy="10" font-size="8.5" fill="${col}">${paren}</tspan>`:''}</text>`;
   });
 
-  // полоса 2: маржинальность CF
   if(pctPlan>0){const ppY=yBand(2,pctPlan,scaleC.max);svg+=`<line x1="${padL}" y1="${ppY}" x2="${plotRight}" y2="${ppY}" stroke="${C_PCT}" stroke-width="1.8" stroke-dasharray="6 6"/>`;}
   if(pctVals.length>1){let p=`M ${x(0)} ${yBand(2,pctVals[0],scaleC.max)}`;pctVals.forEach((v,i)=>{if(i>0)p+=` L ${x(i)} ${yBand(2,v,scaleC.max)}`;});svg+=`<path d="${p}" fill="none" stroke="${C_PCT}" stroke-width="2" stroke-linecap="round"/>`;}
   svg+=dailyPointsOnLine(pctVals,scaleC.max,2,C_PCT,'Маржинальность',fmtPct,'pp',pctPlan);
