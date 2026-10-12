@@ -689,20 +689,28 @@ async function renderMonth(mk){
   if(weeks[weeks.length-1].end.getTime()<mEndMs)weeks.push({start:new Date(weeks[weeks.length-1].end.getTime()+86400000),end:new Date(mEndMs),label:null});
   const weekLabels=weeks.map(w=>w.label||(`Нед ${getISOWeek(w.start)}`));
   const n=weeks.length;
- const factCount=data.real?(data.factRub||[]).length:Math.min((data.factRub||[]).length,weeks.filter(w=>w.end<=today).length);
-  const factWeekly=(data.factRub||[]).slice(0,factCount);
+  const sane=a=>(a||[]).filter(v=>Number.isFinite(v));
+  // CF: только то, что реально пришло из базы
+  const factWeekly=sane(data.factRub);
+  const factCount=factWeekly.length;
   const cum=[];let s=0;factWeekly.forEach(v=>{s+=v;cum.push(s);});
-  const pctCount=data.real?(data.factPct||[]).length:factCount;
+  const pctVals=sane(data.factPct).slice(0,factCount);
+  // PNL: недельная выручка считаем ЗДЕСЬ из дневных сумм по бакетам месяца
   const weekRaw=weeks.map(w=>{const a=w.start.getTime(),b=w.end.getTime();let s2=0,any=false;(data.ordersDaily||[]).forEach(o=>{if(o.t>=a&&o.t<=b){s2+=o.rub;any=true;}});return any?s2:null;});
   let lastIdx=weekRaw.length-1;while(lastIdx>=0&&weekRaw[lastIdx]==null)lastIdx--;
   const weekRev=weekRaw.slice(0,lastIdx+1).map(v=>v||0);
-  const revCount=weekRev.length;
   const cumRev=[];let sr=0;weekRev.forEach(v=>{sr+=v;cumRev.push(sr);});
   const seedBase=y*1000+m*10;
   const fc=cum.length?buildForecast(cum,n,factCount,factCount-1,seedBase):[];
-  const fcRev=cumRev.length?buildForecast(cumRev,n,revCount,revCount-1,seedBase+7):[];
+  const fcRev=cumRev.length?buildForecast(cumRev,n,weekRev.length,weekRev.length-1,seedBase+7):[];
   const ordersDaily=(data.ordersDaily||[]).filter(o=>o.t>=mStartMs&&o.t<=today.getTime());
-  drawChart('chartBoxRub','tooltipRub',{weeks,weekLabels,plan:data.planRub,pctPlan:data.planPct,planRev:data.planRev||0,lineValues:fc,factValues:cum,factWeekly,pctValues:(data.factPct||[]).slice(0,pctCount),ordersDaily,revForecast:fcRev,revFact:cumRev,revWeekly:weekRev});
+  // видимая диагностика под графиком
+  const diag=`[diag] ${mk}: недель=${n} • выручка недель=${weekRev.length} (итог ${fmtRubShort(cumRev[cumRev.length-1]||0)}) • CF маржа недель=${factCount} • маржин.=${pctVals.length} • дней PNL=${ordersDaily.length} • планВыр=${fmtRubShort(data.planRev||0)}`;
+  console.log(diag);
+  let cap=document.getElementById('diagCap');
+  if(!cap){cap=document.createElement('div');cap.id='diagCap';cap.style.cssText='flex:0 0 auto;font-size:.7em;color:rgba(255,255,255,.65);margin-top:4px;font-family:Forum,serif';const lg=document.getElementById('legendBottom');if(lg)lg.parentNode.insertBefore(cap,lg);}
+  cap.textContent=diag;
+  drawChart('chartBoxRub','tooltipRub',{weeks,weekLabels,plan:data.planRub,pctPlan:data.planPct,planRev:data.planRev||0,lineValues:fc,factValues:cum,factWeekly,pctValues:pctVals,ordersDaily,revForecast:fcRev,revFact:cumRev,revWeekly:weekRev});
 }
 
 // === вкладка «Ключевые отклонения» ===
