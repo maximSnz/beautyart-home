@@ -497,7 +497,11 @@ function drawChart(boxId,tooltipId,cfg){
   const avgPcs=ordersDaily.length?ordersDaily.reduce((s,o)=>s+o.pcs,0)/ordersDaily.length:0;
   const scaleD=Math.max(...ordersDaily.map(o=>o.pcs),avgPcs,1);
 
-  const x=i=>padL+inset+(n===1?dataW/2:dataW*i/(n-1));
+  const spanStartMs=weeks[0].start.getTime(),spanEndMs=weeks[n-1].end.getTime()+86400000;
+  const xDay=t=>padL+inset+dataW*((t-spanStartMs)/(spanEndMs-spanStartMs));
+  const asOfMs=cfg.asOf?cfg.asOf.getTime():Infinity;
+  const x=i=>xDay(weeks[i].end.getTime());
+  const xp=i=>xDay(Math.max(weeks[i].start.getTime(),Math.min(weeks[i].end.getTime(),asOfMs)));
   const C_PCS='#5eead4',C_MARGIN='#ffffff',C_PCT='#fde047',C_ORD='#7dd3fc',C_FACT='#c084fc';
 
   let svg=`<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`;
@@ -524,28 +528,14 @@ function drawChart(boxId,tooltipId,cfg){
   bandAxis(1,'right',C_MARGIN,scaleB.max,v=>fmtMillions(v),'Маржа, млн ₽ (CF)',plan);
   bandAxis(2,'left',C_PCT,scaleC.max,v=>fmt1(v),'Маржинальность, % (CF)',pctPlan);
 
-  const spanStartMs=weeks[0].start.getTime(),spanEndMs=weeks[n-1].end.getTime()+86400000;
-  const xDay=t=>padL+inset+dataW*((t-spanStartMs)/(spanEndMs-spanStartMs));
-  const dailyPointsOnLine=(vals,yMax,band,color,prefix,fmtV,devMode,planVal)=>{
-    if(!vals||vals.length<2)return '';
-    const pts=vals.map((v,i)=>[x(i),v]);
-    const valAt=px=>{
-      if(px<pts[0][0]||px>pts[pts.length-1][0])return null;
-      let i=0;while(i<pts.length-2&&px>pts[i+1][0])i++;
-      const f=(px-pts[i][0])/((pts[i+1][0]-pts[i][0])||1);
-      return pts[i][1]+(pts[i+1][1]-pts[i][1])*f;
-    };
+  const dailyPoints=(series,yMax,band,color,prefix,fmtV,devMode,planVal)=>{
     let out='';
-    for(let t=spanStartMs;t<=spanEndMs;t+=86400000){
-      const px=xDay(t);
-      const v=valAt(px);
-      if(v==null)continue;
+    (series||[]).forEach((p,k)=>{
       let dev='';
-      if(devMode==='plan'&&planVal){const dv=v-planVal;dev=tipDev(dv,fmtV,planVal?dv/planVal*100:0);}
-      else if(devMode==='pp'&&planVal!=null){dev=tipDevPp(v-planVal);}
-      else if(devMode==='day'){const pv=valAt(xDay(t-86400000));if(pv!=null&&pv>0){const dv=v-pv;dev=tipDev(dv,fmtV,dv/pv*100);}}
-      out+=`<circle class="chart-point" cx="${px.toFixed(1)}" cy="${yBand(band,v,yMax).toFixed(1)}" r="2.5" fill="${color}" opacity="0.55" data-label="${fmtShort(new Date(t))}" data-value="${prefix}: ${fmtV(v)}${dev}"/>`;
-    }
+      if(devMode==='plan'&&planVal){const dv=p.v-planVal;dev=tipDev(dv,fmtV,dv/planVal*100);}
+      else if(devMode==='day'){dev=` • за день: ${fmtV(p.v-(k>0?series[k-1].v:0))}`;}
+      out+=`<circle class="chart-point" cx="${xDay(p.t).toFixed(1)}" cy="${yBand(band,p.v,yMax).toFixed(1)}" r="2.5" fill="${color}" opacity="0.55" data-label="${fmtShort(new Date(p.t))}" data-value="${prefix}: ${fmtV(p.v)}${dev}"/>`;
+    });
     return out;
   };
 
@@ -562,10 +552,10 @@ function drawChart(boxId,tooltipId,cfg){
   }
   if(avgPcs>0){const ay=yBand(0,avgPcs,scaleD);svg+=`<line x1="${padL}" y1="${ay}" x2="${plotRight}" y2="${ay}" stroke="${C_ORD}" stroke-width="1.5" stroke-dasharray="4 5" opacity="0.85"/>`;}
   if(planRev>0){const py=yBand(0,planRev,scaleA.max);svg+=`<line x1="${padL}" y1="${py}" x2="${plotRight}" y2="${py}" stroke="${C_PCS}" stroke-width="2" stroke-dasharray="6 6"/>`;}
-  if(revFact.length>1){let f=`M ${x(0)} ${yBand(0,revFact[0],scaleA.max)}`;revFact.forEach((v,i)=>{if(i>0)f+=` L ${x(i)} ${yBand(0,v,scaleA.max)}`;});svg+=`<path d="${f}" fill="none" stroke="${C_FACT}" stroke-width="2" stroke-linecap="round"/>`;}
-  svg+=dailyPointsOnLine(revFact,scaleA.max,0,C_FACT,'Факт выручки (накопит.)',fmtRubShort,'day');
+  if(revFact.length>1){let f=`M ${xp(0)} ${yBand(0,revFact[0],scaleA.max)}`;revFact.forEach((v,i)=>{if(i>0)f+=` L ${xp(i)} ${yBand(0,v,scaleA.max)}`;});svg+=`<path d="${f}" fill="none" stroke="${C_FACT}" stroke-width="2" stroke-linecap="round"/>`;}
+  svg+=dailyPoints(cfg.revFactDaily,scaleA.max,0,C_FACT,'Факт выручки (накопит.)',fmtRubShort,'day');
   revFact.forEach((v,i)=>{
-    const px=x(i),py=yBand(0,v,scaleA.max);
+    const px=xp(i),py=yBand(0,v,scaleA.max);
     const weekly=revWeekly[i]||0;
     const dW=(i>0&&revWeekly[i-1])?weekly-revWeekly[i-1]:null;
     const bad=dW!==null&&dW<0;
@@ -577,23 +567,22 @@ function drawChart(boxId,tooltipId,cfg){
     svg+=`<circle class="chart-point${bad?' pulse-bad':''}" cx="${px}" cy="${py}" r="5" fill="${bad?C_DOWN:C_FACT}" data-label="Факт выручки, ${weekLabels[i]}" data-value="${tip}"/>`;
     svg+=`<text class="vlbl" x="${px}" y="${py+16}" text-anchor="middle" font-size="9" font-weight="700" fill="${C_FACT}" font-family="Forum">${plMain}${plParen?`<tspan x="${px}" dy="10" font-size="8.5" fill="${plParenCol}">${plParen}</tspan>`:''}</text>`;
   });
-  if(revForecast.length>1){let p=`M ${x(0)} ${yBand(0,revForecast[0],scaleA.max)}`;revForecast.forEach((v,i)=>{if(i>0)p+=` L ${x(i)} ${yBand(0,v,scaleA.max)}`;});svg+=`<path d="${p}" fill="none" stroke="${C_PCS}" stroke-width="2" stroke-linecap="round"/>`;}
-  svg+=dailyPointsOnLine(revForecast,scaleA.max,0,C_PCS,'Прогноз выручки',fmtRubShort,'plan',planRev);
+  if(revForecast.length>1){let p=`M ${xp(0)} ${yBand(0,revForecast[0],scaleA.max)}`;revForecast.forEach((v,i)=>{if(i>0)p+=` L ${xp(i)} ${yBand(0,v,scaleA.max)}`;});svg+=`<path d="${p}" fill="none" stroke="${C_PCS}" stroke-width="2" stroke-linecap="round"/>`;}
+  svg+=dailyPoints(cfg.revFcDaily,scaleA.max,0,C_PCS,'Прогноз выручки',fmtRubShort,'plan',planRev);
   revForecast.forEach((v,i)=>{
     const py=yBand(0,v,scaleA.max);
     const dev=v-planRev;const devP=planRev?dev/planRev*100:0;
     const bad=dev<0;
     const col=dev>=0?C_UP:C_DOWN;const sg=dev>=0?'+':'−';
     const paren=planRev?`(${sg}${fmtRubShort(Math.abs(dev))} / ${sg}${Math.abs(devP).toLocaleString('ru-RU',{maximumFractionDigits:1})}%)`:'';
-    svg+=`<circle class="chart-point${bad?' pulse-bad':''}" cx="${x(i)}" cy="${py}" r="5" fill="rgba(28,13,46,0.85)" stroke="${bad?C_DOWN:C_PCS}" stroke-width="2.5" data-label="Выручка (прогноз), ${weekLabels[i]}" data-value="Прогноз закрытия месяца: ${fmtRub(v)}${planRev?tipDev(dev,fmtRubShort,devP):''}"/>`;
-    svg+=`<text class="vlbl" x="${x(i)}" y="${py-19}" text-anchor="middle" font-size="9" font-weight="700" fill="${C_PCS}" font-family="Forum">${fmtRubShort(v)}${paren?`<tspan x="${x(i)}" dy="10" font-size="8.5" fill="${col}">${paren}</tspan>`:''}</text>`;
+    svg+=`<circle class="chart-point${bad?' pulse-bad':''}" cx="${xp(i)}" cy="${py}" r="5" fill="rgba(28,13,46,0.85)" stroke="${bad?C_DOWN:C_PCS}" stroke-width="2.5" data-label="Выручка (прогноз), ${weekLabels[i]}" data-value="Прогноз закрытия месяца: ${fmtRub(v)}${planRev?tipDev(dev,fmtRubShort,devP):''}"/>`;
+    svg+=`<text class="vlbl" x="${xp(i)}" y="${py-19}" text-anchor="middle" font-size="9" font-weight="700" fill="${C_PCS}" font-family="Forum">${fmtRubShort(v)}${paren?`<tspan x="${xp(i)}" dy="10" font-size="8.5" fill="${col}">${paren}</tspan>`:''}</text>`;
   });
 
   if(plan>0){const planY=yBand(1,plan,scaleB.max);svg+=`<line x1="${padL}" y1="${planY}" x2="${plotRight}" y2="${planY}" stroke="${C_MARGIN}" stroke-width="2.2" stroke-dasharray="8 6"/>`;}
-  if(factVals.length>1){let f=`M ${x(0)} ${yBand(1,factVals[0],scaleB.max)}`;factVals.forEach((v,i)=>{if(i>0)f+=` L ${x(i)} ${yBand(1,v,scaleB.max)}`;});svg+=`<path d="${f}" fill="none" stroke="${C_FACT}" stroke-width="2" stroke-linecap="round"/>`;}
-  svg+=dailyPointsOnLine(factVals,scaleB.max,1,C_FACT,'Факт маржи (накопит.)',fmtRubShort,'day');
+  if(factVals.length>1){let f=`M ${xp(0)} ${yBand(1,factVals[0],scaleB.max)}`;factVals.forEach((v,i)=>{if(i>0)f+=` L ${xp(i)} ${yBand(1,v,scaleB.max)}`;});svg+=`<path d="${f}" fill="none" stroke="${C_FACT}" stroke-width="2" stroke-linecap="round"/>`;}
   factVals.forEach((v,i)=>{
-    const px=x(i),py=yBand(1,v,scaleB.max);
+    const px=xp(i),py=yBand(1,v,scaleB.max);
     const weekly=factWeekly[i]||0;
     const dW=(i>0&&factWeekly[i-1])?weekly-factWeekly[i-1]:null;
     const bad=dW!==null&&dW<0;
@@ -607,29 +596,27 @@ function drawChart(boxId,tooltipId,cfg){
     if(typeof lineVals[i]==='number'&&Math.abs(py-yBand(1,lineVals[i],scaleB.max))<34)ly=py+16;
     svg+=`<text class="vlbl" x="${px}" y="${ly}" text-anchor="middle" font-size="9" font-weight="700" fill="${C_FACT}" font-family="Forum">${plMain}${plParen?`<tspan x="${px}" dy="10" font-size="8.5" fill="${plParenCol}">${plParen}</tspan>`:''}</text>`;
   });
-  if(lineVals.length>1){let l=`M ${x(0)} ${yBand(1,lineVals[0],scaleB.max)}`;lineVals.forEach((v,i)=>{if(i>0)l+=` L ${x(i)} ${yBand(1,v,scaleB.max)}`;});svg+=`<path class="chart-line" d="${l}" fill="none" stroke="${C_MARGIN}" stroke-width="2.2" stroke-linecap="round"/>`;}
-  svg+=dailyPointsOnLine(lineVals,scaleB.max,1,C_MARGIN,'Прогноз маржи',fmtRubShort,'plan',plan);
+  if(lineVals.length>1){let l=`M ${xp(0)} ${yBand(1,lineVals[0],scaleB.max)}`;lineVals.forEach((v,i)=>{if(i>0)l+=` L ${xp(i)} ${yBand(1,v,scaleB.max)}`;});svg+=`<path class="chart-line" d="${l}" fill="none" stroke="${C_MARGIN}" stroke-width="2.2" stroke-linecap="round"/>`;}
   lineVals.forEach((v,i)=>{
     const py=yBand(1,v,scaleB.max);
     const dev=v-plan;const devP=plan?dev/plan*100:0;
     const bad=dev<0;
     const col=dev>=0?C_UP:C_DOWN;const sg=dev>=0?'+':'−';
     const paren=plan?`(${sg}${fmtMillions(Math.abs(dev))} млн / ${sg}${Math.abs(devP).toLocaleString('ru-RU',{maximumFractionDigits:1})}%)`:'';
-    svg+=`<circle class="chart-point${bad?' pulse-bad':''}" cx="${x(i)}" cy="${py}" r="7" fill="rgba(28,13,46,0.85)" stroke="${bad?C_DOWN:C_MARGIN}" stroke-width="3" data-label="Прогноз, ${weekLabels[i]}" data-value="${fmtRub(v)}${plan?tipDev(dev,fmtRub,devP):''}"/>`;
+    svg+=`<circle class="chart-point${bad?' pulse-bad':''}" cx="${xp(i)}" cy="${py}" r="7" fill="rgba(28,13,46,0.85)" stroke="${bad?C_DOWN:C_MARGIN}" stroke-width="3" data-label="Прогноз, ${weekLabels[i]}" data-value="${fmtRub(v)}${plan?tipDev(dev,fmtRub,devP):''}"/>`;
     let flY=py-20;if(flY<qTop(1)+9)flY=py+16;
-    svg+=`<text class="vlbl" x="${x(i)}" y="${flY}" text-anchor="middle" font-size="9" font-weight="700" fill="${C_MARGIN}" font-family="Forum">${fmtRubShort(v)}${paren?`<tspan x="${x(i)}" dy="10" font-size="8.5" fill="${col}">${paren}</tspan>`:''}</text>`;
+    svg+=`<text class="vlbl" x="${xp(i)}" y="${flY}" text-anchor="middle" font-size="9" font-weight="700" fill="${C_MARGIN}" font-family="Forum">${fmtRubShort(v)}${paren?`<tspan x="${xp(i)}" dy="10" font-size="8.5" fill="${col}">${paren}</tspan>`:''}</text>`;
   });
 
   if(pctPlan>0){const ppY=yBand(2,pctPlan,scaleC.max);svg+=`<line x1="${padL}" y1="${ppY}" x2="${plotRight}" y2="${ppY}" stroke="${C_PCT}" stroke-width="1.8" stroke-dasharray="6 6"/>`;}
-  if(pctVals.length>1){let p=`M ${x(0)} ${yBand(2,pctVals[0],scaleC.max)}`;pctVals.forEach((v,i)=>{if(i>0)p+=` L ${x(i)} ${yBand(2,v,scaleC.max)}`;});svg+=`<path d="${p}" fill="none" stroke="${C_PCT}" stroke-width="2" stroke-linecap="round"/>`;}
-  svg+=dailyPointsOnLine(pctVals,scaleC.max,2,C_PCT,'Маржинальность',fmtPct,'pp',pctPlan);
+  if(pctVals.length>1){let p=`M ${xp(0)} ${yBand(2,pctVals[0],scaleC.max)}`;pctVals.forEach((v,i)=>{if(i>0)p+=` L ${xp(i)} ${yBand(2,v,scaleC.max)}`;});svg+=`<path d="${p}" fill="none" stroke="${C_PCT}" stroke-width="2" stroke-linecap="round"/>`;}
   pctVals.forEach((v,i)=>{
     const py=yBand(2,v,scaleC.max);
     const dev=v-pctPlan;const bad=dev<0;
     const col=dev>=0?C_UP:C_DOWN;const sg=dev>=0?'+':'−';
     const paren=pctPlan?`(${sg}${Math.abs(dev).toLocaleString('ru-RU',{maximumFractionDigits:1})} п.п.)`:'';
-    svg+=`<circle class="chart-point${bad?' pulse-bad':''}" cx="${x(i)}" cy="${py}" r="5.5" fill="rgba(28,13,46,0.85)" stroke="${bad?C_DOWN:C_PCT}" stroke-width="2.5" data-label="Маржинальность, ${weekLabels[i]}" data-value="${fmtPct(v)}${pctPlan?tipDevPp(dev):''}"/>`;
-    svg+=`<text class="vlbl" x="${x(i)}" y="${py-18}" text-anchor="middle" font-size="9" font-weight="700" fill="${C_PCT}" font-family="Forum">${fmtPct(v)}${paren?`<tspan x="${x(i)}" dy="10" font-size="8.5" fill="${col}">${paren}</tspan>`:''}</text>`;
+    svg+=`<circle class="chart-point${bad?' pulse-bad':''}" cx="${xp(i)}" cy="${py}" r="5.5" fill="rgba(28,13,46,0.85)" stroke="${bad?C_DOWN:C_PCT}" stroke-width="2.5" data-label="Маржинальность, ${weekLabels[i]}" data-value="${fmtPct(v)}${pctPlan?tipDevPp(dev):''}"/>`;
+    svg+=`<text class="vlbl" x="${xp(i)}" y="${py-18}" text-anchor="middle" font-size="9" font-weight="700" fill="${C_PCT}" font-family="Forum">${fmtPct(v)}${paren?`<tspan x="${xp(i)}" dy="10" font-size="8.5" fill="${col}">${paren}</tspan>`:''}</text>`;
   });
 
   svg+=`</svg>`;
@@ -724,13 +711,22 @@ async function renderMonth(mk){
     fcRev.push(Math.round(F/E*T));
   }
   const ordersDaily=(data.ordersDaily||[]).filter(o=>o.t>=mStartMs&&o.t<=mEndMs&&o.t<=today.getTime());
+  // реальные дневные ряды PNL (по вчера): накопленная выручка и прогноз закрытия на каждый день
+  const revFactDaily=[],revFcDaily=[];
+  {let cr=0,cp=0;
+   (data.ordersDaily||[]).filter(o=>o.t>=mStartMs&&o.t<=Math.min(mEndMs,D.getTime())).forEach(o=>{
+     cr+=o.rub;cp+=o.planRub||0;
+     revFactDaily.push({t:o.t,v:cr});
+     const E=effRange(mFirst,new Date(o.t));
+     if(E>0)revFcDaily.push({t:o.t,v:Math.round(cp/E*T)});
+   });}
   // видимая диагностика под графиком
   const diag=`[diag] ${mk}: недель=${n} • выручка недель=${weekRev.length} (итог ${fmtRubShort(cumRev[cumRev.length-1]||0)}) • CF маржа недель=${factCount} • маржин.=${pctVals.length} • дней PNL=${ordersDaily.length} • планВыр=${fmtRubShort(data.planRev||0)}`;
   console.log(diag);
   let cap=document.getElementById('diagCap');
   if(!cap){cap=document.createElement('div');cap.id='diagCap';cap.style.cssText='flex:0 0 auto;font-size:.7em;color:rgba(255,255,255,.65);margin-top:4px;font-family:Forum,serif';const lg=document.getElementById('legendBottom');if(lg)lg.parentNode.insertBefore(cap,lg);}
   cap.textContent=diag;
-  drawChart('chartBoxRub','tooltipRub',{weeks,weekLabels,plan:data.planRub,pctPlan:data.planPct,planRev:data.planRev||0,lineValues:fc,factValues:cum,factWeekly,pctValues:pctVals,ordersDaily,revForecast:fcRev,revFact:cumRev,revWeekly:weekRev});
+  drawChart('chartBoxRub','tooltipRub',{weeks,weekLabels,plan:data.planRub,pctPlan:data.planPct,planRev:data.planRev||0,lineValues:fc,factValues:cum,factWeekly,pctValues:pctVals,ordersDaily,revForecast:fcRev,revFact:cumRev,revWeekly:weekRev,revFactDaily,revFcDaily,asOf:D});
 }
 
 // === вкладка «Ключевые отклонения» ===
