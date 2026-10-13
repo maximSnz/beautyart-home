@@ -502,6 +502,9 @@ function drawChart(boxId,tooltipId,cfg){
   const asOfMs=cfg.asOf?cfg.asOf.getTime():Infinity;
   const x=i=>xDay(weeks[i].end.getTime());
   const xp=i=>xDay(Math.max(weeks[i].start.getTime(),Math.min(weeks[i].end.getTime(),asOfMs)));
+  // подписи и цветовая индикация — только у закрытых недель; текущая неделя — простая точка
+  const done=i=>weeks[i].end.getTime()<=asOfMs;
+  const onDate=i=>` • на ${fmtShort(new Date(Math.min(weeks[i].end.getTime(),asOfMs)))}${done(i)?'':' (неделя не закрыта)'}`;
   const C_PCS='#5eead4',C_MARGIN='#ffffff',C_PCT='#fde047',C_ORD='#7dd3fc',C_FACT='#c084fc';
 
   let svg=`<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`;
@@ -560,26 +563,26 @@ function drawChart(boxId,tooltipId,cfg){
     const weekly=revWeekly[i]||0;
     const pc=revPace[i],pp=i>0?revPace[i-1]:null;
     const dW=(pc!=null&&pp)?pc-pp:null;
-    const bad=dW!==null&&dW<0;
+    const bad=done(i)&&dW!==null&&dW<0;
     let tip=`Выручка за неделю: ${fmtRub(weekly)} • Накопительно: ${fmtRub(v)}`;
     if(pc!=null)tip+=` • Темп: ${fmtRubShort(pc)}/день`;
     if(dW!==null)tip+=tipDev(dW,v=>fmtRubShort(v)+'/день',dW/pp*100);
     const plMain=fmtRubShort(v);
     let plParen='',plParenCol=C_UP;
     if(dW!==null){const dp=dW/pp*100;plParenCol=dW>=0?C_UP:C_DOWN;const sg=dW>=0?'+':'−';plParen=`(темп ${sg}${Math.abs(dp).toLocaleString('ru-RU',{maximumFractionDigits:1})}%)`;}
-    svg+=`<circle class="chart-point${bad?' pulse-bad':''}" cx="${px}" cy="${py}" r="5" fill="${bad?C_DOWN:C_FACT}" data-label="Факт выручки, ${weekLabels[i]}" data-value="${tip}"/>`;
-    svg+=`<text class="vlbl" x="${px}" y="${py+16}" text-anchor="middle" font-size="9" font-weight="700" fill="${C_FACT}" font-family="Forum">${plMain}${plParen?`<tspan x="${px}" dy="10" font-size="8.5" fill="${plParenCol}">${plParen}</tspan>`:''}</text>`;
+    svg+=`<circle class="chart-point${bad?' pulse-bad':''}" cx="${px}" cy="${py}" r="${done(i)?5:3}" fill="${bad?C_DOWN:C_FACT}" data-label="Факт выручки, ${weekLabels[i]}${onDate(i)}" data-value="${tip}"/>`;
+    if(done(i))svg+=`<text class="vlbl" x="${px}" y="${py+16}" text-anchor="middle" font-size="9" font-weight="700" fill="${C_FACT}" font-family="Forum">${plMain}${plParen?`<tspan x="${px}" dy="10" font-size="8.5" fill="${plParenCol}">${plParen}</tspan>`:''}</text>`;
   });
   if(revFcDaily.length>1){const p=dayPath(revFcDaily,scaleA.max);svg+=`<path d="${p}" fill="none" stroke="${C_PCS}" stroke-width="2" stroke-linecap="round"/>`;}
   svg+=dailyPoints(cfg.revFcDaily,scaleA.max,0,C_PCS,'Прогноз выручки',fmtRubShort,'plan',planRev);
   revForecast.forEach((v,i)=>{
     const py=yBand(0,v,scaleA.max);
     const dev=v-planRev;const devP=planRev?dev/planRev*100:0;
-    const bad=dev<0;
+    const bad=done(i)&&dev<0;
     const col=dev>=0?C_UP:C_DOWN;const sg=dev>=0?'+':'−';
     const paren=planRev?`(${sg}${fmtRubShort(Math.abs(dev))} / ${sg}${Math.abs(devP).toLocaleString('ru-RU',{maximumFractionDigits:1})}%)`:'';
-    svg+=`<circle class="chart-point${bad?' pulse-bad':''}" cx="${xp(i)}" cy="${py}" r="5" fill="rgba(28,13,46,0.85)" stroke="${bad?C_DOWN:C_PCS}" stroke-width="2.5" data-label="Выручка (прогноз), ${weekLabels[i]}" data-value="Прогноз закрытия месяца: ${fmtRub(v)}${planRev?tipDev(dev,fmtRubShort,devP):''}"/>`;
-    svg+=`<text class="vlbl" x="${xp(i)}" y="${py-19}" text-anchor="middle" font-size="9" font-weight="700" fill="${C_PCS}" font-family="Forum">${fmtRubShort(v)}${paren?`<tspan x="${xp(i)}" dy="10" font-size="8.5" fill="${col}">${paren}</tspan>`:''}</text>`;
+    svg+=`<circle class="chart-point${bad?' pulse-bad':''}" cx="${xp(i)}" cy="${py}" r="${done(i)?5:3}" fill="rgba(28,13,46,0.85)" stroke="${bad?C_DOWN:C_PCS}" stroke-width="2.5" data-label="Выручка (прогноз), ${weekLabels[i]}${onDate(i)}" data-value="Прогноз закрытия месяца: ${fmtRub(v)}${planRev?tipDev(dev,fmtRubShort,devP):''}"/>`;
+    if(done(i))svg+=`<text class="vlbl" x="${xp(i)}" y="${py-19}" text-anchor="middle" font-size="9" font-weight="700" fill="${C_PCS}" font-family="Forum">${fmtRubShort(v)}${paren?`<tspan x="${xp(i)}" dy="10" font-size="8.5" fill="${col}">${paren}</tspan>`:''}</text>`;
   });
 
   if(plan>0){const planY=yBand(1,plan,scaleB.max);svg+=`<line x1="${padL}" y1="${planY}" x2="${plotRight}" y2="${planY}" stroke="${C_MARGIN}" stroke-width="2.2" stroke-dasharray="8 6"/>`;}
@@ -589,28 +592,28 @@ function drawChart(boxId,tooltipId,cfg){
     const weekly=factWeekly[i]||0;
     const pc=marPace[i],pp=i>0?marPace[i-1]:null;
     const dW=(pc!=null&&pp)?pc-pp:null;
-    const bad=dW!==null&&dW<0;
+    const bad=done(i)&&dW!==null&&dW<0;
     let tip=`Маржа в этом месяце: ${fmtRub(weekly)} • Накопительно: ${fmtRub(v)}`;
     if(pc!=null)tip+=` • Темп недели: ${fmtRubShort(pc)}/день`;
     if(dW!==null)tip+=tipDev(dW,v=>fmtRubShort(v)+'/день',dW/pp*100);
     const plMain=fmtRubShort(v);
     let plParen='',plParenCol=C_UP;
     if(dW!==null){const dp=dW/pp*100;plParenCol=dW>=0?C_UP:C_DOWN;const sg=dW>=0?'+':'−';plParen=`(темп ${sg}${Math.abs(dp).toLocaleString('ru-RU',{maximumFractionDigits:1})}%)`;}
-    svg+=`<circle class="chart-point${bad?' pulse-bad':''}" cx="${px}" cy="${py}" r="5.5" fill="${bad?C_DOWN:C_FACT}" data-label="Факт недели ${weekLabels[i]}" data-value="${tip}"/>`;
+    svg+=`<circle class="chart-point${bad?' pulse-bad':''}" cx="${px}" cy="${py}" r="${done(i)?5.5:3}" fill="${bad?C_DOWN:C_FACT}" data-label="Факт недели ${weekLabels[i]}${onDate(i)}" data-value="${tip}"/>`;
     let ly=py-20;if(ly<qTop(1)+9)ly=py+16;
     if(typeof lineVals[i]==='number'&&Math.abs(py-yBand(1,lineVals[i],scaleB.max))<34)ly=py+16;
-    svg+=`<text class="vlbl" x="${px}" y="${ly}" text-anchor="middle" font-size="9" font-weight="700" fill="${C_FACT}" font-family="Forum">${plMain}${plParen?`<tspan x="${px}" dy="10" font-size="8.5" fill="${plParenCol}">${plParen}</tspan>`:''}</text>`;
+    if(done(i))svg+=`<text class="vlbl" x="${px}" y="${ly}" text-anchor="middle" font-size="9" font-weight="700" fill="${C_FACT}" font-family="Forum">${plMain}${plParen?`<tspan x="${px}" dy="10" font-size="8.5" fill="${plParenCol}">${plParen}</tspan>`:''}</text>`;
   });
   if(lineVals.length>1){let l=`M ${xp(0)} ${yBand(1,lineVals[0],scaleB.max)}`;lineVals.forEach((v,i)=>{if(i>0)l+=` L ${xp(i)} ${yBand(1,v,scaleB.max)}`;});svg+=`<path class="chart-line" d="${l}" fill="none" stroke="${C_MARGIN}" stroke-width="2.2" stroke-linecap="round"/>`;}
   lineVals.forEach((v,i)=>{
     const py=yBand(1,v,scaleB.max);
     const dev=v-plan;const devP=plan?dev/plan*100:0;
-    const bad=dev<0;
+    const bad=done(i)&&dev<0;
     const col=dev>=0?C_UP:C_DOWN;const sg=dev>=0?'+':'−';
     const paren=plan?`(${sg}${fmtMillions(Math.abs(dev))} млн / ${sg}${Math.abs(devP).toLocaleString('ru-RU',{maximumFractionDigits:1})}%)`:'';
-    svg+=`<circle class="chart-point${bad?' pulse-bad':''}" cx="${xp(i)}" cy="${py}" r="7" fill="rgba(28,13,46,0.85)" stroke="${bad?C_DOWN:C_MARGIN}" stroke-width="3" data-label="Прогноз, ${weekLabels[i]}" data-value="${fmtRub(v)}${plan?tipDev(dev,fmtRub,devP):''}"/>`;
+    svg+=`<circle class="chart-point${bad?' pulse-bad':''}" cx="${xp(i)}" cy="${py}" r="${done(i)?7:3}" fill="rgba(28,13,46,0.85)" stroke="${bad?C_DOWN:C_MARGIN}" stroke-width="3" data-label="Прогноз, ${weekLabels[i]}${onDate(i)}" data-value="${fmtRub(v)}${plan?tipDev(dev,fmtRub,devP):''}"/>`;
     let flY=py-20;if(flY<qTop(1)+9)flY=py+16;
-    svg+=`<text class="vlbl" x="${xp(i)}" y="${flY}" text-anchor="middle" font-size="9" font-weight="700" fill="${C_MARGIN}" font-family="Forum">${fmtRubShort(v)}${paren?`<tspan x="${xp(i)}" dy="10" font-size="8.5" fill="${col}">${paren}</tspan>`:''}</text>`;
+    if(done(i))svg+=`<text class="vlbl" x="${xp(i)}" y="${flY}" text-anchor="middle" font-size="9" font-weight="700" fill="${C_MARGIN}" font-family="Forum">${fmtRubShort(v)}${paren?`<tspan x="${xp(i)}" dy="10" font-size="8.5" fill="${col}">${paren}</tspan>`:''}</text>`;
   });
 
   if(pctPlan>0){const ppY=yBand(2,pctPlan,scaleC.max);svg+=`<line x1="${padL}" y1="${ppY}" x2="${plotRight}" y2="${ppY}" stroke="${C_PCT}" stroke-width="1.8" stroke-dasharray="6 6"/>`;}
@@ -622,17 +625,17 @@ function drawChart(boxId,tooltipId,cfg){
     const dev=v-pctPlan;
     let tip=`Маржинальность недели: ${fmtPct(v)}${pctPlan?tipDevPp(dev)+' к плану':''}`;
     if(prev!=null)tip+=` • к прошлой неделе:${tipDevPp(v-prev)}`;
-    svg+=`<circle class="chart-point" cx="${xp(i)}" cy="${py}" r="4" fill="${C_PCT}" stroke="rgba(28,13,46,0.85)" stroke-width="1.5" data-label="Маржинальность недели ${weekLabels[i]} (${fmtShort(cfg.weeks[i].mo||cfg.weeks[i].start)}–${fmtShort(addDays(cfg.weeks[i].mo||cfg.weeks[i].start,6))})" data-value="${tip}"/>`;
-    svg+=`<text class="vlbl" x="${xp(i)}" y="${py+17}" text-anchor="middle" font-size="8.5" font-weight="700" fill="${C_PCT}" font-family="Forum">нед. ${fmtPct(v)}</text>`;
+    svg+=`<circle class="chart-point" cx="${xp(i)}" cy="${py}" r="${done(i)?4:3}" fill="${C_PCT}" stroke="rgba(28,13,46,0.85)" stroke-width="1.5" data-label="Маржинальность недели ${weekLabels[i]} (${fmtShort(cfg.weeks[i].mo||cfg.weeks[i].start)}–${fmtShort(addDays(cfg.weeks[i].mo||cfg.weeks[i].start,6))})${onDate(i)}" data-value="${tip}"/>`;
+    if(done(i))svg+=`<text class="vlbl" x="${xp(i)}" y="${py+17}" text-anchor="middle" font-size="8.5" font-weight="700" fill="${C_PCT}" font-family="Forum">нед. ${fmtPct(v)}</text>`;
   });
   if(pctVals.length>1){let p=`M ${xp(0)} ${yBand(2,pctVals[0],scaleC.max)}`;pctVals.forEach((v,i)=>{if(i>0)p+=` L ${xp(i)} ${yBand(2,v,scaleC.max)}`;});svg+=`<path d="${p}" fill="none" stroke="${C_PCT}" stroke-width="2" stroke-linecap="round"/>`;}
   pctVals.forEach((v,i)=>{
     const py=yBand(2,v,scaleC.max);
-    const dev=v-pctPlan;const bad=dev<0;
+    const dev=v-pctPlan;const bad=done(i)&&dev<0;
     const col=dev>=0?C_UP:C_DOWN;const sg=dev>=0?'+':'−';
     const paren=pctPlan?`(${sg}${Math.abs(dev).toLocaleString('ru-RU',{maximumFractionDigits:1})} п.п.)`:'';
-    svg+=`<circle class="chart-point${bad?' pulse-bad':''}" cx="${xp(i)}" cy="${py}" r="5.5" fill="rgba(28,13,46,0.85)" stroke="${bad?C_DOWN:C_PCT}" stroke-width="2.5" data-label="Маржинальность, ${weekLabels[i]}" data-value="${fmtPct(v)}${pctPlan?tipDevPp(dev):''}"/>`;
-    svg+=`<text class="vlbl" x="${xp(i)}" y="${py-18}" text-anchor="middle" font-size="9" font-weight="700" fill="${C_PCT}" font-family="Forum">${fmtPct(v)}${paren?`<tspan x="${xp(i)}" dy="10" font-size="8.5" fill="${col}">${paren}</tspan>`:''}</text>`;
+    svg+=`<circle class="chart-point${bad?' pulse-bad':''}" cx="${xp(i)}" cy="${py}" r="${done(i)?5.5:3}" fill="rgba(28,13,46,0.85)" stroke="${bad?C_DOWN:C_PCT}" stroke-width="2.5" data-label="Маржинальность, ${weekLabels[i]}${onDate(i)}" data-value="${fmtPct(v)}${pctPlan?tipDevPp(dev):''}"/>`;
+    if(done(i))svg+=`<text class="vlbl" x="${xp(i)}" y="${py-18}" text-anchor="middle" font-size="9" font-weight="700" fill="${C_PCT}" font-family="Forum">${fmtPct(v)}${paren?`<tspan x="${xp(i)}" dy="10" font-size="8.5" fill="${col}">${paren}</tspan>`:''}</text>`;
   });
 
   svg+=`</svg>`;
