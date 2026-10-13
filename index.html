@@ -221,6 +221,10 @@
             text-align: right; white-space: nowrap;
         }
         .dev-table tr:hover td { background: rgba(255,255,255,.06); }
+        .dev-table th.dev-grp { cursor: pointer; user-select: none; }
+        .dev-table th.dev-grp:hover { color: #fff; }
+        .dev-table .c-plan, .dev-table .c-avg { display: none; }
+        .dev-table.open-plan .c-plan, .dev-table.open-avg .c-avg { display: table-cell; }
         .dev-pos { color: #4ade80; font-weight: 700; }
         .dev-neg { color: #f87171; font-weight: 700; }
         .dev-warn { color: #fbbf24; font-weight: 700; }
@@ -792,6 +796,7 @@ async function loadDevTable(mk){
   const stockOffer=new Map();
   rStock.forEach(x=>{stockOffer.set(x.offer_id,(stockOffer.get(x.offer_id)||0)+Number(x.stock||0));});
   const effTotal=effDaysOfMonth(y,m);
+  const daysInMonth=new Date(y,m,0).getDate();
   const k=yIsWe?0.7:1;
   const rows=[];
   products.forEach(p=>{
@@ -808,10 +813,13 @@ async function loadDevTable(mk){
     const yestRub=yest*price,avgRub=avg*price;
     const revMonth=(qtyMonth.get(p.offer_id)||0)*price;
     const ads=adsPid.get(p.product_id)||0;
+    const stock=stockOffer.get(p.offer_id)||0;
+    const planPcsDay=need/daysInMonth; // средний плановый расход месяца, шт/день — для оценки запаса
     rows.push({
       offer:p.offer_id,
       yestRub,avgRub,devAvgRub:yestRub-avgRub,expectedRub,devPlanRub:yestRub-expectedRub,
-      stock:stockOffer.get(p.offer_id)||0,
+      planPcsDay,
+      stock,coverDays:planPcsDay>0?stock/planPcsDay:null,
       drr:revMonth>0?ads/revMonth*100:null
     });
   });
@@ -831,12 +839,22 @@ async function renderDevTable(mk){
     const cls=v=>v<-0.5?'dev-neg':(v>0.5?'dev-pos':'dev-neutral');
     const sgn=v=>(v>0?'+':'')+fmt(Math.round(v));
     let h=`<div class="dev-cap">Топ-25 отклонений выручки от планового темпа • ${mName} • вчера к плану (догоняющий темп исключён)</div>`;
-    h+='<table class="dev-table"><thead><tr><th>Артикул</th><th>Выручка вчера, ₽</th><th>Средний темп, ₽</th><th>Откл. от среднего</th><th>Плановый темп, ₽</th><th>Откл. от плана</th><th>Остаток, шт</th><th>ДРР, %</th></tr></thead><tbody>';
+    const op=DEV_OPEN;
+    const grp=(key,title)=>`<th class="dev-grp" onclick="toggleDevGroup('${key}')" title="Показать / скрыть детали">${op[key]?'▾':'▸'} ${title}</th>`;
+    const cov=v=>v==null?'—':(v>=999?'999+':fmt(Math.round(v)));
+    const covCls=v=>v==null?'dev-neutral':(v<14?'dev-neg':(v<30?'dev-warn':(v>90?'dev-warn':'dev-pos')));
+    h+=`<table class="dev-table${op.plan?' open-plan':''}${op.avg?' open-avg':''}"><thead><tr><th>Артикул</th><th title="Цвет — выше / ниже планового темпа">Выручка вчера, ₽</th>`
+      +`${grp('plan','Плановый темп, ₽')}<th class="c-plan">Откл. от плана</th>`
+      +`${grp('avg','Средний темп, ₽')}<th class="c-avg">Откл. от среднего</th>`
+      +`<th>Остаток, шт</th><th title="Средний плановый расход месяца: план÷0,95 ÷ дней в месяце">План, шт/день</th><th title="Остаток ÷ План, шт/день">Запас, дн</th><th>ДРР, %</th></tr></thead><tbody>`;
     rows.forEach(r=>{
       const drrTxt=r.drr==null?'—':fmt1(r.drr);
       const drrCls=r.drr==null?'dev-neutral':(r.drr>10?'dev-neg':(r.drr>5?'dev-warn':'dev-pos'));
       const offer=String(r.offer).replace(/[<>&]/g,'');
-      h+=`<tr><td>${offer}</td><td>${fmt(Math.round(r.yestRub))}</td><td>${fmt(Math.round(r.avgRub))}</td><td class="${cls(r.devAvgRub)}">${sgn(r.devAvgRub)}</td><td>${fmt(Math.round(r.expectedRub))}</td><td class="${cls(r.devPlanRub)}">${sgn(r.devPlanRub)}</td><td>${fmt(r.stock)}</td><td class="${drrCls}">${drrTxt}</td></tr>`;
+      h+=`<tr><td>${offer}</td><td class="${cls(r.devPlanRub)}">${fmt(Math.round(r.yestRub))}</td>`
+        +`<td>${fmt(Math.round(r.expectedRub))}</td><td class="c-plan ${cls(r.devPlanRub)}">${sgn(r.devPlanRub)}</td>`
+        +`<td>${fmt(Math.round(r.avgRub))}</td><td class="c-avg ${cls(r.devAvgRub)}">${sgn(r.devAvgRub)}</td>`
+        +`<td>${fmt(r.stock)}</td><td>${fmt1(r.planPcsDay)}</td><td class="${covCls(r.coverDays)}">${cov(r.coverDays)}</td><td class="${drrCls}">${drrTxt}</td></tr>`;
     });
     h+='</tbody></table>';
     box.innerHTML=h;
@@ -844,6 +862,15 @@ async function renderDevTable(mk){
     console.error('devTable:',e);
     box.innerHTML='<div class="dev-cap">Ошибка: '+e.message+' (подробности в консоли F12)</div>';
   }
+}
+// раскрытие групп столбцов в «Ключевых отклонениях» (по умолчанию свёрнуты)
+let DEV_OPEN={plan:false,avg:false};
+try{DEV_OPEN=Object.assign(DEV_OPEN,JSON.parse(localStorage.getItem('ba_dev_open')||'{}'));}catch(e){}
+function toggleDevGroup(key){
+  DEV_OPEN[key]=!DEV_OPEN[key];
+  try{localStorage.setItem('ba_dev_open',JSON.stringify(DEV_OPEN));}catch(e){}
+  const t=document.querySelector('#devBox .dev-table');
+  if(t){t.classList.toggle('open-'+key,DEV_OPEN[key]);const th=t.querySelector(`th.dev-grp[onclick*="${key}"]`);if(th)th.textContent=th.textContent.replace(/^[▸▾]/,DEV_OPEN[key]?'▾':'▸');}
 }
 function setHomeTab(tab){
   HOME_TAB=tab;
