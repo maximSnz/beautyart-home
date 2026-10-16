@@ -223,6 +223,17 @@
         .dev-table tr:hover td { background: rgba(255,255,255,.06); }
         .dev-table .c-det { display: none; }
         .dev-table.open-det .c-det { display: table-cell; }
+        .dev-table th.dev-hgrp { text-align: center; border-bottom: 1px solid rgba(255,255,255,.18); }
+        .dev-table thead tr:nth-child(2) th { top: 31px; }
+        .dev-table tr.dev-grp td { text-align: left; cursor: pointer; background: rgba(255,255,255,.08); font-weight: 600; border-bottom: 1px solid rgba(255,255,255,.25); }
+        .dev-table tr.dev-row { cursor: pointer; }
+        .dev-table tr.dev-row.on td { background: rgba(255,255,255,.12); }
+        .dev-table tr.dev-note td { text-align: left; white-space: normal; background: rgba(255,255,255,.05); }
+        .dev-table sup { font-size: .7em; margin-left: 2px; }
+        .dev-note-form { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
+        .dev-note-form textarea { flex: 1 1 320px; min-height: 44px; font-family: 'Forum', serif; font-size: 1em; color: #fff; background: rgba(28,13,46,.5); border: 1px solid rgba(255,255,255,.3); border-radius: 8px; padding: 6px 8px; }
+        .dev-note-form input[type=date] { font-family: inherit; color: #fff; background: rgba(28,13,46,.5); border: 1px solid rgba(255,255,255,.3); border-radius: 6px; padding: 3px 6px; color-scheme: dark; }
+        .dev-hist { margin: 2px 0; }
         .dev-toggle { height: 24px; margin-left: 8px; font-size: .9em; vertical-align: middle; }
         .dev-pos { color: #4ade80; font-weight: 700; }
         .dev-neg { color: #f87171; font-weight: 700; }
@@ -749,119 +760,197 @@ async function renderMonth(mk){
 }
 
 // === вкладка «Ключевые отклонения» ===
-async function loadDevTable(mk){
-  if(DEV_CACHE[mk])return DEV_CACHE[mk];
-  const [y,m]=mk.split('-').map(Number);
-  const mStartD=new Date(y,m-1,1),mEndD=new Date(y,m,0);
-  const mStartKey=keyOfMonday(mStartD);
+// === «Ключевые отклонения»: выручка PNL вчера/позавчера и 7 дн/пред. 7 дн, группы по маржинальности CF и ДРР ===
+const DOW_TARGET={0:7,1:13,2:12,3:11,4:10,5:9,6:8}; // норма покрытия остатком, дн — как в weekly.html
+const DRR_LIMIT=8,MARGIN_FLOOR=5;
+const DEV_GROUPS=[
+  {key:'g1',name:'Маржинальность < 5%, ДРР ≤ 8%'},
+  {key:'g2',name:'Маржинальность < 5%, ДРР > 8%'},
+  {key:'g3',name:'Маржинальность ниже плана, ДРР ≤ 8%'},
+  {key:'g4',name:'Маржинальность ниже плана, ДРР > 8%'},
+  {key:'g5',name:'Маржинальность по плану или выше, ДРР ≤ 8%'},
+  {key:'g6',name:'Маржинальность по плану или выше, ДРР > 8%'},
+  {key:'g0',name:'Нет данных по маржинальности (нет плана или CF-факта за неделю)'}
+];
+const escH=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const monthKeyOf=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+function devGroupOf(marPct,planPct,drr){
+  if(marPct==null||planPct==null)return 'g0';
+  const hi=drr>DRR_LIMIT;
+  if(marPct<MARGIN_FLOOR)return hi?'g2':'g1';
+  if(marPct<planPct)return hi?'g4':'g3';
+  return hi?'g6':'g5';
+}
+async function loadWatch(){
+  // заметки и даты контроля; если таблицы ещё нет — отчёт работает без них
+  try{
+    const rows=await fetchPages('product_watch?select=id,product_id,note,control_date,created_at');
+    const by=new Map();rows.forEach(r=>{const k=String(r.product_id);if(!by.has(k))by.set(k,[]);by.get(k).push(r);});
+    by.forEach(a=>a.sort((x,y)=>y.id-x.id));
+    return {ok:true,by};
+  }catch(e){console.warn('product_watch:',e.message);return {ok:false,by:new Map()};}
+}
+async function loadDevTable(){
   const today=new Date();today.setHours(0,0,0,0);
-  const refEndD=(today<=mEndD)?addDays(today,-1):mEndD;
-  const refEndKey=keyOfMonday(refEndD);
-  const {baseDays,yD,yIsWe}=getBaseDays();
+  const yD=addDays(today,-1),y2D=addDays(today,-2);
   const yKey=keyOfMonday(yD);
-  const fetchFromKey=keyOfMonday(baseDays[0])<mStartKey?keyOfMonday(baseDays[0]):mStartKey;
-  const [rProd,rPlan,sRecent,sMonth,rAds,rStock]=await Promise.all([
+  if(DEV_CACHE[yKey])return DEV_CACHE[yKey];
+  const days=[];for(let i=13;i>=0;i--)days.push(keyOfMonday(addDays(yD,-i))); // days[0..6] — пред. 7 дн, days[7..13] — 7 дн
+  const fromKey=days[0];
+  const cur7=days.slice(7),prev7=days.slice(0,7),y2Key=keyOfMonday(y2D);
+  const monthsNeeded=[...new Set(days.map(k=>k.slice(0,7)))];
+  const mk=monthKeyOf(yD);
+  // последняя закрытая календарная неделя для маржинальности CF
+  const curMon=addDays(today,-((today.getDay()+6)%7));
+  const wkD=addDays(curMon,-7),wkKey=keyOfMonday(wkD),wkEnd=addDays(wkD,6);
+  const [rProd,plans,sales,ads,spw,watch,...stockDays]=await Promise.all([
     fetch(SUPABASE_URL+`/rest/v1/products?select=product_id,offer_id,archived,raw&limit=1000`,{headers:HD}),
-    fetch(SUPABASE_URL+`/rest/v1/sales_plan?month=eq.${mk}&select=product_id,plan_qty,price`,{headers:HD}),
-    fetchPages(`product_sales?sale_date=gte.${fetchFromKey}&sale_date=lte.${yKey}&select=offer_id,sale_date,qty`),
-    fetchPages(`product_sales?sale_date=gte.${mStartKey}&sale_date=lte.${refEndKey}&select=offer_id,qty`),
-    fetchPages(`ozon_ad_spend?spend_date=gte.${mStartKey}&spend_date=lte.${refEndKey}&select=offer_id,amount`),
-    (async()=>{
-      const r=await fetch(SUPABASE_URL+'/rest/v1/stock_history?select=report_date&order=report_date.desc&limit=1',{headers:HD});
-      if(!r.ok)throw new Error('stock_history HTTP '+r.status);
-      const last=(await r.json())[0];
-      return last?fetchPages(`stock_history?report_date=eq.${last.report_date}&select=offer_id,stock`):[];
-    })()
+    fetch(SUPABASE_URL+`/rest/v1/sales_plan?month=in.(${monthsNeeded.join(',')})&select=month,product_id,plan_qty,price,margin_pct`,{headers:HD}),
+    fetchPages(`product_sales?sale_date=gte.${fromKey}&sale_date=lte.${yKey}&select=offer_id,sale_date,revenue`),
+    fetchPages(`ozon_ad_spend?spend_date=gte.${fromKey}&spend_date=lte.${yKey}&select=offer_id,spend_date,amount&order=offer_id,spend_date`),
+    fetchPages(`sales_plan_weeks?week=eq.${wkKey}&metric=in.(mar,revn)&select=product_id,metric,fact`),
+    loadWatch(),
+    ...days.map(k=>fetchPages(`stock_history?report_date=eq.${k}&stock=gt.0&select=offer_id,stock`))
   ]);
-  if(!rProd.ok||!rPlan.ok)throw new Error('HTTP '+(rProd.status||rPlan.status));
+  if(!rProd.ok)throw new Error('products HTTP '+rProd.status);
+  if(!plans.ok)throw new Error('sales_plan HTTP '+plans.status);
   const products=(await rProd.json()).filter(p=>!p.archived);
-  const OFFER_PID={},SKU_PID={};
+  const SKU_PID={},OFFER_PID={};
   products.forEach(p=>{OFFER_PID[p.offer_id]=p.product_id;const sku=p.raw&&p.raw.sku!=null?String(p.raw.sku):'';if(sku)SKU_PID[sku]=p.product_id;});
-  const PLANM={};
-  (await rPlan.json()).forEach(r=>{PLANM[r.product_id]={qty:Number(r.plan_qty||0),price:Number(r.price||0)};});
-  const byOfferDay=new Map();
-  sRecent.forEach(x=>{let mm=byOfferDay.get(x.offer_id);if(!mm){mm=new Map();byOfferDay.set(x.offer_id,mm);}mm.set(x.sale_date,(mm.get(x.sale_date)||0)+Number(x.qty||0));});
-  const qtyMonth=new Map();
-  sMonth.forEach(x=>{qtyMonth.set(x.offer_id,(qtyMonth.get(x.offer_id)||0)+Number(x.qty||0));});
-  const adsPid=new Map();
-  rAds.forEach(x=>{const pid=SKU_PID[x.offer_id]||OFFER_PID[x.offer_id];if(!pid)return;adsPid.set(pid,(adsPid.get(pid)||0)+Number(x.amount||0));});
-  const stockOffer=new Map();
-  rStock.forEach(x=>{stockOffer.set(x.offer_id,(stockOffer.get(x.offer_id)||0)+Number(x.stock||0));});
-  const effTotal=effDaysOfMonth(y,m);
-  const daysInMonth=new Date(y,m,0).getDate();
-  const k=yIsWe?0.7:1;
+  const PLAN={};(await plans.json()).forEach(r=>{PLAN[r.month+'|'+r.product_id]=r;});
+  const rev=new Map();sales.forEach(x=>{const k=x.offer_id+'|'+x.sale_date;rev.set(k,(rev.get(k)||0)+Number(x.revenue||0));});
+  const adv=new Map();ads.forEach(x=>{const pid=SKU_PID[x.offer_id]||OFFER_PID[x.offer_id];if(!pid)return;const k=pid+'|'+x.spend_date;adv.set(k,(adv.get(k)||0)+Number(x.amount||0));});
+  const cf=new Map();spw.forEach(x=>{const k=String(x.product_id);if(!cf.has(k))cf.set(k,{mar:0,revn:0,n:0});const o=cf.get(k);if(x.fact==null)return;o[x.metric]+=Number(x.fact);o.n++;});
+  // остатки: Σ по складам за день; дня без снимка нет в карте → «нет данных»
+  const stock=new Map(),hasSnap=new Set();
+  stockDays.forEach((rows,i)=>{if(!rows.length)return;hasSnap.add(days[i]);rows.forEach(x=>{const k=x.offer_id+'|'+days[i];stock.set(k,(stock.get(k)||0)+Number(x.stock||0));});});
+  const sumOf=(m,id,keys)=>keys.reduce((s,k)=>s+(m.get(id+'|'+k)||0),0);
+  // день с остатком: остаток ≥ план месяца ÷ дней месяца (без 0,95) × норма дня недели
+  const stockState=(p,k)=>{
+    if(!hasSnap.has(k))return null;
+    const pl=PLAN[k.slice(0,7)+'|'+p.product_id];
+    const [yy,mm,dd]=k.split('-').map(Number);
+    const perDay=pl&&Number(pl.plan_qty)>0?Number(pl.plan_qty)/new Date(yy,mm,0).getDate():0;
+    const need=perDay*DOW_TARGET[new Date(yy,mm-1,dd).getDay()];
+    const st=stock.get(p.offer_id+'|'+k)||0;
+    return st>0&&st>=need;
+  };
+  const stockCount=(p,keys)=>{let ok=0,nd=0;keys.forEach(k=>{const s=stockState(p,k);if(s==null)nd++;else if(s)ok++;});return {ok,nd,n:keys.length};};
   const rows=[];
   products.forEach(p=>{
-    const pl=PLANM[p.product_id];
-    if(!pl||!(pl.qty>0))return;
-    const price=pl.price||0;
-    const mm=byOfferDay.get(p.offer_id);
-    const yest=mm?(mm.get(yKey)||0):0;
-    let sum=0;baseDays.forEach(d=>{sum+=mm?(mm.get(keyOfMonday(d))||0):0;});
-    const avg=sum/baseDays.length;
-    const need=pl.qty/0.95;
-    const rp=effTotal>0?need/effTotal:0;
-    const expectedRub=rp*k*price;
-    const yestRub=yest*price,avgRub=avg*price;
-    const revMonth=(qtyMonth.get(p.offer_id)||0)*price;
-    const ads=adsPid.get(p.product_id)||0;
-    const stock=stockOffer.get(p.offer_id)||0;
-    const planPcsDay=need/daysInMonth; // средний плановый расход месяца, шт/день — для оценки запаса
+    const pl=PLAN[mk+'|'+p.product_id];
+    if(!pl||!(Number(pl.plan_qty)>0))return;
+    const r1=sumOf(rev,p.offer_id,[yKey]),r2=sumOf(rev,p.offer_id,[y2Key]);
+    const r7=sumOf(rev,p.offer_id,cur7),rp7=sumOf(rev,p.offer_id,prev7);
+    const a1=sumOf(adv,p.product_id,[yKey]),a2=sumOf(adv,p.product_id,[y2Key]);
+    const a7=sumOf(adv,p.product_id,cur7),ap7=sumOf(adv,p.product_id,prev7);
+    const c=cf.get(String(p.product_id));
+    const marPct=c&&c.n&&c.revn>0?c.mar/c.revn*100:null;
+    const planPct=pl.margin_pct==null?null:Number(pl.margin_pct);
+    const drr=r7>0?a7/r7*100:(a7>0?Infinity:0);
+    const w=watch.by.get(String(p.product_id))||[];
     rows.push({
-      offer:p.offer_id,
-      yestRub,avgRub,devAvgRub:yestRub-avgRub,expectedRub,devPlanRub:yestRub-expectedRub,
-      planPcsDay,
-      stock,coverDays:planPcsDay>0?stock/planPcsDay:null,
-      drr:revMonth>0?ads/revMonth*100:null
+      pid:p.product_id,offer:p.offer_id,
+      r1,r2,dev1:r1-r2,r7,rp7,dev7:r7-rp7,
+      s1:stockState(p,yKey),s2:stockState(p,y2Key),s7:stockCount(p,cur7),sp7:stockCount(p,prev7),
+      a1,a2,a7,ap7,marPct,planPct,drr,
+      grp:devGroupOf(marPct,planPct,drr),watch:w
     });
   });
-  rows.sort((a,b)=>a.devPlanRub-b.devPlanRub);
-  const out=rows.slice(0,25);
-  DEV_CACHE[mk]=out;
+  rows.sort((a,b)=>Math.abs(b.dev1)-Math.abs(a.dev1));
+  const out={rows,watchOk:watch.ok,yD,y2D,cur7,prev7,wkD,wkEnd,mk};
+  DEV_CACHE[yKey]=out;
   return out;
 }
-async function renderDevTable(mk){
+// раскрытые группы и строка с заметками — удобство конкретного зрителя
+let DEV_OPEN_GRP={},DEV_NOTE_PID=null;
+try{DEV_OPEN_GRP=JSON.parse(localStorage.getItem('ba_dev_groups')||'{}')||{};}catch(e){}
+let DEV_OPEN=false;
+try{DEV_OPEN=localStorage.getItem('ba_dev_details')==='1';}catch(e){}
+async function renderDevTable(){
   const box=document.getElementById('devBox');
   if(!box)return;
-  box.innerHTML='<div class="dev-cap">Загрузка…</div>';
+  if(!box.innerHTML)box.innerHTML='<div class="dev-cap">Загрузка…</div>';
   try{
-    const rows=await loadDevTable(mk);
-    const [y,m]=mk.split('-').map(Number);
-    const mName=new Date(y,m-1,1).toLocaleDateString('ru-RU',{month:'long',year:'numeric'});
+    const D=await loadDevTable();
+    const todayKey=keyOfMonday(new Date());
+    const dd=k=>{const [,m,d]=k.split('-');return d+'.'+m;};
     const cls=v=>v<-0.5?'dev-neg':(v>0.5?'dev-pos':'dev-neutral');
     const sgn=v=>(v>0?'+':'')+fmt(Math.round(v));
-    let h=`<div class="dev-cap">Топ-25 отклонений выручки от планового темпа • ${mName} • вчера к плану (догоняющий темп исключён)</div>`;
-    const cov=v=>v==null?'—':(v>=999?'999+':fmt(Math.round(v)));
-    const covCls=v=>v==null?'dev-neutral':(v<14?'dev-neg':(v<30?'dev-warn':(v>90?'dev-warn':'dev-pos')));
-    h=h.replace('</div>',` <button class="chip-glass dev-toggle" onclick="toggleDevDetails()">${DEV_OPEN?'▾ Скрыть':'▸ Показать'} выручку и темпы</button></div>`);
-    h+=`<table class="dev-table${DEV_OPEN?' open-det':''}"><thead><tr><th>Артикул</th>`
-      +`<th class="c-det">Выручка вчера, ₽</th><th class="c-det">Плановый темп, ₽</th><th class="c-det">Средний темп, ₽</th>`
-      +`<th>Откл. от плана, ₽</th><th>Откл. от среднего, ₽</th>`
-      +`<th>Остаток, шт</th><th title="Средний плановый расход месяца: план÷0,95 ÷ дней в месяце">План, шт/день</th><th title="Остаток ÷ План, шт/день">Запас, дн</th><th>ДРР, %</th></tr></thead><tbody>`;
-    rows.forEach(r=>{
-      const drrTxt=r.drr==null?'—':fmt1(r.drr);
-      const drrCls=r.drr==null?'dev-neutral':(r.drr>10?'dev-neg':(r.drr>5?'dev-warn':'dev-pos'));
-      const offer=String(r.offer).replace(/[<>&]/g,'');
-      h+=`<tr><td>${offer}</td>`
-        +`<td class="c-det">${fmt(Math.round(r.yestRub))}</td><td class="c-det">${fmt(Math.round(r.expectedRub))}</td><td class="c-det">${fmt(Math.round(r.avgRub))}</td>`
-        +`<td class="${cls(r.devPlanRub)}">${sgn(r.devPlanRub)}</td><td class="${cls(r.devAvgRub)}">${sgn(r.devAvgRub)}</td>`
-        +`<td>${fmt(r.stock)}</td><td>${fmt1(r.planPcsDay)}</td><td class="${covCls(r.coverDays)}">${cov(r.coverDays)}</td><td class="${drrCls}">${drrTxt}</td></tr>`;
+    const pair=(a,b)=>`${fmt(Math.round(a))} / ${fmt(Math.round(b))}`;
+    const st1=s=>s==null?'<span class="dev-neutral" title="нет снимка остатков">н/д</span>':(s?'<span class="dev-pos">✓</span>':'<span class="dev-neg">✗</span>');
+    const stN=c=>{const known=c.n-c.nd;const cl=known===0?'dev-neutral':(c.ok===known?'dev-pos':(c.ok===0?'dev-neg':'dev-warn'));return `<span class="${cl}" title="дней с остатком из ${c.n}${c.nd?'; без снимка: '+c.nd:''}">${c.ok}${c.nd?`<sup>н/д ${c.nd}</sup>`:''}</span>`;};
+    const pctTxt=v=>v==null?'—':fmt1(v);
+    const drrTxt=v=>v===Infinity?'∞':fmt1(v);
+    const ctrl=r=>{
+      const w=r.watch[0];if(!w)return '<span class="dev-neutral">＋</span>';
+      const d=w.control_date;const c=!d?'dev-neutral':(d<todayKey?'dev-neg':(d===todayKey?'dev-warn':'dev-pos'));
+      return `<span class="${c}" title="${escH(w.note||'')}">${d?dd(d):'—'}${w.note?' ✎':''}</span>`;
+    };
+    let h=`<div class="dev-cap">Отклонения выручки PNL по позициям • вчера (${fmtShort(D.yD)}) к позавчера (${fmtShort(D.y2D)}) • 7 дн (${dd(D.cur7[0])}–${dd(D.cur7[6])}) к пред. 7 дн (${dd(D.prev7[0])}–${dd(D.prev7[6])}) • маржинальность CF — неделя ${fmtShort(D.wkD)}–${fmtShort(D.wkEnd)}, ДРР — 7 дн`
+      +` <button class="chip-glass dev-toggle" onclick="toggleDevDetails()">${DEV_OPEN?'▾ Скрыть':'▸ Показать'} выручку</button></div>`;
+    if(!D.watchOk)h+=`<div class="dev-cap dev-warn">Заметки недоступны: нет таблицы product_watch в базе.</div>`;
+    h+=`<table class="dev-table${DEV_OPEN?' open-det':''}"><thead><tr><th rowspan="2">Артикул</th>`
+      +`<th colspan="${DEV_OPEN?4:3}" class="dev-hgrp">Вчера к позавчера</th><th colspan="${DEV_OPEN?4:3}" class="dev-hgrp">7 дн к пред. 7 дн</th>`
+      +`<th rowspan="2" title="Маржинальность CF за неделю / план месяца">Маржин., % / план</th><th rowspan="2" title="Реклама 7 дн ÷ выручка PNL 7 дн">ДРР 7 дн, %</th><th rowspan="2" title="Дата контроля; ✎ — есть заметка. Клик по строке — заметки">Контроль</th></tr><tr>`
+      +`<th class="c-det">Выручка, ₽</th><th>Откл., ₽</th><th title="День с остатком: остаток ≥ план÷дней месяца × норма покрытия дня недели (weekly)">Остаток</th><th>Реклама, ₽</th>`
+      +`<th class="c-det">Выручка, ₽</th><th>Откл., ₽</th><th title="Дней с остатком: 7 дн / пред. 7 дн">Дни с ост.</th><th>Реклама, ₽</th></tr></thead>`;
+    DEV_GROUPS.forEach(g=>{
+      const list=D.rows.filter(r=>r.grp===g.key);
+      if(!list.length)return;
+      const open=!!DEV_OPEN_GRP[g.key];
+      const s1=list.reduce((s,r)=>s+r.dev1,0),s7=list.reduce((s,r)=>s+r.dev7,0);
+      h+=`<tbody><tr class="dev-grp" onclick="toggleDevGroup('${g.key}')"><td colspan="12">${open?'▾':'▸'} ${g.name} <span class="dev-neutral">• ${list.length} поз. • откл. вчера</span> <span class="${cls(s1)}">${sgn(s1)}</span> <span class="dev-neutral">• 7 дн</span> <span class="${cls(s7)}">${sgn(s7)}</span></td></tr>`;
+      if(open)list.forEach(r=>{
+        h+=`<tr class="dev-row${DEV_NOTE_PID===r.pid?' on':''}" onclick="toggleDevNote(${r.pid})"><td>${escH(r.offer)}</td>`
+          +`<td class="c-det">${pair(r.r1,r.r2)}</td><td class="${cls(r.dev1)}">${sgn(r.dev1)}</td><td>${st1(r.s1)} / ${st1(r.s2)}</td><td>${pair(r.a1,r.a2)}</td>`
+          +`<td class="c-det">${pair(r.r7,r.rp7)}</td><td class="${cls(r.dev7)}">${sgn(r.dev7)}</td><td>${stN(r.s7)} / ${stN(r.sp7)}</td><td>${pair(r.a7,r.ap7)}</td>`
+          +`<td>${pctTxt(r.marPct)} / ${pctTxt(r.planPct)}</td><td class="${r.drr>DRR_LIMIT?'dev-neg':'dev-pos'}">${drrTxt(r.drr)}</td><td>${ctrl(r)}</td></tr>`;
+        if(DEV_NOTE_PID===r.pid)h+=devNoteRow(r,D.watchOk);
+      });
+      h+='</tbody>';
     });
-    h+='</tbody></table>';
+    h+='</table>';
+    if(!D.rows.length)h+='<div class="dev-cap">Нет товаров с планом на месяц.</div>';
     box.innerHTML=h;
   }catch(e){
     console.error('devTable:',e);
-    box.innerHTML='<div class="dev-cap">Ошибка: '+e.message+' (подробности в консоли F12)</div>';
+    box.innerHTML='<div class="dev-cap">Ошибка: '+escH(e.message)+' (подробности в консоли F12)</div>';
   }
 }
-// блок «Выручка вчера / Плановый темп / Средний темп» в «Ключевых отклонениях» (по умолчанию свёрнут)
-let DEV_OPEN=false;
-try{DEV_OPEN=localStorage.getItem('ba_dev_details')==='1';}catch(e){}
+function devNoteRow(r,ok){
+  const hist=r.watch.slice(0,5).map(w=>`<div class="dev-hist"><span class="dev-neutral">${escH((w.created_at||'').slice(0,10))}</span> ${w.control_date?'контроль '+escH(w.control_date)+' • ':''}${escH(w.note||'')}</div>`).join('');
+  const def=keyOfMonday(addDays(new Date(),7));
+  return `<tr class="dev-note"><td colspan="12" onclick="event.stopPropagation()">`
+    +(ok?`<div class="dev-note-form"><textarea id="devNoteText" placeholder="Заметка по ${escH(r.offer)}…"></textarea>`
+      +`<label>Вернуться к контролю <input type="date" id="devNoteDate" value="${def}"></label>`
+      +`<button class="chip-glass" onclick="saveDevNote(${r.pid},'${escH(r.offer)}')">Сохранить</button><span id="devNoteMsg" class="dev-neutral"></span></div>`
+      :'<div class="dev-neutral">Заметки недоступны: нет таблицы product_watch.</div>')
+    +(hist||'<div class="dev-neutral">Заметок пока нет.</div>')+`</td></tr>`;
+}
+function toggleDevGroup(k){
+  DEV_OPEN_GRP[k]=!DEV_OPEN_GRP[k];
+  try{localStorage.setItem('ba_dev_groups',JSON.stringify(DEV_OPEN_GRP));}catch(e){}
+  renderDevTable();
+}
+function toggleDevNote(pid){DEV_NOTE_PID=DEV_NOTE_PID===pid?null:pid;renderDevTable();}
+async function saveDevNote(pid,offer){
+  const note=(document.getElementById('devNoteText').value||'').trim();
+  const date=document.getElementById('devNoteDate').value||null;
+  const msg=document.getElementById('devNoteMsg');
+  if(!note&&!date){msg.textContent='Введите заметку или дату';return;}
+  msg.textContent='Сохранение…';
+  try{
+    const r=await fetch(SUPABASE_URL+'/rest/v1/product_watch',{method:'POST',headers:{...HD,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({product_id:pid,offer_id:offer,note,control_date:date})});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    Object.keys(DEV_CACHE).forEach(k=>delete DEV_CACHE[k]);
+    renderDevTable();
+  }catch(e){console.error('saveDevNote:',e);msg.textContent='Ошибка: '+e.message;}
+}
 function toggleDevDetails(){
   DEV_OPEN=!DEV_OPEN;
   try{localStorage.setItem('ba_dev_details',DEV_OPEN?'1':'0');}catch(e){}
-  const t=document.querySelector('#devBox .dev-table');if(t)t.classList.toggle('open-det',DEV_OPEN);
-  const b=document.querySelector('#devBox .dev-toggle');if(b)b.textContent=(DEV_OPEN?'▾ Скрыть':'▸ Показать')+' выручку и темпы';
+  renderDevTable(); // colspan шапки зависит от видимости колонок выручки
 }
 function setHomeTab(tab){
   HOME_TAB=tab;
