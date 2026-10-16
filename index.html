@@ -335,13 +335,6 @@
 
             <!-- ПРАВАЯ КОЛОНКА -->
             <div class="content-area">
-                <!-- КАРТОЧКА ВХОДА -->
-                <div class="glass-card" id="loginCard" style="max-width:480px;margin:40px auto;align-items:center;justify-content:center;text-align:center">
-                    <div class="card-title" style="margin-bottom:12px;font-size:1.15em">🔒 Финансовый раздел</div>
-                    <input type="password" id="pwdHome" class="week-select-glass" style="width:100%;max-width:none;margin:0 0 8px" placeholder="Пароль" onkeypress="if(event.key==='Enter')loginHome()">
-                    <button class="week-select-glass" style="width:100%;max-width:none;border:none;background:linear-gradient(90deg,#78A6C7,#E33D78);color:#fff;padding:7px 10px;cursor:pointer" onclick="loginHome()">Войти</button>
-                    <div id="loginErrHome" style="display:none;margin-top:8px;font-size:.8em;color:#ffd7dd">Неверный пароль. Попробуйте ещё раз.</div>
-                </div>
 
                 <!-- КАРТОЧКА ДАННЫХ -->
                 <div class="glass-card hide" id="finCard">
@@ -384,7 +377,6 @@
 const SUPABASE_URL='https://jvoofakrkhzoblhhuyvr.supabase.co';
 const ANON='sb_publishable_IA4ReUU9xTL7hb_sbsHaFA_LPATJazE';
 const HD={apikey:ANON,Authorization:'Bearer '+ANON};
-const PASSWORD_HASH='6dd81b2b2385ffaeae34bc09050f3258110c5c7f1db578c69bcbc30ad8a121e0';
 const CHART_DATA={},REAL_CACHE={},DEV_CACHE={};
 const C_UP='#4ade80',C_DOWN='#f87171';
 const GRID='rgba(255,255,255,0.14)',BASELINE='rgba(255,255,255,0.45)';
@@ -915,24 +907,13 @@ function toggleAnnotations(){
   applyAnnotations();
 }
 
-// === доступ ===
-async function loginHome(){
-  const v=document.getElementById('pwdHome').value;
-  const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(v));
-  const h=[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('');
-  if(h!==PASSWORD_HASH){document.getElementById('loginErrHome').style.display='block';document.getElementById('pwdHome').value='';return;}
-  sessionStorage.setItem('ba_home_access','1');
-  showFin();
-}
+// === финансовый раздел: без пароля ===
 function showFin(){
-  document.getElementById('loginCard').classList.add('hide');
   document.getElementById('finCard').classList.remove('hide');
   applyAnnotations();
   buildMonthOptions();
 }
-document.addEventListener('DOMContentLoaded',()=>{
-  if(sessionStorage.getItem('ba_home_access')==='1')showFin();
-});
+document.addEventListener('DOMContentLoaded',()=>{ showFin(); });
 </script>
 </body>
 </html>
