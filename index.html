@@ -775,6 +775,9 @@ async function renderMonth(mk){
 // === «Ключевые отклонения»: выручка PNL вчера/позавчера и 7 дн/пред. 7 дн, группы по маржинальности CF и ДРР ===
 const STOCK_DAYS=4; // день с остатком: товара хватает на 4 дня продаж по плану
 const DRR_LIMIT=8,MARGIN_FLOOR=5;
+// менеджеры — как matrixOf в plan.html ИП (у ООО префиксы другие — при добавлении ООО брать его правило)
+function matrixOf(offer){ return (/^(CAP|GLV|SEAL|RNC)-/.test(offer))?'m1':'m2'; }
+const DEV_MANAGERS={all:'Все',m1:'Илья',m2:'Ольга'};
 // списки верхнего уровня — по знаку отклонения выручки выбранной базы (ноль — к положительным)
 const DEV_BASES={d1:{name:'вчера к позавчера',v:r=>r.dev1},d7:{name:'7 дн к пред. 7 дн',v:r=>r.dev7},d7p:{name:'7 дн к плану',v:r=>r.dev7p}};
 const DEV_SIDES=[
@@ -927,8 +930,8 @@ async function loadDevTable(){
   return out;
 }
 // раскрытые группы и строка с заметками — удобство конкретного зрителя
-let DEV_OPEN_GRP={},DEV_NOTE_PID=null,DEV_NCOLS=14,DEV_BASIS='d1',DEV_FILTER='',DEV_FILTER_CLOSED=new Set(); // фильтр по артикулу и свёрнутое при нём — только на время просмотра
-try{const b=localStorage.getItem('ba_dev_basis');if(DEV_BASES[b])DEV_BASIS=b;}catch(e){}
+let DEV_OPEN_GRP={},DEV_NOTE_PID=null,DEV_NCOLS=14,DEV_BASIS='d1',DEV_MGR='all',DEV_FILTER='',DEV_FILTER_CLOSED=new Set(); // фильтр по артикулу и свёрнутое при нём — только на время просмотра
+try{const b=localStorage.getItem('ba_dev_basis');if(DEV_BASES[b])DEV_BASIS=b;const m=localStorage.getItem('ba_dev_mgr');if(DEV_MANAGERS[m])DEV_MGR=m;}catch(e){}
 try{DEV_OPEN_GRP=JSON.parse(localStorage.getItem('ba_dev_groups')||'{}')||{};}catch(e){}
 let DEV_OPEN=false;
 try{DEV_OPEN=localStorage.getItem('ba_dev_details')==='1';}catch(e){}
@@ -960,6 +963,7 @@ async function renderDevTable(){
     };
     let h=`<div class="dev-cap">Отклонения выручки PNL по позициям • вчера (${fmtShort(D.yD)}) к позавчера (${fmtShort(D.y2D)}) • 7 дн (${dd(D.cur7[0])}–${dd(D.cur7[6])}) к пред. 7 дн (${dd(D.prev7[0])}–${dd(D.prev7[6])}) • маржинальность CF — неделя ${fmtShort(D.wkD)}–${fmtShort(D.wkEnd)} к пред. неделе, ДРР — 7 дн к пред. 7 дн`
       +` <span class="dev-basis"><input type="search" id="devFilter" class="chip-glass dev-filter" placeholder="Артикул…" value="${escH(DEV_FILTER)}" oninput="setDevFilter(this.value)"></span>`
+      +` <span class="dev-basis">Менеджер: ${Object.keys(DEV_MANAGERS).map(k=>`<button class="chip-glass dev-toggle${DEV_MGR===k?' on':''}" onclick="setDevMgr('${k}')">${DEV_MANAGERS[k]}</button>`).join('')}</span>`
       +` <span class="dev-basis">Группировка: ${Object.keys(DEV_BASES).map(k=>`<button class="chip-glass dev-toggle${DEV_BASIS===k?' on':''}" onclick="setDevBasis('${k}')">${DEV_BASES[k].name}</button>`).join('')}</span>`
       +` <button class="chip-glass dev-toggle" onclick="toggleDevDetails()">${DEV_OPEN?'▾ Скрыть':'▸ Показать'} выручку</button></div>`;
     if(!D.watchOk)h+=`<div class="dev-cap dev-warn">Заметки недоступны: нет таблицы product_watch в базе.</div>`;
@@ -979,7 +983,7 @@ async function renderDevTable(){
     const isOpen=k=>fq?!DEV_FILTER_CLOSED.has(k):!!DEV_OPEN_GRP[k];
     // сортировка: «7 дн к плану» — по (к плану + 7 дн к пред. 7 дн), худшие сверху; иначе — по модулю отклонения базы
     const cmp=isPlan?(a,b)=>(a.dev7p+a.dev7)-(b.dev7p+b.dev7):(a,b)=>Math.abs(bv(b))-Math.abs(bv(a));
-    const sorted=D.rows.filter(r=>!fq||hit(r)||(r.fam&&r.members.some(hit))).sort(cmp);
+    const sorted=D.rows.filter(r=>DEV_MGR==='all'||matrixOf(r.offer)===DEV_MGR).filter(r=>!fq||hit(r)||(r.fam&&r.members.some(hit))).sort(cmp);
     const noSt='<span class="dev-neutral" title="Остатки — по размерам: раскройте группу">—</span>';
     const rowHtml=(r,trCls,click,first)=>{
         return `<tr class="${trCls}" onclick="${click}"><td class="dev-art" title="${escH(r.offer)}">${first}</td>`
@@ -1017,7 +1021,7 @@ async function renderDevTable(){
     });
     h+='</table>';
     if(!D.rows.length)h+='<div class="dev-cap">Нет товаров с планом на месяц.</div>';
-    else if(!sorted.length)h+='<div class="dev-cap">По фильтру «'+escH(DEV_FILTER)+'» товаров нет.</div>';
+    else if(!sorted.length)h+='<div class="dev-cap">Товаров нет'+(DEV_MGR!=='all'?' у менеджера '+DEV_MANAGERS[DEV_MGR]:'')+(fq?' по фильтру «'+escH(DEV_FILTER)+'»':'')+'.</div>';
     const typing=document.activeElement&&document.activeElement.id==='devFilter';
     box.innerHTML=h;
     // перерисовка заменяет поле фильтра — возвращаем фокус и курсор
@@ -1040,6 +1044,11 @@ function devNoteRow(r,ok){
     +(hist||'<div class="dev-neutral">Заметок пока нет.</div>')+`</td></tr>`;
 }
 function setDevFilter(v){DEV_FILTER=v;DEV_FILTER_CLOSED.clear();renderDevTable();}
+function setDevMgr(m){
+  DEV_MGR=m;
+  try{localStorage.setItem('ba_dev_mgr',m);}catch(e){}
+  renderDevTable();
+}
 function setDevBasis(b){
   DEV_BASIS=b;
   try{localStorage.setItem('ba_dev_basis',b);}catch(e){}
