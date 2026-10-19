@@ -946,7 +946,7 @@ async function renderDevTable(){
           +`<td class="bl">${fmt0(r.o1)} / ${fmt0(r.oPlan)}</td><td class="${cls(r.oDev)}">${ordDev(r)}</td>`
           +`<td class="c-det ${bl[0]}">${pair(r.r1,r.r2)}</td><td class="${cls(r.dev1)}${bl[1]}">${sgn(r.dev1)}</td><td>${st1(r.s1)} / ${st1(r.s2)}</td><td>${pair(r.a1,r.a2)}</td>`
           +`<td class="c-det ${bl[0]}">${pair(r.r7,r.rp7)}</td><td class="${cls(r.dev7)}${bl[1]}">${sgn(r.dev7)}</td><td>${stN(r.s7)} / ${stN(r.sp7)}</td><td>${pair(r.a7,r.ap7)}</td>`
-          +`<td class="bl">${rub(r.pr7)} <span class="dev-neutral">/ ${rub(r.prp7)}</span>${arr(r.pr7,r.prp7,null,0.5)}</td><td>${pctTxt(r.marPct)} <span class="dev-neutral">/ ${pctTxt(r.marPrev)}</span>${arr(r.marPct,r.marPrev,true)}</td><td>${pctTxt(r.planPct)}</td>`
+          +`<td class="bl">${rub(r.pr7)} <span class="dev-neutral">/ ${rub(r.prp7)}</span>${arr(r.pr7,r.prp7,true,0.5)}</td><td>${pctTxt(r.marPct)} <span class="dev-neutral">/ ${pctTxt(r.marPrev)}</span>${arr(r.marPct,r.marPrev,true)}</td><td>${pctTxt(r.planPct)}</td>`
           +`<td><span class="${r.drr>DRR_LIMIT?'dev-neg':'dev-pos'}">${drrTxt(r.drr)}</span> <span class="dev-neutral">/ ${drrTxt(r.drrPrev)}</span>${arr(r.drr,r.drrPrev,false)}</td><td class="bl">${ctrl(r)}</td></tr>`;
         if(DEV_NOTE_PID===r.pid)h+=devNoteRow(r,D.watchOk);
       });
