@@ -237,6 +237,8 @@
         .dev-note-form textarea { flex: 1 1 320px; min-height: 44px; font-family: 'Forum', serif; font-size: 1em; color: #fff; background: rgba(28,13,46,.5); border: 1px solid rgba(255,255,255,.3); border-radius: 8px; padding: 6px 8px; }
         .dev-note-form input[type=date] { font-family: inherit; color: #fff; background: rgba(28,13,46,.5); border: 1px solid rgba(255,255,255,.3); border-radius: 6px; padding: 3px 6px; color-scheme: dark; }
         .dev-hist { margin: 2px 0; }
+        .dev-toggle.on { background: rgba(255,255,255,.35); }
+        .dev-basis { margin-left: 8px; white-space: nowrap; }
         .dev-toggle { height: 24px; margin-left: 8px; font-size: .9em; vertical-align: middle; }
         .dev-pos { color: #4ade80; font-weight: 700; }
         .dev-neg { color: #f87171; font-weight: 700; }
@@ -766,10 +768,11 @@ async function renderMonth(mk){
 // === «Ключевые отклонения»: выручка PNL вчера/позавчера и 7 дн/пред. 7 дн, группы по маржинальности CF и ДРР ===
 const DOW_TARGET={0:7,1:13,2:12,3:11,4:10,5:9,6:8}; // норма покрытия остатком, дн — как в weekly.html
 const DRR_LIMIT=8,MARGIN_FLOOR=5;
-// списки верхнего уровня — по знаку отклонения выручки «вчера к позавчера» (ноль — к положительным)
+// списки верхнего уровня — по знаку отклонения выручки выбранной базы (ноль — к положительным)
+const DEV_BASES={d1:{name:'вчера к позавчера',v:r=>r.dev1},d7:{name:'7 дн к пред. 7 дн',v:r=>r.dev7}};
 const DEV_SIDES=[
-  {key:'neg',name:'Отрицательное отклонение выручки (вчера к позавчера)',f:r=>r.dev1<0},
-  {key:'pos',name:'Положительное отклонение выручки (вчера к позавчера)',f:r=>r.dev1>=0}
+  {key:'neg',name:'Отрицательное отклонение выручки',f:d=>d<0},
+  {key:'pos',name:'Положительное отклонение выручки',f:d=>d>=0}
 ];
 const DEV_GROUPS=[
   {key:'g1',name:'Маржинальность < 5%, ДРР ≤ 8%'},
@@ -869,13 +872,13 @@ async function loadDevTable(){
       grp:devGroupOf(marPct,planPct,drr),watch:w
     });
   });
-  rows.sort((a,b)=>Math.abs(b.dev1)-Math.abs(a.dev1));
   const out={rows,watchOk:watch.ok,yD,y2D,cur7,prev7,wkD,wkEnd,mk,kY};
   DEV_CACHE[yKey]=out;
   return out;
 }
 // раскрытые группы и строка с заметками — удобство конкретного зрителя
-let DEV_OPEN_GRP={},DEV_NOTE_PID=null,DEV_NCOLS=14;
+let DEV_OPEN_GRP={},DEV_NOTE_PID=null,DEV_NCOLS=14,DEV_BASIS='d1';
+try{const b=localStorage.getItem('ba_dev_basis');if(DEV_BASES[b])DEV_BASIS=b;}catch(e){}
 try{DEV_OPEN_GRP=JSON.parse(localStorage.getItem('ba_dev_groups')||'{}')||{};}catch(e){}
 let DEV_OPEN=false;
 try{DEV_OPEN=localStorage.getItem('ba_dev_details')==='1';}catch(e){}
@@ -903,6 +906,7 @@ async function renderDevTable(){
       return `<span class="${c}" title="${escH(w.note||'')}">${d?dd(d):'—'}${w.note?' ✎':''}</span>`;
     };
     let h=`<div class="dev-cap">Отклонения выручки PNL по позициям • вчера (${fmtShort(D.yD)}) к позавчера (${fmtShort(D.y2D)}) • 7 дн (${dd(D.cur7[0])}–${dd(D.cur7[6])}) к пред. 7 дн (${dd(D.prev7[0])}–${dd(D.prev7[6])}) • маржинальность CF — неделя ${fmtShort(D.wkD)}–${fmtShort(D.wkEnd)}, ДРР — 7 дн`
+      +` <span class="dev-basis">Группировка: ${Object.keys(DEV_BASES).map(k=>`<button class="chip-glass dev-toggle${DEV_BASIS===k?' on':''}" onclick="setDevBasis('${k}')">${DEV_BASES[k].name}</button>`).join('')}</span>`
       +` <button class="chip-glass dev-toggle" onclick="toggleDevDetails()">${DEV_OPEN?'▾ Скрыть':'▸ Показать'} выручку</button></div>`;
     if(!D.watchOk)h+=`<div class="dev-cap dev-warn">Заметки недоступны: нет таблицы product_watch в базе.</div>`;
     h+=`<table class="dev-table${DEV_OPEN?' open-det':''}"><thead><tr><th rowspan="2">Артикул</th>`
@@ -913,12 +917,15 @@ async function renderDevTable(){
       +`<th class="c-det ${bl[0]}">Выручка, ₽</th><th class="${bl[1]}">Откл., ₽</th><th title="День с остатком: остаток ≥ план÷дней месяца × норма покрытия дня недели (weekly)">Остаток</th><th>Реклама, ₽</th>`
       +`<th class="c-det ${bl[0]}">Выручка, ₽</th><th class="${bl[1]}">Откл., ₽</th><th title="Дней с остатком: 7 дн / пред. 7 дн">Дни с ост.</th><th>Реклама, ₽</th>`
       +`<th class="bl" title="Маржинальность CF за неделю / план месяца">Маржин., % / план</th><th title="Реклама 7 дн ÷ выручка PNL 7 дн">ДРР 7 дн, %</th></tr></thead>`;
+    // база группировки: знак списка и сортировка по модулю отклонения
+    const bv=DEV_BASES[DEV_BASIS].v;
+    const sorted=D.rows.slice().sort((a,b)=>Math.abs(bv(b))-Math.abs(bv(a)));
     DEV_SIDES.forEach(sd=>{
-      const all=D.rows.filter(sd.f);
+      const all=sorted.filter(r=>sd.f(bv(r)));
       if(!all.length)return;
-      const sOpen=DEV_OPEN_GRP[sd.key]!==false; // списки верхнего уровня раскрыты по умолчанию
+      const sOpen=!!DEV_OPEN_GRP[sd.key];
       const t1=all.reduce((s,r)=>s+r.dev1,0),t7=all.reduce((s,r)=>s+r.dev7,0);
-      h+=`<tbody><tr class="dev-top" onclick="toggleDevGroup('${sd.key}',true)"><td colspan="${DEV_NCOLS}">${sOpen?'▾':'▸'} ${sd.name} <span class="dev-neutral">• ${all.length} поз. • откл. вчера</span> <span class="${cls(t1)}">${sgn(t1)}</span> <span class="dev-neutral">• 7 дн</span> <span class="${cls(t7)}">${sgn(t7)}</span></td></tr></tbody>`;
+      h+=`<tbody><tr class="dev-top" onclick="toggleDevGroup('${sd.key}')"><td colspan="${DEV_NCOLS}">${sOpen?'▾':'▸'} ${sd.name} (${DEV_BASES[DEV_BASIS].name}) <span class="dev-neutral">• ${all.length} поз. • откл. вчера</span> <span class="${cls(t1)}">${sgn(t1)}</span> <span class="dev-neutral">• 7 дн</span> <span class="${cls(t7)}">${sgn(t7)}</span></td></tr></tbody>`;
       if(sOpen)DEV_GROUPS.forEach(g=>{
       const list=all.filter(r=>r.grp===g.key);
       if(!list.length)return;
@@ -955,8 +962,13 @@ function devNoteRow(r,ok){
       :'<div class="dev-neutral">Заметки недоступны: нет таблицы product_watch.</div>')
     +(hist||'<div class="dev-neutral">Заметок пока нет.</div>')+`</td></tr>`;
 }
-function toggleDevGroup(k,defOpen){
-  DEV_OPEN_GRP[k]=defOpen?DEV_OPEN_GRP[k]===false:!DEV_OPEN_GRP[k];
+function setDevBasis(b){
+  DEV_BASIS=b;
+  try{localStorage.setItem('ba_dev_basis',b);}catch(e){}
+  renderDevTable();
+}
+function toggleDevGroup(k){
+  DEV_OPEN_GRP[k]=!DEV_OPEN_GRP[k];
   try{localStorage.setItem('ba_dev_groups',JSON.stringify(DEV_OPEN_GRP));}catch(e){}
   renderDevTable();
 }
