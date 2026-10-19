@@ -830,10 +830,13 @@ function groupGloves(rows){
   });
   return out;
 }
-// упущенная маржа («7 дн к плану») = (к плану + 7 дн к пред. 7 дн) × маржинальность CF недели; нет факта — плановая
+// упущенная маржа («7 дн к плану») = (к плану + 7 дн к пред. 7 дн) × маржинальность CF недели; нет факта — плановая.
+// Не считается (null): сумма отклонений ≥ 0 — упущенной маржи нет; убыточный товар (маржинальность CF < 0) — отдельно сверху
 function devLost(r){
+  const sum=r.dev7p+r.dev7;
+  if(sum>=0||(r.marPct!=null&&r.marPct<0))return null;
   const m=r.marPct!=null?r.marPct:r.planPct;
-  return m==null?null:(r.dev7p+r.dev7)*m/100;
+  return m==null?null:sum*m/100;
 }
 function devGroupOf(marPct,planPct,drr){
   if(marPct==null||planPct==null)return 'g0';
@@ -979,7 +982,7 @@ async function renderDevTable(){
       +`<th colspan="4" class="dev-hgrp bl">Цена, маржинальность и ДРР</th><th rowspan="2" class="bl" title="Дата контроля; ✎ — есть заметка. Клик по строке — заметки">Контроль</th></tr><tr>`
       +`<th class="bl">Факт / план, шт</th><th>Откл., шт</th>`
       +`<th class="c-det ${bl[0]}">Выручка, ₽</th><th class="${bl[1]}">Откл., ₽</th><th title="День с остатком: остаток ≥ план÷дней месяца × ${STOCK_DAYS} дн">Остаток</th><th>Реклама, ₽</th>`
-      +`<th class="c-det ${bl[0]}">Выручка, ₽</th><th class="${bl[1]}">Откл., ₽</th>${isPlan?'<th title="Факт выручки 7 дн − план 7 дн (план, шт × плановая цена ÷ эфф. дни, выходной ×0,7, без 0,95)">К плану, ₽</th><th title="(к плану + 7 дн к пред. 7 дн) × маржинальность CF недели; * — по плановой (нет факта). Сортировка: убыточные сверху, затем худшие">Упущ. маржа, ₽</th>':''}<th title="Дней с остатком: 7 дн / пред. 7 дн">Дни с ост.</th><th>Реклама, ₽</th>`
+      +`<th class="c-det ${bl[0]}">Выручка, ₽</th><th class="${bl[1]}">Откл., ₽</th>${isPlan?'<th title="Факт выручки 7 дн − план 7 дн (план, шт × плановая цена ÷ эфф. дни, выходной ×0,7, без 0,95)">К плану, ₽</th><th title="(к плану + 7 дн к пред. 7 дн) × маржинальность CF недели; * — по плановой (нет факта). «—»: сумма ≥ 0 или убыточный товар. Сортировка: убыточные сверху, затем худшие">Упущ. маржа, ₽</th>':''}<th title="Дней с остатком: 7 дн / пред. 7 дн">Дни с ост.</th><th>Реклама, ₽</th>`
       +`<th class="bl" title="Средняя цена PNL = выручка ÷ заказы, шт: 7 дн / пред. 7 дн">Ср. цена, ₽<br><span class="dev-neutral">7 дн / пред.</span></th><th title="Маржинальность CF: неделя ${fmtShort(D.wkD)}–${fmtShort(D.wkEnd)} / пред. неделя ${fmtShort(D.pwkD)}–${fmtShort(D.pwkEnd)}">Маржин., %<br><span class="dev-neutral">нед / пред.</span></th><th title="План маржинальности месяца">План, %</th><th title="Реклама ÷ выручка PNL: 7 дн / пред. 7 дн">ДРР, %<br><span class="dev-neutral">7 дн / пред.</span></th></tr></thead>`;
     // база группировки: знак списка и сортировка по модулю отклонения
     const bv=DEV_BASES[DEV_BASIS].v;
@@ -987,13 +990,14 @@ async function renderDevTable(){
     const hit=r=>String(r.offer).toLowerCase().includes(fq);
     // при фильтре найденное раскрыто, пока его не свернули; без фильтра — сохранённое состояние
     const isOpen=k=>fq?!DEV_FILTER_CLOSED.has(k):!!DEV_OPEN_GRP[k];
-    // сортировка: «7 дн к плану» — сначала убыточные (маржинальность CF < 0), внутри — по упущенной марже, худшие сверху,
-    // без расчёта — в конец; другие режимы — по модулю отклонения базы
+    // сортировка: «7 дн к плану» — убыточные (маржинальность CF < 0) сверху, затем с упущенной маржой (худшие сверху),
+    // затем без неё — эти две группы по сумме (к плану + 7 дн к пред. 7 дн); другие режимы — по модулю отклонения базы
     const lossy=r=>r.marPct!=null&&r.marPct<0;
-    const lostKey=r=>{const v=devLost(r);return v==null?Infinity:v;};
-    const cmp=isPlan?(a,b)=>(lossy(b)-lossy(a))||(lostKey(a)-lostKey(b)):(a,b)=>Math.abs(bv(b))-Math.abs(bv(a));
+    const devSum=r=>r.dev7p+r.dev7;
+    const hasLost=r=>devLost(r)!=null;
+    const cmp=isPlan?(a,b)=>(lossy(b)-lossy(a))||(hasLost(b)-hasLost(a))||(hasLost(a)?devLost(a)-devLost(b):devSum(a)-devSum(b)):(a,b)=>Math.abs(bv(b))-Math.abs(bv(a));
     const sorted=D.rows.filter(r=>DEV_MGR==='all'||matrixOf(r.offer)===DEV_MGR).filter(r=>!fq||hit(r)||(r.fam&&r.members.some(hit))).sort(cmp);
-    const lostTd=r=>{const v=devLost(r);if(v==null)return '<td class="dev-neutral">—</td>';const byPlan=r.marPct==null;return `<td class="${cls(v)}"${byPlan?' title="по плановой маржинальности: нет CF-факта за неделю"':''}>${sgn(v)}${byPlan?'*':''}</td>`;};
+    const lostTd=r=>{const v=devLost(r);if(v==null)return `<td class="dev-neutral" title="${lossy(r)?'убыточный товар — упущенная маржа не считается':(devSum(r)>=0?'выручка с учётом динамики не ниже плана — упущенной маржи нет':'нет маржинальности: ни CF-факта, ни плана')}">—</td>`;const byPlan=r.marPct==null;return `<td class="${cls(v)}"${byPlan?' title="по плановой маржинальности: нет CF-факта за неделю"':''}>${sgn(v)}${byPlan?'*':''}</td>`;};
     const noSt='<span class="dev-neutral" title="Остатки — по размерам: раскройте группу">—</span>';
     const rowHtml=(r,trCls,click,first)=>{
         if(isPlan&&lossy(r))trCls+=' dev-lossy';
