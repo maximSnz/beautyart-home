@@ -211,13 +211,13 @@
         .dev-table th {
             position: sticky; top: 0; z-index: 2;
             background: rgba(28, 13, 46, 0.92);
-            padding: 5px 5px; text-align: right; white-space: normal; line-height: 1.15;
+            padding: 5px 3px; text-align: right; white-space: normal; line-height: 1.15;
             color: rgba(255,255,255,.8); font-weight: 600; font-size: .92em;
             border-bottom: 1px solid rgba(255,255,255,.3);
         }
         .dev-table th:first-child, .dev-table td:first-child { text-align: left; }
         .dev-table td {
-            padding: 4px 5px; border-bottom: 1px dashed rgba(255,255,255,.15);
+            padding: 4px 3px; border-bottom: 1px dashed rgba(255,255,255,.15);
             text-align: right; white-space: nowrap;
         }
         .dev-table tr:hover td { background: rgba(255,255,255,.06); }
@@ -229,7 +229,9 @@
         .dev-table tr.dev-grp td { text-align: left; cursor: pointer; background: rgba(255,255,255,.08); font-weight: 600; border-bottom: 1px solid rgba(255,255,255,.25); }
         .dev-table tr.dev-top td { text-align: left; cursor: pointer; background: rgba(255,255,255,.16); font-weight: 600; font-size: 1.05em; border-bottom: 1px solid rgba(255,255,255,.35); }
         .dev-table td.dev-sub { padding-left: 22px; }
+        .dev-table tr.dev-top td, .dev-table tr.dev-grp td { white-space: normal; } /* длинные заголовки групп переносятся, а не растягивают таблицу */
         .dev-table tr.dev-row { cursor: pointer; }
+        .dev-table td.dev-art { max-width: 140px; overflow: hidden; text-overflow: ellipsis; } /* длинный артикул — «…», полный в подсказке */
         .dev-table tr.dev-fam td { font-weight: 600; }
         .dev-table tr.dev-member td { background: rgba(28,13,46,.18); }
         .dev-table tr.dev-member td:first-child { padding-left: 22px; color: rgba(255,255,255,.85); }
@@ -774,7 +776,7 @@ async function renderMonth(mk){
 const STOCK_DAYS=4; // день с остатком: товара хватает на 4 дня продаж по плану
 const DRR_LIMIT=8,MARGIN_FLOOR=5;
 // списки верхнего уровня — по знаку отклонения выручки выбранной базы (ноль — к положительным)
-const DEV_BASES={d1:{name:'вчера к позавчера',v:r=>r.dev1},d7:{name:'7 дн к пред. 7 дн',v:r=>r.dev7}};
+const DEV_BASES={d1:{name:'вчера к позавчера',v:r=>r.dev1},d7:{name:'7 дн к пред. 7 дн',v:r=>r.dev7},d7p:{name:'7 дн к плану',v:r=>r.dev7p}};
 const DEV_SIDES=[
   {key:'neg',name:'Отрицательное отклонение выручки',f:d=>d<0},
   {key:'pos',name:'Положительное отклонение выручки',f:d=>d>=0}
@@ -810,8 +812,8 @@ function groupGloves(rows){
     const drrOf=(a,r)=>r>0?a/r*100:(a>0?Infinity:0);
     const wp=m.filter(r=>r.planPct!=null&&r.planRev>0),wpr=wp.reduce((s,r)=>s+r.planRev,0);
     const g={fam:k,members:m,offer:k,pid:'f:'+k};
-    ['o1','oPlan','r1','r2','r7','rp7','a1','a2','a7','ap7','q7','qp7'].forEach(f=>g[f]=S(f));
-    g.oDev=g.o1-g.oPlan;g.dev1=g.r1-g.r2;g.dev7=g.r7-g.rp7;
+    ['o1','oPlan','r1','r2','r7','rp7','p7','a1','a2','a7','ap7','q7','qp7'].forEach(f=>g[f]=S(f));
+    g.oDev=g.o1-g.oPlan;g.dev1=g.r1-g.r2;g.dev7=g.r7-g.rp7;g.dev7p=g.r7-g.p7;
     g.pr7=g.q7>0?g.r7/g.q7:null;g.prp7=g.qp7>0?g.rp7/g.qp7:null;
     g.marPct=pct(cfS('cfC'));g.marPrev=pct(cfS('cfP'));
     g.planPct=wpr>0?wp.reduce((s,r)=>s+r.planPct*r.planRev,0)/wpr:null;
@@ -889,13 +891,15 @@ async function loadDevTable(){
     return st>0&&st>=need;
   };
   const stockCount=(p,keys)=>{let ok=0,nd=0;keys.forEach(k=>{const s=stockState(p,k);if(s==null)nd++;else if(s)ok++;});return {ok,nd,n:keys.length};};
+  // план выручки за 7 дн: по дням — план месяца, шт × плановая цена ÷ эфф. дни месяца (без 0,95); выходной — ×0,7
+  const planRev7=pid=>cur7.reduce((s,k)=>{const pl=PLAN[k.slice(0,7)+'|'+pid];if(!pl)return s;const [yy,mm,dd]=k.split('-').map(Number);const e=effDaysOfMonth(yy,mm);return s+(e>0?Number(pl.plan_qty||0)*Number(pl.price||0)/e*(isWeekendD(new Date(yy,mm-1,dd))?0.7:1):0);},0);
   const rows=[];
   products.forEach(p=>{
     const pl=PLAN[mk+'|'+p.product_id];
     if(!pl||!(Number(pl.plan_qty)>0))return;
     const o1=sumOf(ord,p.offer_id,[yKey]),oPlan=effM>0?Number(pl.plan_qty)/effM*kY:0;
     const r1=sumOf(rev,p.offer_id,[yKey]),r2=sumOf(rev,p.offer_id,[y2Key]);
-    const r7=sumOf(rev,p.offer_id,cur7),rp7=sumOf(rev,p.offer_id,prev7);
+    const r7=sumOf(rev,p.offer_id,cur7),rp7=sumOf(rev,p.offer_id,prev7),p7=planRev7(p.product_id);
     const a1=sumOf(adv,p.product_id,[yKey]),a2=sumOf(adv,p.product_id,[y2Key]);
     const a7=sumOf(adv,p.product_id,cur7),ap7=sumOf(adv,p.product_id,prev7);
     const pctOf=c=>c&&c.n&&c.revn>0?c.mar/c.revn*100:null;
@@ -911,7 +915,7 @@ async function loadDevTable(){
     rows.push({
       pid:p.product_id,offer:p.offer_id,
       o1,oPlan,oDev:o1-oPlan,
-      r1,r2,dev1:r1-r2,r7,rp7,dev7:r7-rp7,
+      r1,r2,dev1:r1-r2,r7,rp7,dev7:r7-rp7,p7,dev7p:r7-p7,
       s1:stockState(p,yKey),s2:stockState(p,y2Key),s7:stockCount(p,cur7),sp7:stockCount(p,prev7),
       a1,a2,a7,ap7,q7,qp7,pr7,prp7,marPct,marPrev,planPct,drr,drrPrev,
       cfC:cfC&&cfC.n?cfC:null,cfP:cfP&&cfP.n?cfP:null,planRev:Number(pl.plan_qty)*Number(pl.price||0),
@@ -941,7 +945,7 @@ async function renderDevTable(){
     const pair=(a,b)=>`${fmt(Math.round(a))} / ${fmt(Math.round(b))}`;
     const ordDev=r=>`${(Math.round(r.oDev)>0?'+':'')+fmt0(Math.round(r.oDev)||0)}${r.oPlan>0?` <span class="dev-neutral">(${(r.oDev>0?'+':'')+fmt0(r.oDev/r.oPlan*100)}%)</span>`:''}`;
     // вертикальные разделители блоков: первая видимая колонка блока
-    const bl=DEV_OPEN?['bl',''] :['',' bl'];DEV_NCOLS=1+2+2*(DEV_OPEN?4:3)+5;
+    const bl=DEV_OPEN?['bl',''] :['',' bl'];const isPlan=DEV_BASIS==='d7p';DEV_NCOLS=1+2+2*(DEV_OPEN?4:3)+5+(isPlan?1:0); // «К плану» — только при группировке 7 дн к плану
     const st1=s=>s==null?'<span class="dev-neutral" title="нет снимка остатков">н/д</span>':(s?'<span class="dev-pos">✓</span>':'<span class="dev-neg">✗</span>');
     const stN=c=>{const known=c.n-c.nd;const cl=known===0?'dev-neutral':(c.ok===known?'dev-pos':(c.ok===0?'dev-neg':'dev-warn'));return `<span class="${cl}" title="дней с остатком из ${c.n}${c.nd?'; без снимка: '+c.nd:''}">${c.ok}${c.nd?`<sup>н/д ${c.nd}</sup>`:''}</span>`;};
     const pctTxt=v=>v==null?'—':fmt1(v);
@@ -961,11 +965,11 @@ async function renderDevTable(){
     if(!D.watchOk)h+=`<div class="dev-cap dev-warn">Заметки недоступны: нет таблицы product_watch в базе.</div>`;
     h+=`<table class="dev-table${DEV_OPEN?' open-det':''}"><thead><tr><th rowspan="2">Артикул</th>`
       +`<th colspan="2" class="dev-hgrp bl" title="План в день = план месяца ÷ эфф. дни месяца (будни + 0,7 × выходные), без 0,95${D.kY<1?'; вчера выходной — ×0,7':''}">Заказы вчера к плану</th>`
-      +`<th colspan="${DEV_OPEN?4:3}" class="dev-hgrp bl">Выручка: вчера к позавчера</th><th colspan="${DEV_OPEN?4:3}" class="dev-hgrp bl">Выручка: 7 дн к пред. 7 дн</th>`
+      +`<th colspan="${DEV_OPEN?4:3}" class="dev-hgrp bl">Выручка: вчера к позавчера</th><th colspan="${(DEV_OPEN?4:3)+(isPlan?1:0)}" class="dev-hgrp bl">Выручка: 7 дн к пред. 7 дн${isPlan?' и к плану':''}</th>`
       +`<th colspan="4" class="dev-hgrp bl">Цена, маржинальность и ДРР</th><th rowspan="2" class="bl" title="Дата контроля; ✎ — есть заметка. Клик по строке — заметки">Контроль</th></tr><tr>`
       +`<th class="bl">Факт / план, шт</th><th>Откл., шт</th>`
       +`<th class="c-det ${bl[0]}">Выручка, ₽</th><th class="${bl[1]}">Откл., ₽</th><th title="День с остатком: остаток ≥ план÷дней месяца × ${STOCK_DAYS} дн">Остаток</th><th>Реклама, ₽</th>`
-      +`<th class="c-det ${bl[0]}">Выручка, ₽</th><th class="${bl[1]}">Откл., ₽</th><th title="Дней с остатком: 7 дн / пред. 7 дн">Дни с ост.</th><th>Реклама, ₽</th>`
+      +`<th class="c-det ${bl[0]}">Выручка, ₽</th><th class="${bl[1]}">Откл., ₽</th>${isPlan?'<th title="Факт выручки 7 дн − план 7 дн (план, шт × плановая цена ÷ эфф. дни, выходной ×0,7, без 0,95)">К плану, ₽</th>':''}<th title="Дней с остатком: 7 дн / пред. 7 дн">Дни с ост.</th><th>Реклама, ₽</th>`
       +`<th class="bl" title="Средняя цена PNL = выручка ÷ заказы, шт: 7 дн / пред. 7 дн">Ср. цена, ₽<br><span class="dev-neutral">7 дн / пред.</span></th><th title="Маржинальность CF: неделя ${fmtShort(D.wkD)}–${fmtShort(D.wkEnd)} / пред. неделя ${fmtShort(D.pwkD)}–${fmtShort(D.pwkEnd)}">Маржин., %<br><span class="dev-neutral">нед / пред.</span></th><th title="План маржинальности месяца">План, %</th><th title="Реклама ÷ выручка PNL: 7 дн / пред. 7 дн">ДРР, %<br><span class="dev-neutral">7 дн / пред.</span></th></tr></thead>`;
     // база группировки: знак списка и сортировка по модулю отклонения
     const bv=DEV_BASES[DEV_BASIS].v;
@@ -976,10 +980,10 @@ async function renderDevTable(){
     const sorted=D.rows.filter(r=>!fq||hit(r)||(r.fam&&r.members.some(hit))).sort((a,b)=>Math.abs(bv(b))-Math.abs(bv(a)));
     const noSt='<span class="dev-neutral" title="Остатки — по размерам: раскройте группу">—</span>';
     const rowHtml=(r,trCls,click,first)=>{
-        return `<tr class="${trCls}" onclick="${click}"><td>${first}</td>`
+        return `<tr class="${trCls}" onclick="${click}"><td class="dev-art" title="${escH(r.offer)}">${first}</td>`
           +`<td class="bl">${fmt0(r.o1)} / ${fmt0(r.oPlan)}</td><td class="${cls(r.oDev)}">${ordDev(r)}</td>`
           +`<td class="c-det ${bl[0]}">${pair(r.r1,r.r2)}</td><td class="${cls(r.dev1)}${bl[1]}">${sgn(r.dev1)}</td><td>${r.fam?noSt:st1(r.s1)+' / '+st1(r.s2)}</td><td>${pair(r.a1,r.a2)}</td>`
-          +`<td class="c-det ${bl[0]}">${pair(r.r7,r.rp7)}</td><td class="${cls(r.dev7)}${bl[1]}">${sgn(r.dev7)}</td><td>${r.fam?noSt:stN(r.s7)+' / '+stN(r.sp7)}</td><td>${pair(r.a7,r.ap7)}</td>`
+          +`<td class="c-det ${bl[0]}">${pair(r.r7,r.rp7)}</td><td class="${cls(r.dev7)}${bl[1]}">${sgn(r.dev7)}</td>${isPlan?`<td class="${cls(r.dev7p)}" title="план 7 дн: ${fmt(Math.round(r.p7))} ₽">${sgn(r.dev7p)}</td>`:''}<td>${r.fam?noSt:stN(r.s7)+' / '+stN(r.sp7)}</td><td>${pair(r.a7,r.ap7)}</td>`
           +`<td class="bl">${rub(r.pr7)} <span class="dev-neutral">/ ${rub(r.prp7)}</span>${arr(r.pr7,r.prp7,true,0.5)}</td><td>${pctTxt(r.marPct)} <span class="dev-neutral">/ ${pctTxt(r.marPrev)}</span>${arr(r.marPct,r.marPrev,true)}</td><td>${pctTxt(r.planPct)}</td>`
           +`<td><span class="${r.drr>DRR_LIMIT?'dev-neg':'dev-pos'}">${drrTxt(r.drr)}</span> <span class="dev-neutral">/ ${drrTxt(r.drrPrev)}</span>${arr(r.drr,r.drrPrev,false)}</td><td class="bl">${ctrl(r)}</td></tr>`;
     };
@@ -987,15 +991,15 @@ async function renderDevTable(){
       const all=sorted.filter(r=>sd.f(bv(r)));
       if(!all.length)return;
       const sOpen=isOpen(sd.key);
-      const t1=all.reduce((s,r)=>s+r.dev1,0),t7=all.reduce((s,r)=>s+r.dev7,0);
-      h+=`<tbody><tr class="dev-top" onclick="toggleDevGroup('${sd.key}')"><td colspan="${DEV_NCOLS}">${sOpen?'▾':'▸'} ${sd.name} (${DEV_BASES[DEV_BASIS].name}) <span class="dev-neutral">• ${all.length} поз. • откл. вчера</span> <span class="${cls(t1)}">${sgn(t1)}</span> <span class="dev-neutral">• 7 дн</span> <span class="${cls(t7)}">${sgn(t7)}</span></td></tr></tbody>`;
+      const t1=all.reduce((s,r)=>s+r.dev1,0),t7=all.reduce((s,r)=>s+r.dev7,0),tp=all.reduce((s,r)=>s+r.dev7p,0);
+      h+=`<tbody><tr class="dev-top" onclick="toggleDevGroup('${sd.key}')"><td colspan="${DEV_NCOLS}">${sOpen?'▾':'▸'} ${sd.name} (${DEV_BASES[DEV_BASIS].name}) <span class="dev-neutral">• ${all.length} поз. • откл. вчера</span> <span class="${cls(t1)}">${sgn(t1)}</span> <span class="dev-neutral">• 7 дн</span> <span class="${cls(t7)}">${sgn(t7)}</span>${isPlan?` <span class="dev-neutral">• к плану</span> <span class="${cls(tp)}">${sgn(tp)}</span>`:''}</td></tr></tbody>`;
       if(sOpen)DEV_GROUPS.forEach(g=>{
       const list=all.filter(r=>r.grp===g.key);
       if(!list.length)return;
       const gk=sd.key+':'+g.key;
       const open=isOpen(gk);
-      const s1=list.reduce((s,r)=>s+r.dev1,0),s7=list.reduce((s,r)=>s+r.dev7,0);
-      h+=`<tbody><tr class="dev-grp" onclick="toggleDevGroup('${gk}')"><td colspan="${DEV_NCOLS}" class="dev-sub">${open?'▾':'▸'} ${g.name} <span class="dev-neutral">• ${list.length} поз. • откл. вчера</span> <span class="${cls(s1)}">${sgn(s1)}</span> <span class="dev-neutral">• 7 дн</span> <span class="${cls(s7)}">${sgn(s7)}</span></td></tr>`;
+      const s1=list.reduce((s,r)=>s+r.dev1,0),s7=list.reduce((s,r)=>s+r.dev7,0),sp=list.reduce((s,r)=>s+r.dev7p,0);
+      h+=`<tbody><tr class="dev-grp" onclick="toggleDevGroup('${gk}')"><td colspan="${DEV_NCOLS}" class="dev-sub">${open?'▾':'▸'} ${g.name} <span class="dev-neutral">• ${list.length} поз. • откл. вчера</span> <span class="${cls(s1)}">${sgn(s1)}</span> <span class="dev-neutral">• 7 дн</span> <span class="${cls(s7)}">${sgn(s7)}</span>${isPlan?` <span class="dev-neutral">• к плану</span> <span class="${cls(sp)}">${sgn(sp)}</span>`:''}</td></tr>`;
       if(open)list.forEach(r=>{
         if(!r.fam){h+=rowHtml(r,'dev-row'+(DEV_NOTE_PID===r.pid?' on':''),`toggleDevNote(${r.pid})`,escH(r.offer));if(DEV_NOTE_PID===r.pid)h+=devNoteRow(r,D.watchOk);return;}
         const fo=isOpen('fam:'+r.fam);
