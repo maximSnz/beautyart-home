@@ -243,6 +243,7 @@
         .dev-note-form textarea { flex: 1 1 320px; min-height: 44px; font-family: 'Forum', serif; font-size: 1em; color: #fff; background: rgba(28,13,46,.5); border: 1px solid rgba(255,255,255,.3); border-radius: 8px; padding: 6px 8px; }
         .dev-note-form input[type=date] { font-family: inherit; color: #fff; background: rgba(28,13,46,.5); border: 1px solid rgba(255,255,255,.3); border-radius: 6px; padding: 3px 6px; color-scheme: dark; }
         .dev-hist { margin: 2px 0; }
+        .dev-hypo { margin-top: 8px; padding: 6px 8px; border-left: 3px solid #fde047; background: rgba(28,13,46,.25); border-radius: 4px; }
         .dev-toggle.on { background: rgba(255,255,255,.35); }
         .dev-basis { margin-left: 8px; white-space: nowrap; }
         .dev-filter { height: 24px; width: 150px; padding: 0 8px; font-family: inherit; font-size: .9em; color: #fff; vertical-align: middle; }
@@ -856,6 +857,46 @@ async function loadWatch(){
     return {ok:true,by};
   }catch(e){console.warn('product_watch:',e.message);return {ok:false,by:new Map()};}
 }
+// гипотезы из plan.html (product_protocol): гипотеза — запись с дедлайном без родителя, дополнения — дочерние записи.
+// Только чтение; если загрузить не удалось — отчёт работает без них
+async function loadHypos(){
+  try{
+    const rows=await fetchPages('product_protocol?select=id,product_id,parent_id,action,deadline,created_at,metric,target_orders,target_pct,baseline_ctx,fact_ctx,baseline_dev,target_dev,fact_dev,fact_date');
+    const last=new Map(),kids=new Map();
+    rows.forEach(r=>{
+      if(r.parent_id!=null){if(!kids.has(r.parent_id))kids.set(r.parent_id,[]);kids.get(r.parent_id).push(r);return;}
+      if(!r.deadline)return;
+      const k=String(r.product_id),c=last.get(k);
+      if(!c||r.created_at>c.created_at)last.set(k,r);
+    });
+    kids.forEach(a=>a.sort((x,y)=>x.created_at<y.created_at?-1:1));
+    return {ok:true,last,kids};
+  }catch(e){console.warn('product_protocol:',e.message);return {ok:false,last:new Map(),kids:new Map()};}
+}
+// вердикт гипотезы — копия verdict() из plan.html (SMART: прогресс (F−B)/(T−B), допуск 10%)
+function hypoVerdict(it){
+  const base=it.baseline_ctx?JSON.parse(it.baseline_ctx):null;
+  if(!base||!('orders' in base)){
+    if(it.fact_dev==null)return null;
+    const B=Number(it.baseline_dev||0),T=Number(it.target_dev||0),F=Number(it.fact_dev||0);
+    if(B===T)return F>=B?'success':'fail';
+    const pr=(F-B)/(T-B),tol=Math.abs(T-B)*0.1;
+    if(pr>=1||Math.abs(F-T)<=tol)return 'success';
+    return pr>0?'partial':'fail';
+  }
+  if(it.fact_ctx==null)return null;
+  const fact=JSON.parse(it.fact_ctx);
+  const m=it.metric||'orders';
+  const B=(m==='orders')?base.orders:base.pct;
+  const F=(m==='orders')?fact.orders:fact.pct;
+  const T=(m==='orders')?Number(it.target_orders):Number(it.target_pct);
+  if(B==null||F==null||T==null||isNaN(T))return null;
+  if(Math.abs(T-B)<0.01)return F>=B?'success':'fail';
+  const pr=(F-B)/(T-B),tol=Math.abs(T-B)*0.1;
+  if(pr>=1||Math.abs(F-T)<=tol)return 'success';
+  if(pr>0)return 'partial';
+  return 'fail';
+}
 async function loadDevTable(){
   const today=new Date();today.setHours(0,0,0,0);
   const yD=addDays(today,-1),y2D=addDays(today,-2);
@@ -870,13 +911,14 @@ async function loadDevTable(){
   const curMon=addDays(today,-((today.getDay()+6)%7));
   const wkD=addDays(curMon,-7),wkKey=keyOfMonday(wkD),wkEnd=addDays(wkD,6);
   const pwkD=addDays(wkD,-7),pwkKey=keyOfMonday(pwkD),pwkEnd=addDays(pwkD,6); // предыдущая закрытая неделя — для сравнения
-  const [rProd,plans,sales,ads,spw,watch,...stockDays]=await Promise.all([
+  const [rProd,plans,sales,ads,spw,watch,hypos,...stockDays]=await Promise.all([
     fetch(SUPABASE_URL+`/rest/v1/products?select=product_id,offer_id,archived,raw&limit=1000`,{headers:HD}),
     fetch(SUPABASE_URL+`/rest/v1/sales_plan?month=in.(${monthsNeeded.join(',')})&select=month,product_id,plan_qty,price,margin_pct`,{headers:HD}),
     fetchPages(`product_sales?sale_date=gte.${fromKey}&sale_date=lte.${yKey}&select=offer_id,sale_date,qty,revenue`),
     fetchPages(`ozon_ad_spend?spend_date=gte.${fromKey}&spend_date=lte.${yKey}&select=offer_id,spend_date,amount&order=offer_id,spend_date`),
     fetchPages(`sales_plan_weeks?week=in.(${wkKey},${pwkKey})&metric=in.(mar,revn)&select=product_id,week,metric,fact`),
     loadWatch(),
+    loadHypos(),
     ...days.map(k=>fetchPages(`stock_history?report_date=eq.${k}&stock=gt.0&select=offer_id,stock`))
   ]);
   if(!rProd.ok)throw new Error('products HTTP '+rProd.status);
@@ -936,7 +978,7 @@ async function loadDevTable(){
       grp:devGroupOf(marPct,planPct,drr),watch:w
     });
   });
-  const out={rows:groupGloves(rows),watchOk:watch.ok,yD,y2D,cur7,prev7,wkD,wkEnd,pwkD,pwkEnd,mk,kY};
+  const out={hypos,rows:groupGloves(rows),watchOk:watch.ok,yD,y2D,cur7,prev7,wkD,wkEnd,pwkD,pwkEnd,mk,kY};
   DEV_CACHE[yKey]=out;
   return out;
 }
@@ -1049,6 +1091,27 @@ async function renderDevTable(){
     box.innerHTML='<div class="dev-cap">Ошибка: '+escH(e.message)+' (подробности в консоли F12)</div>';
   }
 }
+function hypoHtml(pid){
+  const H=(Object.values(DEV_CACHE)[0]||{}).hypos;
+  if(!H||!H.ok)return '<div class="dev-hypo dev-neutral">Гипотезы не загрузились.</div>';
+  const it=H.last.get(String(pid));
+  if(!it)return '<div class="dev-hypo dev-neutral">Гипотез по товару нет (создаются в «Плане продаж»).</div>';
+  const dm=iso=>iso?iso.slice(8,10)+'.'+iso.slice(5,7):'—';
+  const today=keyOfMonday(new Date());
+  const v=hypoVerdict(it);
+  const st=v==='success'?'<span class="dev-pos">успешна</span>':v==='partial'?'<span class="dev-warn">частичный успех</span>':v==='fail'?'<span class="dev-neg">неудачна</span>'
+    :(it.deadline<today?'<span class="dev-neutral">ожидает фиксации факта</span>':'<span class="dev-neutral">в работе</span>');
+  const base=it.baseline_ctx?JSON.parse(it.baseline_ctx):null,fact=it.fact_ctx?JSON.parse(it.fact_ctx):null;
+  let line;
+  if(base&&('orders' in base)){
+    const m=it.metric||'orders',p=x=>x==null?'—':fmt1(x)+'%';
+    line=m==='orders'?`Заказы, шт/день (будни): база ${fmt1(base.orders)} → цель ${fmt1(it.target_orders)}${fact?` → факт ${fmt1(fact.orders)}`:''}`
+      :`Маржинальность: база ${p(base.pct)} → цель ${p(it.target_pct)}${fact?` → факт ${p(fact.pct)}`:''}`;
+  }else line=`Отклонение маржи: от ${fmt(Number(it.baseline_dev||0))} ₽ к ${fmt(Number(it.target_dev||0))} ₽${it.fact_dev!=null?` → факт ${fmt(Number(it.fact_dev))} ₽`:''}`;
+  const kids=(H.kids.get(it.id)||[]).map(k=>`<div class="dev-hist"><span class="dev-neutral">${dm((k.created_at||'').slice(0,10))}</span> ${escH(k.action)}</div>`).join('');
+  return `<div class="dev-hypo"><b>Последняя гипотеза</b> <span class="dev-neutral">• создана ${dm((it.created_at||'').slice(0,10))} • контроль ${dm(it.deadline)} •</span> ${st}`
+    +`<div>${escH(it.action)}</div><div class="dev-neutral">${line}</div>${kids?`<div class="dev-neutral">Дополнения:</div>${kids}`:''}</div>`;
+}
 function devNoteRow(r,ok){
   const hist=r.watch.slice(0,5).map(w=>`<div class="dev-hist"><span class="dev-neutral">${escH((w.created_at||'').slice(0,10))}</span> ${w.control_date?'контроль '+escH(w.control_date)+' • ':''}${escH(w.note||'')}</div>`).join('');
   const def=keyOfMonday(addDays(new Date(),7));
@@ -1057,7 +1120,7 @@ function devNoteRow(r,ok){
       +`<label>Вернуться к контролю <input type="date" id="devNoteDate" value="${def}"></label>`
       +`<button class="chip-glass" onclick="saveDevNote(${r.pid},'${escH(r.offer)}')">Сохранить</button><span id="devNoteMsg" class="dev-neutral"></span></div>`
       :'<div class="dev-neutral">Заметки недоступны: нет таблицы product_watch.</div>')
-    +(hist||'<div class="dev-neutral">Заметок пока нет.</div>')+`</td></tr>`;
+    +(hist||'<div class="dev-neutral">Заметок пока нет.</div>')+hypoHtml(r.pid)+`</td></tr>`;
 }
 function setDevFilter(v){DEV_FILTER=v;DEV_FILTER_CLOSED.clear();renderDevTable();}
 function setDevMgr(m){
