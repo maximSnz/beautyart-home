@@ -923,7 +923,7 @@ async function loadDevTable(){
   return out;
 }
 // раскрытые группы и строка с заметками — удобство конкретного зрителя
-let DEV_OPEN_GRP={},DEV_NOTE_PID=null,DEV_NCOLS=14,DEV_BASIS='d1',DEV_FILTER=''; // фильтр по артикулу — только на время просмотра
+let DEV_OPEN_GRP={},DEV_NOTE_PID=null,DEV_NCOLS=14,DEV_BASIS='d1',DEV_FILTER='',DEV_FILTER_CLOSED=new Set(); // фильтр по артикулу и свёрнутое при нём — только на время просмотра
 try{const b=localStorage.getItem('ba_dev_basis');if(DEV_BASES[b])DEV_BASIS=b;}catch(e){}
 try{DEV_OPEN_GRP=JSON.parse(localStorage.getItem('ba_dev_groups')||'{}')||{};}catch(e){}
 let DEV_OPEN=false;
@@ -971,6 +971,8 @@ async function renderDevTable(){
     const bv=DEV_BASES[DEV_BASIS].v;
     const fq=DEV_FILTER.trim().toLowerCase();
     const hit=r=>String(r.offer).toLowerCase().includes(fq);
+    // при фильтре найденное раскрыто, пока его не свернули; без фильтра — сохранённое состояние
+    const isOpen=k=>fq?!DEV_FILTER_CLOSED.has(k):!!DEV_OPEN_GRP[k];
     const sorted=D.rows.filter(r=>!fq||hit(r)||(r.fam&&r.members.some(hit))).sort((a,b)=>Math.abs(bv(b))-Math.abs(bv(a)));
     const noSt='<span class="dev-neutral" title="Остатки — по размерам: раскройте группу">—</span>';
     const rowHtml=(r,trCls,click,first)=>{
@@ -984,19 +986,19 @@ async function renderDevTable(){
     DEV_SIDES.forEach(sd=>{
       const all=sorted.filter(r=>sd.f(bv(r)));
       if(!all.length)return;
-      const sOpen=!!fq||!!DEV_OPEN_GRP[sd.key]; // при фильтре найденное раскрыто
+      const sOpen=isOpen(sd.key);
       const t1=all.reduce((s,r)=>s+r.dev1,0),t7=all.reduce((s,r)=>s+r.dev7,0);
       h+=`<tbody><tr class="dev-top" onclick="toggleDevGroup('${sd.key}')"><td colspan="${DEV_NCOLS}">${sOpen?'▾':'▸'} ${sd.name} (${DEV_BASES[DEV_BASIS].name}) <span class="dev-neutral">• ${all.length} поз. • откл. вчера</span> <span class="${cls(t1)}">${sgn(t1)}</span> <span class="dev-neutral">• 7 дн</span> <span class="${cls(t7)}">${sgn(t7)}</span></td></tr></tbody>`;
       if(sOpen)DEV_GROUPS.forEach(g=>{
       const list=all.filter(r=>r.grp===g.key);
       if(!list.length)return;
       const gk=sd.key+':'+g.key;
-      const open=!!fq||!!DEV_OPEN_GRP[gk];
+      const open=isOpen(gk);
       const s1=list.reduce((s,r)=>s+r.dev1,0),s7=list.reduce((s,r)=>s+r.dev7,0);
       h+=`<tbody><tr class="dev-grp" onclick="toggleDevGroup('${gk}')"><td colspan="${DEV_NCOLS}" class="dev-sub">${open?'▾':'▸'} ${g.name} <span class="dev-neutral">• ${list.length} поз. • откл. вчера</span> <span class="${cls(s1)}">${sgn(s1)}</span> <span class="dev-neutral">• 7 дн</span> <span class="${cls(s7)}">${sgn(s7)}</span></td></tr>`;
       if(open)list.forEach(r=>{
         if(!r.fam){h+=rowHtml(r,'dev-row'+(DEV_NOTE_PID===r.pid?' on':''),`toggleDevNote(${r.pid})`,escH(r.offer));if(DEV_NOTE_PID===r.pid)h+=devNoteRow(r,D.watchOk);return;}
-        const fo=!!fq||!!DEV_OPEN_GRP['fam:'+r.fam];
+        const fo=isOpen('fam:'+r.fam);
         h+=rowHtml(r,'dev-row dev-fam',`toggleDevGroup('fam:${r.fam}')`,`${fo?'▾':'▸'} ${escH(r.fam)}-* <span class="dev-neutral">(${r.members.length})</span>`);
         if(fo)r.members.filter(x=>!fq||hit(x)||hit(r)).sort((a,b)=>Math.abs(bv(b))-Math.abs(bv(a))).forEach(x=>{
           h+=rowHtml(x,'dev-row dev-member'+(DEV_NOTE_PID===x.pid?' on':''),`toggleDevNote(${x.pid})`,escH(x.offer));
@@ -1030,13 +1032,14 @@ function devNoteRow(r,ok){
       :'<div class="dev-neutral">Заметки недоступны: нет таблицы product_watch.</div>')
     +(hist||'<div class="dev-neutral">Заметок пока нет.</div>')+`</td></tr>`;
 }
-function setDevFilter(v){DEV_FILTER=v;renderDevTable();}
+function setDevFilter(v){DEV_FILTER=v;DEV_FILTER_CLOSED.clear();renderDevTable();}
 function setDevBasis(b){
   DEV_BASIS=b;
   try{localStorage.setItem('ba_dev_basis',b);}catch(e){}
   renderDevTable();
 }
 function toggleDevGroup(k){
+  if(DEV_FILTER.trim()){DEV_FILTER_CLOSED.has(k)?DEV_FILTER_CLOSED.delete(k):DEV_FILTER_CLOSED.add(k);renderDevTable();return;}
   DEV_OPEN_GRP[k]=!DEV_OPEN_GRP[k];
   try{localStorage.setItem('ba_dev_groups',JSON.stringify(DEV_OPEN_GRP));}catch(e){}
   renderDevTable();
