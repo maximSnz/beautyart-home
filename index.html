@@ -230,6 +230,9 @@
         .dev-table tr.dev-top td { text-align: left; cursor: pointer; background: rgba(255,255,255,.16); font-weight: 600; font-size: 1.05em; border-bottom: 1px solid rgba(255,255,255,.35); }
         .dev-table td.dev-sub { padding-left: 22px; }
         .dev-table tr.dev-row { cursor: pointer; }
+        .dev-table tr.dev-fam td { font-weight: 600; }
+        .dev-table tr.dev-member td { background: rgba(28,13,46,.18); }
+        .dev-table tr.dev-member td:first-child { padding-left: 22px; color: rgba(255,255,255,.85); }
         .dev-table tr.dev-row.on td { background: rgba(255,255,255,.12); }
         .dev-table tr.dev-note td { text-align: left; white-space: normal; background: rgba(255,255,255,.05); }
         .dev-table sup { font-size: .7em; margin-left: 2px; }
@@ -787,6 +790,40 @@ const DEV_GROUPS=[
 ];
 const escH=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const monthKeyOf=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+// перчатки: группа = артикул до цвета включительно (GLV-NIT-BNV-BLU-50-L → GLV-NIT-BNV-BLU); упаковка и размер не важны
+const GLV_COLORS=new Set(['BLK','BLU','PNK','GRY','YLW','PUR','CLR','WHT','GRN','RED','ORG','BRN','BEG']);
+function gloveFamily(offer){
+  const s=String(offer).split('-');
+  if(s[0]!=='GLV')return null;
+  for(let i=2;i<s.length;i++)if(GLV_COLORS.has(s[i]))return i<s.length-1?s.slice(0,i+1).join('-'):null;
+  return null;
+}
+// группа перчаток — одна позиция: суммы по товарам; цена, ДРР, маржинальность — из сумм; план маржинальности — взвешенный по плановой выручке
+function groupGloves(rows){
+  const fam=new Map(),out=[];
+  rows.forEach(r=>{const k=gloveFamily(r.offer);if(!k){out.push(r);return;}if(!fam.has(k))fam.set(k,[]);fam.get(k).push(r);});
+  fam.forEach((m,k)=>{
+    if(m.length<2){out.push(...m);return;}
+    const S=f=>m.reduce((s,r)=>s+(r[f]||0),0);
+    const cfS=f=>{const xs=m.map(r=>r[f]).filter(Boolean);return xs.length?{mar:xs.reduce((s,c)=>s+c.mar,0),revn:xs.reduce((s,c)=>s+c.revn,0)}:null;};
+    const pct=c=>c&&c.revn>0?c.mar/c.revn*100:null;
+    const drrOf=(a,r)=>r>0?a/r*100:(a>0?Infinity:0);
+    const wp=m.filter(r=>r.planPct!=null&&r.planRev>0),wpr=wp.reduce((s,r)=>s+r.planRev,0);
+    const g={fam:k,members:m,offer:k,pid:'f:'+k};
+    ['o1','oPlan','r1','r2','r7','rp7','a1','a2','a7','ap7','q7','qp7'].forEach(f=>g[f]=S(f));
+    g.oDev=g.o1-g.oPlan;g.dev1=g.r1-g.r2;g.dev7=g.r7-g.rp7;
+    g.pr7=g.q7>0?g.r7/g.q7:null;g.prp7=g.qp7>0?g.rp7/g.qp7:null;
+    g.marPct=pct(cfS('cfC'));g.marPrev=pct(cfS('cfP'));
+    g.planPct=wpr>0?wp.reduce((s,r)=>s+r.planPct*r.planRev,0)/wpr:null;
+    g.drr=drrOf(g.a7,g.r7);g.drrPrev=drrOf(g.ap7,g.rp7);
+    g.grp=devGroupOf(g.marPct,g.planPct,g.drr);
+    // ближайшая дата контроля среди товаров группы
+    const ds=m.map(r=>r.watch[0]).filter(w=>w&&w.control_date).sort((a,b)=>a.control_date<b.control_date?-1:1);
+    g.watch=ds.length?[{control_date:ds[0].control_date,note:ds.length+' контр. в группе'}]:[];
+    out.push(g);
+  });
+  return out;
+}
 function devGroupOf(marPct,planPct,drr){
   if(marPct==null||planPct==null)return 'g0';
   const hi=drr>DRR_LIMIT;
@@ -862,7 +899,8 @@ async function loadDevTable(){
     const a1=sumOf(adv,p.product_id,[yKey]),a2=sumOf(adv,p.product_id,[y2Key]);
     const a7=sumOf(adv,p.product_id,cur7),ap7=sumOf(adv,p.product_id,prev7);
     const pctOf=c=>c&&c.n&&c.revn>0?c.mar/c.revn*100:null;
-    const marPct=pctOf(cf.get(p.product_id+'|'+wkKey)),marPrev=pctOf(cf.get(p.product_id+'|'+pwkKey));
+    const cfC=cf.get(p.product_id+'|'+wkKey),cfP=cf.get(p.product_id+'|'+pwkKey);
+    const marPct=pctOf(cfC),marPrev=pctOf(cfP);
     const planPct=pl.margin_pct==null?null:Number(pl.margin_pct);
     const drrOf=(a,r)=>r>0?a/r*100:(a>0?Infinity:0);
     const drr=drrOf(a7,r7),drrPrev=drrOf(ap7,rp7);
@@ -875,11 +913,12 @@ async function loadDevTable(){
       o1,oPlan,oDev:o1-oPlan,
       r1,r2,dev1:r1-r2,r7,rp7,dev7:r7-rp7,
       s1:stockState(p,yKey),s2:stockState(p,y2Key),s7:stockCount(p,cur7),sp7:stockCount(p,prev7),
-      a1,a2,a7,ap7,pr7,prp7,marPct,marPrev,planPct,drr,drrPrev,
+      a1,a2,a7,ap7,q7,qp7,pr7,prp7,marPct,marPrev,planPct,drr,drrPrev,
+      cfC:cfC&&cfC.n?cfC:null,cfP:cfP&&cfP.n?cfP:null,planRev:Number(pl.plan_qty)*Number(pl.price||0),
       grp:devGroupOf(marPct,planPct,drr),watch:w
     });
   });
-  const out={rows,watchOk:watch.ok,yD,y2D,cur7,prev7,wkD,wkEnd,pwkD,pwkEnd,mk,kY};
+  const out={rows:groupGloves(rows),watchOk:watch.ok,yD,y2D,cur7,prev7,wkD,wkEnd,pwkD,pwkEnd,mk,kY};
   DEV_CACHE[yKey]=out;
   return out;
 }
@@ -900,7 +939,7 @@ async function renderDevTable(){
     const cls=v=>v<-0.5?'dev-neg':(v>0.5?'dev-pos':'dev-neutral');
     const sgn=v=>(v>0?'+':'')+fmt(Math.round(v));
     const pair=(a,b)=>`${fmt(Math.round(a))} / ${fmt(Math.round(b))}`;
-    const ordDev=r=>`${(Math.round(r.oDev)>0?'+':'')+fmt0(r.oDev)}${r.oPlan>0?` <span class="dev-neutral">(${(r.oDev>0?'+':'')+fmt0(r.oDev/r.oPlan*100)}%)</span>`:''}`;
+    const ordDev=r=>`${(Math.round(r.oDev)>0?'+':'')+fmt0(Math.round(r.oDev)||0)}${r.oPlan>0?` <span class="dev-neutral">(${(r.oDev>0?'+':'')+fmt0(r.oDev/r.oPlan*100)}%)</span>`:''}`;
     // вертикальные разделители блоков: первая видимая колонка блока
     const bl=DEV_OPEN?['bl',''] :['',' bl'];DEV_NCOLS=1+2+2*(DEV_OPEN?4:3)+5;
     const st1=s=>s==null?'<span class="dev-neutral" title="нет снимка остатков">н/д</span>':(s?'<span class="dev-pos">✓</span>':'<span class="dev-neg">✗</span>');
@@ -931,7 +970,17 @@ async function renderDevTable(){
     // база группировки: знак списка и сортировка по модулю отклонения
     const bv=DEV_BASES[DEV_BASIS].v;
     const fq=DEV_FILTER.trim().toLowerCase();
-    const sorted=D.rows.filter(r=>!fq||String(r.offer).toLowerCase().includes(fq)).sort((a,b)=>Math.abs(bv(b))-Math.abs(bv(a)));
+    const hit=r=>String(r.offer).toLowerCase().includes(fq);
+    const sorted=D.rows.filter(r=>!fq||hit(r)||(r.fam&&r.members.some(hit))).sort((a,b)=>Math.abs(bv(b))-Math.abs(bv(a)));
+    const noSt='<span class="dev-neutral" title="Остатки — по размерам: раскройте группу">—</span>';
+    const rowHtml=(r,trCls,click,first)=>{
+        return `<tr class="${trCls}" onclick="${click}"><td>${first}</td>`
+          +`<td class="bl">${fmt0(r.o1)} / ${fmt0(r.oPlan)}</td><td class="${cls(r.oDev)}">${ordDev(r)}</td>`
+          +`<td class="c-det ${bl[0]}">${pair(r.r1,r.r2)}</td><td class="${cls(r.dev1)}${bl[1]}">${sgn(r.dev1)}</td><td>${r.fam?noSt:st1(r.s1)+' / '+st1(r.s2)}</td><td>${pair(r.a1,r.a2)}</td>`
+          +`<td class="c-det ${bl[0]}">${pair(r.r7,r.rp7)}</td><td class="${cls(r.dev7)}${bl[1]}">${sgn(r.dev7)}</td><td>${r.fam?noSt:stN(r.s7)+' / '+stN(r.sp7)}</td><td>${pair(r.a7,r.ap7)}</td>`
+          +`<td class="bl">${rub(r.pr7)} <span class="dev-neutral">/ ${rub(r.prp7)}</span>${arr(r.pr7,r.prp7,true,0.5)}</td><td>${pctTxt(r.marPct)} <span class="dev-neutral">/ ${pctTxt(r.marPrev)}</span>${arr(r.marPct,r.marPrev,true)}</td><td>${pctTxt(r.planPct)}</td>`
+          +`<td><span class="${r.drr>DRR_LIMIT?'dev-neg':'dev-pos'}">${drrTxt(r.drr)}</span> <span class="dev-neutral">/ ${drrTxt(r.drrPrev)}</span>${arr(r.drr,r.drrPrev,false)}</td><td class="bl">${ctrl(r)}</td></tr>`;
+    };
     DEV_SIDES.forEach(sd=>{
       const all=sorted.filter(r=>sd.f(bv(r)));
       if(!all.length)return;
@@ -946,13 +995,13 @@ async function renderDevTable(){
       const s1=list.reduce((s,r)=>s+r.dev1,0),s7=list.reduce((s,r)=>s+r.dev7,0);
       h+=`<tbody><tr class="dev-grp" onclick="toggleDevGroup('${gk}')"><td colspan="${DEV_NCOLS}" class="dev-sub">${open?'▾':'▸'} ${g.name} <span class="dev-neutral">• ${list.length} поз. • откл. вчера</span> <span class="${cls(s1)}">${sgn(s1)}</span> <span class="dev-neutral">• 7 дн</span> <span class="${cls(s7)}">${sgn(s7)}</span></td></tr>`;
       if(open)list.forEach(r=>{
-        h+=`<tr class="dev-row${DEV_NOTE_PID===r.pid?' on':''}" onclick="toggleDevNote(${r.pid})"><td>${escH(r.offer)}</td>`
-          +`<td class="bl">${fmt0(r.o1)} / ${fmt0(r.oPlan)}</td><td class="${cls(r.oDev)}">${ordDev(r)}</td>`
-          +`<td class="c-det ${bl[0]}">${pair(r.r1,r.r2)}</td><td class="${cls(r.dev1)}${bl[1]}">${sgn(r.dev1)}</td><td>${st1(r.s1)} / ${st1(r.s2)}</td><td>${pair(r.a1,r.a2)}</td>`
-          +`<td class="c-det ${bl[0]}">${pair(r.r7,r.rp7)}</td><td class="${cls(r.dev7)}${bl[1]}">${sgn(r.dev7)}</td><td>${stN(r.s7)} / ${stN(r.sp7)}</td><td>${pair(r.a7,r.ap7)}</td>`
-          +`<td class="bl">${rub(r.pr7)} <span class="dev-neutral">/ ${rub(r.prp7)}</span>${arr(r.pr7,r.prp7,true,0.5)}</td><td>${pctTxt(r.marPct)} <span class="dev-neutral">/ ${pctTxt(r.marPrev)}</span>${arr(r.marPct,r.marPrev,true)}</td><td>${pctTxt(r.planPct)}</td>`
-          +`<td><span class="${r.drr>DRR_LIMIT?'dev-neg':'dev-pos'}">${drrTxt(r.drr)}</span> <span class="dev-neutral">/ ${drrTxt(r.drrPrev)}</span>${arr(r.drr,r.drrPrev,false)}</td><td class="bl">${ctrl(r)}</td></tr>`;
-        if(DEV_NOTE_PID===r.pid)h+=devNoteRow(r,D.watchOk);
+        if(!r.fam){h+=rowHtml(r,'dev-row'+(DEV_NOTE_PID===r.pid?' on':''),`toggleDevNote(${r.pid})`,escH(r.offer));if(DEV_NOTE_PID===r.pid)h+=devNoteRow(r,D.watchOk);return;}
+        const fo=!!fq||!!DEV_OPEN_GRP['fam:'+r.fam];
+        h+=rowHtml(r,'dev-row dev-fam',`toggleDevGroup('fam:${r.fam}')`,`${fo?'▾':'▸'} ${escH(r.fam)}-* <span class="dev-neutral">(${r.members.length})</span>`);
+        if(fo)r.members.filter(x=>!fq||hit(x)||hit(r)).sort((a,b)=>Math.abs(bv(b))-Math.abs(bv(a))).forEach(x=>{
+          h+=rowHtml(x,'dev-row dev-member'+(DEV_NOTE_PID===x.pid?' on':''),`toggleDevNote(${x.pid})`,escH(x.offer));
+          if(DEV_NOTE_PID===x.pid)h+=devNoteRow(x,D.watchOk);
+        });
       });
       h+='</tbody>';
     });
