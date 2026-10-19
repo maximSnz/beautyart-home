@@ -988,6 +988,8 @@ try{const b=localStorage.getItem('ba_dev_basis');if(DEV_BASES[b])DEV_BASIS=b;con
 try{DEV_OPEN_GRP=JSON.parse(localStorage.getItem('ba_dev_groups')||'{}')||{};}catch(e){}
 let DEV_OPEN=false;
 try{DEV_OPEN=localStorage.getItem('ba_dev_details')==='1';}catch(e){}
+// с 19.10.2026 режим зафиксирован: только «7 дн к плану», колонки выручки скрыты; селекторы спрятаны, код режимов оставлен
+DEV_BASIS='d7p';DEV_OPEN=false;
 async function renderDevTable(){
   const box=document.getElementById('devBox');
   if(!box)return;
@@ -1014,11 +1016,11 @@ async function renderDevTable(){
       const d=w.control_date;const c=!d?'dev-neutral':(d<todayKey?'dev-neg':(d===todayKey?'dev-warn':'dev-pos'));
       return `<span class="${c}" title="${escH(w.note||'')}">${d?dd(d):'—'}${w.note?' ✎':''}</span>`;
     };
-    let h=`<div class="dev-cap">Отклонения выручки PNL по позициям • вчера (${fmtShort(D.yD)}) к позавчера (${fmtShort(D.y2D)}) • 7 дн (${dd(D.cur7[0])}–${dd(D.cur7[6])}) к пред. 7 дн (${dd(D.prev7[0])}–${dd(D.prev7[6])}) • маржинальность CF — неделя ${fmtShort(D.wkD)}–${fmtShort(D.wkEnd)} к пред. неделе, ДРР — 7 дн к пред. 7 дн`
-      +` <span class="dev-basis"><input type="search" id="devFilter" class="chip-glass dev-filter" placeholder="Артикул…" value="${escH(DEV_FILTER)}" oninput="setDevFilter(this.value)"></span>`
+    // периоды — в подсказке строки фильтров (подпись скрыта 19.10.2026)
+    let h=`<div class="dev-cap" title="Отклонения выручки PNL по позициям • вчера (${fmtShort(D.yD)}) к позавчера (${fmtShort(D.y2D)}) • 7 дн (${dd(D.cur7[0])}–${dd(D.cur7[6])}) к пред. 7 дн (${dd(D.prev7[0])}–${dd(D.prev7[6])}) • маржинальность CF — неделя ${fmtShort(D.wkD)}–${fmtShort(D.wkEnd)} к пред. неделе, ДРР — 7 дн к пред. 7 дн">`
+      +`<span class="dev-basis" style="margin-left:0"><input type="search" id="devFilter" class="chip-glass dev-filter" placeholder="Артикул…" value="${escH(DEV_FILTER)}" oninput="setDevFilter(this.value)"></span>`
       +` <span class="dev-basis">Менеджер: ${Object.keys(DEV_MANAGERS).map(k=>`<button class="chip-glass dev-toggle${DEV_MGR===k?' on':''}" onclick="setDevMgr('${k}')">${DEV_MANAGERS[k]}</button>`).join('')}</span>`
-      +` <span class="dev-basis">Группировка: ${Object.keys(DEV_BASES).map(k=>`<button class="chip-glass dev-toggle${DEV_BASIS===k?' on':''}" onclick="setDevBasis('${k}')">${DEV_BASES[k].name}</button>`).join('')}</span>`
-      +` <button class="chip-glass dev-toggle" onclick="toggleDevDetails()">${DEV_OPEN?'▾ Скрыть':'▸ Показать'} выручку</button></div>`;
+      +`</div>`;
     if(!D.watchOk)h+=`<div class="dev-cap dev-warn">Заметки недоступны: нет таблицы product_watch в базе.</div>`;
     h+=`<table class="dev-table${DEV_OPEN?' open-det':''}"><thead><tr><th rowspan="2">Артикул</th>`
       +`<th colspan="2" class="dev-hgrp bl" title="План в день = план месяца ÷ эфф. дни месяца (будни + 0,7 × выходные), без 0,95${D.kY<1?'; вчера выходной — ×0,7':''}">Заказы вчера к плану</th>`
