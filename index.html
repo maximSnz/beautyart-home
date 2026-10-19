@@ -239,6 +239,8 @@
         .dev-hist { margin: 2px 0; }
         .dev-toggle.on { background: rgba(255,255,255,.35); }
         .dev-basis { margin-left: 8px; white-space: nowrap; }
+        .dev-filter { height: 24px; width: 150px; padding: 0 8px; font-family: inherit; font-size: .9em; color: #fff; vertical-align: middle; }
+        .dev-filter::placeholder { color: rgba(255,255,255,.6); }
         .dev-toggle { height: 24px; margin-left: 8px; font-size: .9em; vertical-align: middle; }
         .dev-pos { color: #4ade80; font-weight: 700; }
         .dev-neg { color: #f87171; font-weight: 700; }
@@ -882,7 +884,7 @@ async function loadDevTable(){
   return out;
 }
 // раскрытые группы и строка с заметками — удобство конкретного зрителя
-let DEV_OPEN_GRP={},DEV_NOTE_PID=null,DEV_NCOLS=14,DEV_BASIS='d1';
+let DEV_OPEN_GRP={},DEV_NOTE_PID=null,DEV_NCOLS=14,DEV_BASIS='d1',DEV_FILTER=''; // фильтр по артикулу — только на время просмотра
 try{const b=localStorage.getItem('ba_dev_basis');if(DEV_BASES[b])DEV_BASIS=b;}catch(e){}
 try{DEV_OPEN_GRP=JSON.parse(localStorage.getItem('ba_dev_groups')||'{}')||{};}catch(e){}
 let DEV_OPEN=false;
@@ -914,6 +916,7 @@ async function renderDevTable(){
       return `<span class="${c}" title="${escH(w.note||'')}">${d?dd(d):'—'}${w.note?' ✎':''}</span>`;
     };
     let h=`<div class="dev-cap">Отклонения выручки PNL по позициям • вчера (${fmtShort(D.yD)}) к позавчера (${fmtShort(D.y2D)}) • 7 дн (${dd(D.cur7[0])}–${dd(D.cur7[6])}) к пред. 7 дн (${dd(D.prev7[0])}–${dd(D.prev7[6])}) • маржинальность CF — неделя ${fmtShort(D.wkD)}–${fmtShort(D.wkEnd)} к пред. неделе, ДРР — 7 дн к пред. 7 дн`
+      +` <span class="dev-basis"><input type="search" id="devFilter" class="chip-glass dev-filter" placeholder="Артикул…" value="${escH(DEV_FILTER)}" oninput="setDevFilter(this.value)"></span>`
       +` <span class="dev-basis">Группировка: ${Object.keys(DEV_BASES).map(k=>`<button class="chip-glass dev-toggle${DEV_BASIS===k?' on':''}" onclick="setDevBasis('${k}')">${DEV_BASES[k].name}</button>`).join('')}</span>`
       +` <button class="chip-glass dev-toggle" onclick="toggleDevDetails()">${DEV_OPEN?'▾ Скрыть':'▸ Показать'} выручку</button></div>`;
     if(!D.watchOk)h+=`<div class="dev-cap dev-warn">Заметки недоступны: нет таблицы product_watch в базе.</div>`;
@@ -927,18 +930,19 @@ async function renderDevTable(){
       +`<th class="bl" title="Средняя цена PNL = выручка ÷ заказы, шт: 7 дн / пред. 7 дн">Ср. цена, ₽<br><span class="dev-neutral">7 дн / пред.</span></th><th title="Маржинальность CF: неделя ${fmtShort(D.wkD)}–${fmtShort(D.wkEnd)} / пред. неделя ${fmtShort(D.pwkD)}–${fmtShort(D.pwkEnd)}">Маржин., %<br><span class="dev-neutral">нед / пред.</span></th><th title="План маржинальности месяца">План, %</th><th title="Реклама ÷ выручка PNL: 7 дн / пред. 7 дн">ДРР, %<br><span class="dev-neutral">7 дн / пред.</span></th></tr></thead>`;
     // база группировки: знак списка и сортировка по модулю отклонения
     const bv=DEV_BASES[DEV_BASIS].v;
-    const sorted=D.rows.slice().sort((a,b)=>Math.abs(bv(b))-Math.abs(bv(a)));
+    const fq=DEV_FILTER.trim().toLowerCase();
+    const sorted=D.rows.filter(r=>!fq||String(r.offer).toLowerCase().includes(fq)).sort((a,b)=>Math.abs(bv(b))-Math.abs(bv(a)));
     DEV_SIDES.forEach(sd=>{
       const all=sorted.filter(r=>sd.f(bv(r)));
       if(!all.length)return;
-      const sOpen=!!DEV_OPEN_GRP[sd.key];
+      const sOpen=!!fq||!!DEV_OPEN_GRP[sd.key]; // при фильтре найденное раскрыто
       const t1=all.reduce((s,r)=>s+r.dev1,0),t7=all.reduce((s,r)=>s+r.dev7,0);
       h+=`<tbody><tr class="dev-top" onclick="toggleDevGroup('${sd.key}')"><td colspan="${DEV_NCOLS}">${sOpen?'▾':'▸'} ${sd.name} (${DEV_BASES[DEV_BASIS].name}) <span class="dev-neutral">• ${all.length} поз. • откл. вчера</span> <span class="${cls(t1)}">${sgn(t1)}</span> <span class="dev-neutral">• 7 дн</span> <span class="${cls(t7)}">${sgn(t7)}</span></td></tr></tbody>`;
       if(sOpen)DEV_GROUPS.forEach(g=>{
       const list=all.filter(r=>r.grp===g.key);
       if(!list.length)return;
       const gk=sd.key+':'+g.key;
-      const open=!!DEV_OPEN_GRP[gk];
+      const open=!!fq||!!DEV_OPEN_GRP[gk];
       const s1=list.reduce((s,r)=>s+r.dev1,0),s7=list.reduce((s,r)=>s+r.dev7,0);
       h+=`<tbody><tr class="dev-grp" onclick="toggleDevGroup('${gk}')"><td colspan="${DEV_NCOLS}" class="dev-sub">${open?'▾':'▸'} ${g.name} <span class="dev-neutral">• ${list.length} поз. • откл. вчера</span> <span class="${cls(s1)}">${sgn(s1)}</span> <span class="dev-neutral">• 7 дн</span> <span class="${cls(s7)}">${sgn(s7)}</span></td></tr>`;
       if(open)list.forEach(r=>{
@@ -955,7 +959,11 @@ async function renderDevTable(){
     });
     h+='</table>';
     if(!D.rows.length)h+='<div class="dev-cap">Нет товаров с планом на месяц.</div>';
+    else if(!sorted.length)h+='<div class="dev-cap">По фильтру «'+escH(DEV_FILTER)+'» товаров нет.</div>';
+    const typing=document.activeElement&&document.activeElement.id==='devFilter';
     box.innerHTML=h;
+    // перерисовка заменяет поле фильтра — возвращаем фокус и курсор
+    const fi=document.getElementById('devFilter');if(fi&&typing){fi.focus();const n=fi.value.length;fi.setSelectionRange(n,n);}
     // вторая строка шапки закреплена сразу под первой (высота первой зависит от переносов)
     const hr=box.querySelectorAll('.dev-table thead tr');if(hr[1]){const g=hr[0].querySelector('th.dev-hgrp'),top=g?g.getBoundingClientRect().height:0;hr[1].querySelectorAll('th').forEach(th=>th.style.top=top+'px');}
   }catch(e){
@@ -973,6 +981,7 @@ function devNoteRow(r,ok){
       :'<div class="dev-neutral">Заметки недоступны: нет таблицы product_watch.</div>')
     +(hist||'<div class="dev-neutral">Заметок пока нет.</div>')+`</td></tr>`;
 }
+function setDevFilter(v){DEV_FILTER=v;renderDevTable();}
 function setDevBasis(b){
   DEV_BASIS=b;
   try{localStorage.setItem('ba_dev_basis',b);}catch(e){}
