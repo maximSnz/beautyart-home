@@ -766,7 +766,7 @@ async function renderMonth(mk){
 
 // === вкладка «Ключевые отклонения» ===
 // === «Ключевые отклонения»: выручка PNL вчера/позавчера и 7 дн/пред. 7 дн, группы по маржинальности CF и ДРР ===
-const DOW_TARGET={0:7,1:13,2:12,3:11,4:10,5:9,6:8}; // норма покрытия остатком, дн — как в weekly.html
+const STOCK_DAYS=4; // день с остатком: товара хватает на 4 дня продаж по плану
 const DRR_LIMIT=8,MARGIN_FLOOR=5;
 // списки верхнего уровня — по знаку отклонения выручки выбранной базы (ноль — к положительным)
 const DEV_BASES={d1:{name:'вчера к позавчера',v:r=>r.dev1},d7:{name:'7 дн к пред. 7 дн',v:r=>r.dev7}};
@@ -838,13 +838,13 @@ async function loadDevTable(){
   const stock=new Map(),hasSnap=new Set();
   stockDays.forEach((rows,i)=>{if(!rows.length)return;hasSnap.add(days[i]);rows.forEach(x=>{const k=x.offer_id+'|'+days[i];stock.set(k,(stock.get(k)||0)+Number(x.stock||0));});});
   const sumOf=(m,id,keys)=>keys.reduce((s,k)=>s+(m.get(id+'|'+k)||0),0);
-  // день с остатком: остаток ≥ план месяца ÷ дней месяца (без 0,95) × норма дня недели
+  // день с остатком: остаток ≥ план месяца ÷ дней месяца (без 0,95) × STOCK_DAYS
   const stockState=(p,k)=>{
     if(!hasSnap.has(k))return null;
     const pl=PLAN[k.slice(0,7)+'|'+p.product_id];
-    const [yy,mm,dd]=k.split('-').map(Number);
+    const [yy,mm]=k.split('-').map(Number);
     const perDay=pl&&Number(pl.plan_qty)>0?Number(pl.plan_qty)/new Date(yy,mm,0).getDate():0;
-    const need=perDay*DOW_TARGET[new Date(yy,mm-1,dd).getDay()];
+    const need=perDay*STOCK_DAYS;
     const st=stock.get(p.offer_id+'|'+k)||0;
     return st>0&&st>=need;
   };
@@ -914,7 +914,7 @@ async function renderDevTable(){
       +`<th colspan="${DEV_OPEN?4:3}" class="dev-hgrp bl">Выручка: вчера к позавчера</th><th colspan="${DEV_OPEN?4:3}" class="dev-hgrp bl">Выручка: 7 дн к пред. 7 дн</th>`
       +`<th colspan="2" class="dev-hgrp bl">Маржинальность и ДРР</th><th rowspan="2" class="bl" title="Дата контроля; ✎ — есть заметка. Клик по строке — заметки">Контроль</th></tr><tr>`
       +`<th class="bl">Вчера / план, шт</th><th>Откл., шт</th>`
-      +`<th class="c-det ${bl[0]}">Выручка, ₽</th><th class="${bl[1]}">Откл., ₽</th><th title="День с остатком: остаток ≥ план÷дней месяца × норма покрытия дня недели (weekly)">Остаток</th><th>Реклама, ₽</th>`
+      +`<th class="c-det ${bl[0]}">Выручка, ₽</th><th class="${bl[1]}">Откл., ₽</th><th title="День с остатком: остаток ≥ план÷дней месяца × ${STOCK_DAYS} дн">Остаток</th><th>Реклама, ₽</th>`
       +`<th class="c-det ${bl[0]}">Выручка, ₽</th><th class="${bl[1]}">Откл., ₽</th><th title="Дней с остатком: 7 дн / пред. 7 дн">Дни с ост.</th><th>Реклама, ₽</th>`
       +`<th class="bl" title="Маржинальность CF за неделю / план месяца">Маржин., % / план</th><th title="Реклама 7 дн ÷ выручка PNL 7 дн">ДРР 7 дн, %</th></tr></thead>`;
     // база группировки: знак списка и сортировка по модулю отклонения
