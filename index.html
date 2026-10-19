@@ -116,9 +116,9 @@
         .menu-item:last-child { margin-bottom: 0; }
 
         /* === ПРАВАЯ КОЛОНКА === */
-        .content-area { min-height: 0; overflow: hidden; display: flex; }
+        .content-area { min-height: 0; min-width: 0; overflow: hidden; display: flex; }
         .glass-card {
-            flex: 1; min-height: 0;
+            flex: 1; min-height: 0; min-width: 0; /* min-width: 0 — широкая таблица прокручивается внутри, а не обрезается */
             display: flex; flex-direction: column;
             background: rgba(255, 255, 255, 0.12);
             backdrop-filter: blur(20px) saturate(1.4); -webkit-backdrop-filter: blur(20px) saturate(1.4);
@@ -207,17 +207,17 @@
         .dev-wrap::-webkit-scrollbar { width: 6px; height: 6px; }
         .dev-wrap::-webkit-scrollbar-thumb { background: rgba(255,255,255,.35); border-radius: 3px; }
         .dev-cap { font-family: 'Forum', serif; font-size: .85em; color: rgba(255,255,255,.75); margin: 2px 2px 8px; }
-        .dev-table { width: 100%; border-collapse: collapse; font-family: 'Forum', serif; font-size: .88em; color: #fff; }
+        .dev-table { width: 100%; border-collapse: collapse; font-family: 'Forum', serif; font-size: .8em; color: #fff; }
         .dev-table th {
             position: sticky; top: 0; z-index: 2;
             background: rgba(28, 13, 46, 0.92);
-            padding: 7px 8px; text-align: right; white-space: nowrap;
+            padding: 5px 5px; text-align: right; white-space: normal; line-height: 1.15;
             color: rgba(255,255,255,.8); font-weight: 600; font-size: .92em;
             border-bottom: 1px solid rgba(255,255,255,.3);
         }
         .dev-table th:first-child, .dev-table td:first-child { text-align: left; }
         .dev-table td {
-            padding: 6px 8px; border-bottom: 1px dashed rgba(255,255,255,.15);
+            padding: 4px 5px; border-bottom: 1px dashed rgba(255,255,255,.15);
             text-align: right; white-space: nowrap;
         }
         .dev-table tr:hover td { background: rgba(255,255,255,.06); }
@@ -225,7 +225,7 @@
         .dev-table.open-det .c-det { display: table-cell; }
         .dev-table .bl { border-left: 1px solid rgba(255,255,255,.35); }
         .dev-table th.dev-hgrp { text-align: center; border-bottom: 1px solid rgba(255,255,255,.18); }
-        .dev-table thead tr:nth-child(2) th { top: 31px; }
+        .dev-table thead tr:nth-child(2) th { top: 24px; }
         .dev-table tr.dev-grp td { text-align: left; cursor: pointer; background: rgba(255,255,255,.08); font-weight: 600; border-bottom: 1px solid rgba(255,255,255,.25); }
         .dev-table tr.dev-top td { text-align: left; cursor: pointer; background: rgba(255,255,255,.16); font-weight: 600; font-size: 1.05em; border-bottom: 1px solid rgba(255,255,255,.35); }
         .dev-table td.dev-sub { padding-left: 22px; }
@@ -917,10 +917,10 @@ async function renderDevTable(){
       +`<th colspan="2" class="dev-hgrp bl" title="План в день = план месяца ÷ эфф. дни месяца (будни + 0,7 × выходные), без 0,95${D.kY<1?'; вчера выходной — ×0,7':''}">Заказы вчера к плану</th>`
       +`<th colspan="${DEV_OPEN?4:3}" class="dev-hgrp bl">Выручка: вчера к позавчера</th><th colspan="${DEV_OPEN?4:3}" class="dev-hgrp bl">Выручка: 7 дн к пред. 7 дн</th>`
       +`<th colspan="3" class="dev-hgrp bl">Маржинальность и ДРР</th><th rowspan="2" class="bl" title="Дата контроля; ✎ — есть заметка. Клик по строке — заметки">Контроль</th></tr><tr>`
-      +`<th class="bl">Вчера / план, шт</th><th>Откл., шт</th>`
+      +`<th class="bl">Факт / план, шт</th><th>Откл., шт</th>`
       +`<th class="c-det ${bl[0]}">Выручка, ₽</th><th class="${bl[1]}">Откл., ₽</th><th title="День с остатком: остаток ≥ план÷дней месяца × ${STOCK_DAYS} дн">Остаток</th><th>Реклама, ₽</th>`
       +`<th class="c-det ${bl[0]}">Выручка, ₽</th><th class="${bl[1]}">Откл., ₽</th><th title="Дней с остатком: 7 дн / пред. 7 дн">Дни с ост.</th><th>Реклама, ₽</th>`
-      +`<th class="bl" title="Маржинальность CF: неделя ${fmtShort(D.wkD)}–${fmtShort(D.wkEnd)} / пред. неделя ${fmtShort(D.pwkD)}–${fmtShort(D.pwkEnd)}">Маржин., %: нед / пред.</th><th title="План маржинальности месяца">План, %</th><th title="Реклама ÷ выручка PNL: 7 дн / пред. 7 дн">ДРР, %: 7 дн / пред.</th></tr></thead>`;
+      +`<th class="bl" title="Маржинальность CF: неделя ${fmtShort(D.wkD)}–${fmtShort(D.wkEnd)} / пред. неделя ${fmtShort(D.pwkD)}–${fmtShort(D.pwkEnd)}">Маржин., %<br><span class="dev-neutral">нед / пред.</span></th><th title="План маржинальности месяца">План, %</th><th title="Реклама ÷ выручка PNL: 7 дн / пред. 7 дн">ДРР, %<br><span class="dev-neutral">7 дн / пред.</span></th></tr></thead>`;
     // база группировки: знак списка и сортировка по модулю отклонения
     const bv=DEV_BASES[DEV_BASIS].v;
     const sorted=D.rows.slice().sort((a,b)=>Math.abs(bv(b))-Math.abs(bv(a)));
