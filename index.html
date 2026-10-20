@@ -217,7 +217,7 @@
         .dev-wrap::-webkit-scrollbar { width: 6px; height: 6px; }
         .dev-wrap::-webkit-scrollbar-thumb { background: rgba(255,255,255,.35); border-radius: 3px; }
         .dev-cap { font-family: 'Forum', serif; font-size: .85em; color: rgba(255,255,255,.75); margin: 2px 2px 8px; }
-        .dev-table { width: 100%; border-collapse: collapse; font-family: 'Forum', serif; font-size: .8em; color: #fff; }
+        .dev-table { width: 100%; border-collapse: collapse; font-family: 'Forum', serif; font-size: .76em; color: #fff; }
         .dev-table th {
             position: sticky; top: 0; z-index: 2;
             background: rgba(28, 13, 46, 0.92);
@@ -242,7 +242,7 @@
         .dev-table tr.dev-top td, .dev-table tr.dev-grp td { white-space: normal; } /* длинные заголовки групп переносятся, а не растягивают таблицу */
         .dev-table tr.dev-row { cursor: pointer; }
         .dev-table tr.dev-lossy td:first-child { box-shadow: inset 3px 0 0 #f87171; } /* убыточный (маржинальность CF < 0) */
-        .dev-table td.dev-art { max-width: 140px; overflow: hidden; text-overflow: ellipsis; } /* длинный артикул — «…», полный в подсказке */
+        .dev-table td.dev-art { max-width: 122px; overflow: hidden; text-overflow: ellipsis; } /* длинный артикул — «…», полный в подсказке */
         .dev-table tr.dev-fam td { font-weight: 600; }
         .dev-table tr.dev-member td { background: rgba(28,13,46,.18); }
         .dev-table tr.dev-member td:first-child { padding-left: 22px; color: rgba(255,255,255,.85); }
@@ -254,8 +254,8 @@
         .dev-note-form input[type=date] { font-family: inherit; color: #fff; background: rgba(28,13,46,.5); border: 1px solid rgba(255,255,255,.3); border-radius: 6px; padding: 3px 6px; color-scheme: dark; }
         .dev-hist { margin: 2px 0; }
         .dev-anabox { margin-top: 8px; }
-        .dev-ana { margin-right: 3px; }
-        .dev-restock { color: #4ade80; margin-right: 3px; }
+        .dev-ana { margin-right: 1px; font-size: .85em; }
+        .dev-restock { color: #4ade80; margin-right: 1px; font-size: .85em; }
         .dev-hypo { margin-top: 8px; padding: 6px 8px; border-left: 3px solid #fde047; background: rgba(28,13,46,.25); border-radius: 4px; }
         .dev-toggle.on { background: rgba(255,255,255,.35); }
         .dev-basis { margin-left: 8px; white-space: nowrap; }
@@ -385,9 +385,8 @@
                     <div class="chart-box" id="chartBoxRub"><div class="chart-tooltip" id="tooltipRub"></div></div>
                     <div class="legend-bottom" id="legendBottom">
                         <div class="legend-col">
-                            <div class="legend-item"><span class="sw dash-white"></span>План маржи</div>
-                            <div class="legend-item"><span class="sw solid-white"></span>Прогноз маржи (CF)</div>
-                            <div class="legend-item"><span class="sw solid-plum"></span>Факт маржи накопит. итогом (CF)</div>
+                            <div class="legend-item"><span class="sw dash-white"></span>План маржи в день (CF)</div>
+                            <div class="legend-item"><span class="sw solid-white"></span>Маржа за день (CF)</div>
                         </div>
                         <div class="legend-col">
                             <div class="legend-item"><span class="sw dash-yellow"></span>План маржинальности</div>
@@ -395,9 +394,8 @@
                             <div class="legend-item"><span class="sw dot-yellow"></span>Маржинальность недели (CF)</div>
                         </div>
                         <div class="legend-col">
-                            <div class="legend-item"><span class="sw dash-teal"></span>План выручки (PNL)</div>
-                            <div class="legend-item"><span class="sw solid-teal"></span>Прогноз выручки (PNL)</div>
-                            <div class="legend-item"><span class="sw solid-plum"></span>Факт выручки накопит. итогом (PNL)</div>
+                            <div class="legend-item"><span class="sw dash-teal"></span>План выручки в день (PNL)</div>
+                            <div class="legend-item"><span class="sw solid-teal"></span>Выручка за день (PNL)</div>
                             <div class="legend-item"><span class="sw pale-blue"></span>Заказы, шт (PNL, день)</div>
                             <div class="legend-item"><span class="sw dash-paleblue"></span>Средний темп продаж, шт/день (PNL)</div>
                         </div>
@@ -485,7 +483,15 @@ async function loadRealMonth(mk){
     dayMap.set(x.sale_date,g);
   });
   const ordersDaily=[...dayMap.entries()].sort((a,b)=>a[0]<b[0]?-1:1).map(([d,g])=>{const [yy,mm,dd]=d.split('-').map(Number);return {t:new Date(yy,mm-1,dd).getTime(),rub:g.rub,pcs:g.pcs};});
-  const out={planRub:Math.round(planRub),planRev:Math.round(planRev),planPct,cfWeeks,ordersDaily,real:true};
+  // дневная маржа CF (cf_daily пишет syncPnl в plan.html; сумма по товарам). Нет таблицы/данных — null
+  let cfDaily=null;
+  try{
+    const mFrom=`${mk}-01`,mTo=keyOfMonday(new Date(y,m,0));
+    const map=new Map();
+    (await fetchPages(`cf_daily?day=gte.${mFrom}&day=lte.${mTo}&select=day,mar,revn&order=product_id,day`)).forEach(r=>{const g=map.get(r.day)||{mar:0,revn:0};g.mar+=Number(r.mar||0);g.revn+=Number(r.revn||0);map.set(r.day,g);});
+    if(map.size)cfDaily=[...map.entries()].sort((a,b)=>a[0]<b[0]?-1:1).map(([d,g])=>{const [yy,mm,dd]=d.split('-').map(Number);return {t:new Date(yy,mm-1,dd).getTime(),mar:g.mar,revn:g.revn};});
+  }catch(e){console.warn('cf_daily:',e.message);}
+  const out={planRub:Math.round(planRub),planRev:Math.round(planRev),planPct,cfWeeks,ordersDaily,cfDaily,real:true};
   REAL_CACHE[mk]=out;
   return out;
 }
@@ -519,14 +525,17 @@ function drawChart(boxId,tooltipId,cfg){
   const dataW=innerW-2*inset;
   const bandH=innerH/3;
   const qTop=q=>padT+bandH*q;
-  const yBand=(q,v,max)=>qTop(q+1)-bandH*0.08-(v/max)*(bandH*0.84);
+  const yBand=(q,v,max,min=0)=>qTop(q+1)-bandH*0.08-((v-min)/(max-min))*(bandH*0.84);
 
   const fin=a=>a.filter(v=>Number.isFinite(v));
-  const scaleB=niceScale(Math.max(plan,...fin(lineVals),...fin(factVals)));
+  const revDay=cfg.revDay||[],marDay=cfg.marDay||[],planRevDay=cfg.planRevDay||0,planMarDay=cfg.planMarDay||0;
+  // маржа за день бывает отрицательной — шкала полосы маржи от min (≤ 0) до max
+  const scaleB=niceScale(Math.max(planMarDay,...marDay.map(p=>p.v),1));
+  const minB=Math.min(0,...marDay.map(p=>p.v));const scaleBmin=minB<0?-niceScale(-minB,2).max:0;
   const weekPct=cfg.weekPct||[],revPace=cfg.revPace||[],marPace=cfg.marPace||[];
   const scaleC=niceScale(Math.max(pctPlan,...fin(pctVals),...fin(weekPct)));
   const revFactDaily=cfg.revFactDaily||[],revFcDaily=cfg.revFcDaily||[];
-  const scaleA=niceScale(Math.max(planRev,...fin(revForecast),...fin(revFact),...revFactDaily.map(p=>p.v),...revFcDaily.map(p=>p.v)));
+  const scaleA=niceScale(Math.max(planRevDay,...revDay.map(p=>p.v),1));
   const avgPcs=ordersDaily.length?ordersDaily.reduce((s,o)=>s+o.pcs,0)/ordersDaily.length:0;
   const scaleD=Math.max(...ordersDaily.map(o=>o.pcs),avgPcs,1);
 
@@ -546,22 +555,22 @@ function drawChart(boxId,tooltipId,cfg){
   weeks.forEach((w,i)=>{svg+=`<line x1="${x(i)}" y1="${padT}" x2="${x(i)}" y2="${baseY}" stroke="${GRID}" stroke-width="1" stroke-dasharray="2 4"/>`;});
   weeks.forEach((w,i)=>{svg+=`<text x="${x(i)}" y="${baseY+18}" text-anchor="middle" font-size="12" font-weight="700" fill="${TXT_WEEK}" font-family="Forum">${weekLabels[i]}</text>`;svg+=`<text x="${x(i)}" y="${baseY+33}" text-anchor="middle" font-size="9" fill="${TXT_SUB}" font-family="Forum">${fmtShort(w.start)}–${fmtShort(w.end)}</text>`;});
 
-  function bandAxis(q,side,color,max,fmt,title,planVal){
+  function bandAxis(q,side,color,max,fmt,title,planVal,min=0){
     const ax=side==='left'?padL-12:plotRight+12;
     const top=qTop(q)+bandH*0.08,bottom=qTop(q+1)-bandH*0.08;
     const anchor=side==='left'?'end':'start';
     const lx=side==='left'?ax-6:ax+6;
     svg+=`<line x1="${ax}" y1="${top}" x2="${ax}" y2="${bottom}" stroke="${color}" stroke-width="1.5"/>`;
-    [0,1].forEach(f=>{const v=max*f,yy=yBand(q,v,max);svg+=`<line x1="${ax}" y1="${yy}" x2="${side==='left'?ax-4:ax+4}" y2="${yy}" stroke="${color}" stroke-width="1.5"/>`;svg+=`<text x="${lx}" y="${yy+4}" text-anchor="${anchor}" font-size="9.5" fill="${color}" opacity="0.85" font-family="Forum">${fmt(v)}</text>`;});
-    if(planVal!=null&&planVal>0){const py=yBand(q,planVal,max);const midY=yBand(q,max/2,max);const ly=(Math.abs(py-midY)<10)?py-11:py;svg+=`<line x1="${ax}" y1="${py}" x2="${side==='left'?ax-5:ax+5}" y2="${py}" stroke="${color}" stroke-width="2.5"/>`;svg+=`<text x="${lx}" y="${ly+4}" text-anchor="${anchor}" font-size="10.5" font-weight="700" fill="${color}" font-family="Forum">${fmt(planVal)}</text>`;}
+    [...new Set([min,0,max])].forEach(v=>{const yy=yBand(q,v,max,min);svg+=`<line x1="${ax}" y1="${yy}" x2="${side==='left'?ax-4:ax+4}" y2="${yy}" stroke="${color}" stroke-width="1.5"/>`;svg+=`<text x="${lx}" y="${yy+4}" text-anchor="${anchor}" font-size="9.5" fill="${color}" opacity="0.85" font-family="Forum">${fmt(v)}</text>`;});
+    if(planVal!=null&&planVal>0){const py=yBand(q,planVal,max,min);const midY=yBand(q,(max+min)/2,max,min);const ly=(Math.abs(py-midY)<10)?py-11:py;svg+=`<line x1="${ax}" y1="${py}" x2="${side==='left'?ax-5:ax+5}" y2="${py}" stroke="${color}" stroke-width="2.5"/>`;svg+=`<text x="${lx}" y="${ly+4}" text-anchor="${anchor}" font-size="10.5" font-weight="700" fill="${color}" font-family="Forum">${fmt(planVal)}</text>`;}
     const tX=side==='left'?4:W-4;
     const tAnchor=side==='left'?'start':'end';
     svg+=`<text x="${tX}" y="${qTop(q)+5}" text-anchor="${tAnchor}" font-size="11" font-weight="700" fill="${color}" font-family="Forum">${title}</text>`;
   }
 
-  bandAxis(0,'left',C_PCS,scaleA.max,v=>fmtMillions(v),'Выручка, млн ₽ (PNL)',planRev);
+  bandAxis(0,'left',C_PCS,scaleA.max,v=>fmtMillions(v),'Выручка в день, млн ₽ (PNL)',planRevDay);
   bandAxis(0,'right',C_ORD,scaleD,v=>fmt0(v),'Заказы, шт (PNL, день)',avgPcs);
-  bandAxis(1,'right',C_MARGIN,scaleB.max,v=>fmtMillions(v),'Маржа, млн ₽ (CF)',plan);
+  bandAxis(1,'right',C_MARGIN,scaleB.max,v=>fmtMillions(v),'Маржа в день, млн ₽ (CF)',planMarDay,scaleBmin);
   bandAxis(2,'left',C_PCT,scaleC.max,v=>fmt1(v),'Маржинальность, % (CF)',pctPlan);
 
   const dailyPoints=(series,yMax,band,color,prefix,fmtV,devMode,planVal)=>{
@@ -587,68 +596,40 @@ function drawChart(boxId,tooltipId,cfg){
     });
   }
   if(avgPcs>0){const ay=yBand(0,avgPcs,scaleD);svg+=`<line x1="${padL}" y1="${ay}" x2="${plotRight}" y2="${ay}" stroke="${C_ORD}" stroke-width="1.5" stroke-dasharray="4 5" opacity="0.85"/>`;}
-  if(planRev>0){const py=yBand(0,planRev,scaleA.max);svg+=`<line x1="${padL}" y1="${py}" x2="${plotRight}" y2="${py}" stroke="${C_PCS}" stroke-width="2" stroke-dasharray="6 6"/>`;}
-  const dayPath=(ser,max)=>ser.map((p,k)=>`${k?'L':'M'} ${xDay(p.t)} ${yBand(0,p.v,max)}`).join(' ');
-  if(revFactDaily.length>1){const f=dayPath(revFactDaily,scaleA.max);svg+=`<path d="${f}" fill="none" stroke="${C_FACT}" stroke-width="2" stroke-linecap="round"/>`;}
-  svg+=dailyPoints(cfg.revFactDaily,scaleA.max,0,C_FACT,'Факт выручки (накопит.)',fmtRubShort,'day');
-  revFact.forEach((v,i)=>{
-    const px=xp(i),py=yBand(0,v,scaleA.max);
-    const weekly=revWeekly[i]||0;
-    const pc=revPace[i],pp=i>0?revPace[i-1]:null;
-    const dW=(pc!=null&&pp)?pc-pp:null;
-    const bad=done(i)&&dW!==null&&dW<0;
-    let tip=`Выручка за неделю: ${fmtRub(weekly)} • Накопительно: ${fmtRub(v)}`;
-    if(pc!=null)tip+=` • Темп: ${fmtRubShort(pc)}/день`;
-    if(dW!==null)tip+=tipDev(dW,v=>fmtRubShort(v)+'/день',dW/pp*100);
-    const plMain=fmtRubShort(v);
-    let plParen='',plParenCol=C_UP;
-    if(dW!==null){const dp=dW/pp*100;plParenCol=dW>=0?C_UP:C_DOWN;const sg=dW>=0?'+':'−';plParen=`(темп ${sg}${Math.abs(dp).toLocaleString('ru-RU',{maximumFractionDigits:1})}%)`;}
-    svg+=`<circle class="chart-point${done(i)?'':' wk-open'}${bad?' pulse-bad':''}" cx="${px}" cy="${py}" r="${done(i)?5:3}" fill="${bad?C_DOWN:C_FACT}" data-label="Факт выручки, ${weekLabels[i]}${onDate(i)}" data-value="${tip}"/>`;
-    if(done(i))svg+=`<text class="vlbl" x="${px}" y="${py+16}" text-anchor="middle" font-size="9" font-weight="700" fill="${C_FACT}" font-family="Forum">${plMain}${plParen?`<tspan x="${px}" dy="10" font-size="8.5" fill="${plParenCol}">${plParen}</tspan>`:''}</text>`;
-  });
-  if(revFcDaily.length>1){const p=dayPath(revFcDaily,scaleA.max);svg+=`<path d="${p}" fill="none" stroke="${C_PCS}" stroke-width="2" stroke-linecap="round"/>`;}
-  svg+=dailyPoints(cfg.revFcDaily,scaleA.max,0,C_PCS,'Прогноз выручки',fmtRubShort,'plan',planRev);
-  revForecast.forEach((v,i)=>{
-    const py=yBand(0,v,scaleA.max);
-    const dev=v-planRev;const devP=planRev?dev/planRev*100:0;
-    const bad=done(i)&&dev<0;
-    const col=dev>=0?C_UP:C_DOWN;const sg=dev>=0?'+':'−';
-    const paren=planRev?`(${sg}${fmtRubShort(Math.abs(dev))} / ${sg}${Math.abs(devP).toLocaleString('ru-RU',{maximumFractionDigits:1})}%)`:'';
-    svg+=`<circle class="chart-point${done(i)?'':' wk-open'}${bad?' pulse-bad':''}" cx="${xp(i)}" cy="${py}" r="${done(i)?5:3}" fill="rgba(28,13,46,0.85)" stroke="${bad?C_DOWN:C_PCS}" stroke-width="2.5" data-label="Выручка (прогноз), ${weekLabels[i]}${onDate(i)}" data-value="Прогноз закрытия месяца: ${fmtRub(v)}${planRev?tipDev(dev,fmtRubShort,devP):''}"/>`;
-    if(done(i))svg+=`<text class="vlbl" x="${xp(i)}" y="${py-19}" text-anchor="middle" font-size="9" font-weight="700" fill="${C_PCS}" font-family="Forum">${fmtRubShort(v)}${paren?`<tspan x="${xp(i)}" dy="10" font-size="8.5" fill="${col}">${paren}</tspan>`:''}</text>`;
-  });
-
-  if(plan>0){const planY=yBand(1,plan,scaleB.max);svg+=`<line x1="${padL}" y1="${planY}" x2="${plotRight}" y2="${planY}" stroke="${C_MARGIN}" stroke-width="2.2" stroke-dasharray="8 6"/>`;}
-  if(factVals.length>1){let f=`M ${xp(0)} ${yBand(1,factVals[0],scaleB.max)}`;factVals.forEach((v,i)=>{if(i>0)f+=` L ${xp(i)} ${yBand(1,v,scaleB.max)}`;});svg+=`<path d="${f}" fill="none" stroke="${C_FACT}" stroke-width="2" stroke-linecap="round"/>`;}
-  factVals.forEach((v,i)=>{
-    const px=xp(i),py=yBand(1,v,scaleB.max);
-    const weekly=factWeekly[i]||0;
-    const pc=marPace[i],pp=i>0?marPace[i-1]:null;
-    const dW=(pc!=null&&pp)?pc-pp:null;
-    const bad=done(i)&&dW!==null&&dW<0;
-    let tip=`Маржа в этом месяце: ${fmtRub(weekly)} • Накопительно: ${fmtRub(v)}`;
-    if(pc!=null)tip+=` • Темп недели: ${fmtRubShort(pc)}/день`;
-    if(dW!==null)tip+=tipDev(dW,v=>fmtRubShort(v)+'/день',dW/pp*100);
-    const plMain=fmtRubShort(v);
-    let plParen='',plParenCol=C_UP;
-    if(dW!==null){const dp=dW/pp*100;plParenCol=dW>=0?C_UP:C_DOWN;const sg=dW>=0?'+':'−';plParen=`(темп ${sg}${Math.abs(dp).toLocaleString('ru-RU',{maximumFractionDigits:1})}%)`;}
-    svg+=`<circle class="chart-point${done(i)?'':' wk-open'}${bad?' pulse-bad':''}" cx="${px}" cy="${py}" r="${done(i)?5.5:3}" fill="${bad?C_DOWN:C_FACT}" data-label="Факт недели ${weekLabels[i]}${onDate(i)}" data-value="${tip}"/>`;
-    let ly=py-20;if(ly<qTop(1)+9)ly=py+16;
-    if(typeof lineVals[i]==='number'&&Math.abs(py-yBand(1,lineVals[i],scaleB.max))<34)ly=py+16;
-    if(done(i))svg+=`<text class="vlbl" x="${px}" y="${ly}" text-anchor="middle" font-size="9" font-weight="700" fill="${C_FACT}" font-family="Forum">${plMain}${plParen?`<tspan x="${px}" dy="10" font-size="8.5" fill="${plParenCol}">${plParen}</tspan>`:''}</text>`;
-  });
-  if(lineVals.length>1){let l=`M ${xp(0)} ${yBand(1,lineVals[0],scaleB.max)}`;lineVals.forEach((v,i)=>{if(i>0)l+=` L ${xp(i)} ${yBand(1,v,scaleB.max)}`;});svg+=`<path class="chart-line" d="${l}" fill="none" stroke="${C_MARGIN}" stroke-width="2.2" stroke-linecap="round"/>`;}
-  lineVals.forEach((v,i)=>{
-    const py=yBand(1,v,scaleB.max);
-    const dev=v-plan;const devP=plan?dev/plan*100:0;
-    const bad=done(i)&&dev<0;
-    const col=dev>=0?C_UP:C_DOWN;const sg=dev>=0?'+':'−';
-    const paren=plan?`(${sg}${fmtMillions(Math.abs(dev))} млн / ${sg}${Math.abs(devP).toLocaleString('ru-RU',{maximumFractionDigits:1})}%)`:'';
-    svg+=`<circle class="chart-point${done(i)?'':' wk-open'}${bad?' pulse-bad':''}" cx="${xp(i)}" cy="${py}" r="${done(i)?7:3}" fill="rgba(28,13,46,0.85)" stroke="${bad?C_DOWN:C_MARGIN}" stroke-width="3" data-label="Прогноз, ${weekLabels[i]}${onDate(i)}" data-value="${fmtRub(v)}${plan?tipDev(dev,fmtRub,devP):''}"/>`;
-    let flY=py-20;if(flY<qTop(1)+9)flY=py+16;
-    if(done(i))svg+=`<text class="vlbl" x="${xp(i)}" y="${flY}" text-anchor="middle" font-size="9" font-weight="700" fill="${C_MARGIN}" font-family="Forum">${fmtRubShort(v)}${paren?`<tspan x="${xp(i)}" dy="10" font-size="8.5" fill="${col}">${paren}</tspan>`:''}</text>`;
-  });
-
+  // суточная полоса: факт дня (линия + точки), план дня (пунктир); подписи недель — средний темп ₽/день закрытой недели
+  const wd=t=>['вс','пн','вт','ср','чт','пт','сб'][new Date(t).getDay()];
+  const daySeries=(ser,band,max,min,color,planDay,label,planMonth)=>{
+    let o='';
+    if(planDay>0){const py=yBand(band,planDay,max,min);o+=`<line x1="${padL}" y1="${py}" x2="${plotRight}" y2="${py}" stroke="${color}" stroke-width="1.8" stroke-dasharray="6 6" opacity="0.9"/>`;}
+    if(min<0){const zy=yBand(band,0,max,min);o+=`<line x1="${padL}" y1="${zy}" x2="${plotRight}" y2="${zy}" stroke="${BASELINE}" stroke-width="1" opacity="0.5"/>`;}
+    if(ser.length>1)o+=`<path d="${ser.map((p,k)=>`${k?'L':'M'} ${xDay(p.t).toFixed(1)} ${yBand(band,p.v,max,min).toFixed(1)}`).join(' ')}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+    ser.forEach(p=>{
+      const dv=p.v-planDay;
+      let tip=`${label} за день: ${fmtRub(Math.round(p.v))}${planDay>0?' • к плану дня'+tipDev(dv,v=>fmtRubShort(v),dv/planDay*100):''}`;
+      tip+=` • Накопительно: ${fmtRub(Math.round(p.cum))}`;
+      if(planMonth>0)tip+=` • План месяца: ${fmtRub(Math.round(planMonth))}`;
+      if(p.fc!=null){const d2=p.fc-planMonth;tip+=` • Прогноз закрытия: ${fmtRub(p.fc)}${planMonth>0?tipDev(d2,v=>fmtRubShort(v),d2/planMonth*100):''}`;}
+      const bad=planDay>0&&p.v<planDay;
+      o+=`<circle class="chart-point" cx="${xDay(p.t).toFixed(1)}" cy="${yBand(band,p.v,max,min).toFixed(1)}" r="3.2" fill="${bad?C_DOWN:color}" stroke="rgba(28,13,46,0.85)" stroke-width="1" data-label="${label}, ${fmtShort(new Date(p.t))} (${wd(p.t)})" data-value="${tip}"/>`;
+    });
+    return o;
+  };
+  const paceChips=(band,pace,color)=>{
+    let o='';
+    weeks.forEach((w,i)=>{
+      if(!done(i)||pace[i]==null)return;
+      const pp=i>0?pace[i-1]:null,dW=pp?pace[i]-pp:null;
+      const col=dW==null?color:(dW>=0?C_UP:C_DOWN),sg=dW>=0?'+':'−';
+      const txt=`ср. ${fmtRubShort(pace[i])}/день${dW!=null?` (${sg}${Math.abs(dW/pp*100).toLocaleString('ru-RU',{maximumFractionDigits:1})}%)`:''}`;
+      o+=`<text class="vlbl" x="${xDay((w.start.getTime()+w.end.getTime())/2+43200000)}" y="${qTop(band+1)-8}" text-anchor="middle" font-size="8.5" font-weight="700" fill="${col}" font-family="Forum">${txt}</text>`;
+    });
+    return o;
+  };
+  svg+=daySeries(revDay,0,scaleA.max,0,C_PCS,planRevDay,'Выручка',planRev);
+  svg+=paceChips(0,revPace,C_PCS);
+  if(marDay.length)svg+=daySeries(marDay,1,scaleB.max,scaleBmin,C_MARGIN,planMarDay,'Маржа',plan);
+  else svg+=`<text x="${(padL+plotRight)/2}" y="${qTop(1)+bandH/2}" text-anchor="middle" font-size="11" fill="${TXT_SUB}" font-family="Forum">${cfg.hasCfDaily===false?'Дневной маржи CF за месяц нет — появится после загрузки начислений в «Плане продаж»':''}</text>`;
+  if(marDay.length)svg+=paceChips(1,marPace,C_MARGIN);
   if(pctPlan>0){const ppY=yBand(2,pctPlan,scaleC.max);svg+=`<line x1="${padL}" y1="${ppY}" x2="${plotRight}" y2="${ppY}" stroke="${C_PCT}" stroke-width="1.8" stroke-dasharray="6 6"/>`;}
   const wp=weekPct.map((v,i)=>[i,v]).filter(a=>Number.isFinite(a[1]));
   if(wp.length>1)svg+=`<path d="${wp.map((a,k)=>`${k?'L':'M'} ${xp(a[0])} ${yBand(2,a[1],scaleC.max)}`).join(' ')}" fill="none" stroke="${C_PCT}" stroke-width="1.3" stroke-dasharray="2 4" opacity="0.8"/>`;
@@ -782,7 +763,14 @@ async function renderMonth(mk){
      const E=effRange(mFirst,new Date(o.t));
      if(E>0)revFcDaily.push({t:o.t,v:Math.round(cr/E*T)});
    });}
-  drawChart('chartBoxRub','tooltipRub',{weeks,weekLabels,plan:data.planRub,pctPlan:data.planPct,planRev:data.planRev||0,lineValues:fc,factValues:cum,factWeekly,pctValues:pctVals,ordersDaily,revForecast:fcRev,revFact:cumRev,revWeekly:weekRev,revFactDaily,revFcDaily,asOf:D,weekPct,revPace,marPace});
+  // суточные ряды (с 20.10.2026): выручка PNL и маржа CF за день; план дня = план месяца ÷ дней месяца;
+  // в подсказке — накопленный факт, план месяца и прогноз закрытия на этот день (та же формула: факт ÷ эфф. дни × эфф. дни месяца)
+  const DM=new Date(y,m,0).getDate();
+  const planRevDay=(data.planRev||0)/DM,planMarDay=(data.planRub||0)/DM;
+  const revDay=[],marDay=[];
+  {let cr=0;(data.ordersDaily||[]).filter(o=>o.t>=mStartMs&&o.t<=Math.min(mEndMs,D.getTime())).forEach(o=>{cr+=o.rub;const E=effRange(mFirst,new Date(o.t));revDay.push({t:o.t,v:o.rub,cum:cr,fc:E>0?Math.round(cr/E*T):null});});}
+  {let cm=0;(data.cfDaily||[]).filter(o=>o.t>=mStartMs&&o.t<=Math.min(mEndMs,D.getTime())).forEach(o=>{cm+=o.mar;const E=effRange(mFirst,new Date(o.t));marDay.push({t:o.t,v:o.mar,cum:cm,fc:E>0?Math.round(cm/E*T):null});});}
+  drawChart('chartBoxRub','tooltipRub',{revDay,marDay,planRevDay,planMarDay,hasCfDaily:!!data.cfDaily,weeks,weekLabels,plan:data.planRub,pctPlan:data.planPct,planRev:data.planRev||0,lineValues:fc,factValues:cum,factWeekly,pctValues:pctVals,ordersDaily,revForecast:fcRev,revFact:cumRev,revWeekly:weekRev,revFactDaily,revFcDaily,asOf:D,weekPct,revPace,marPace});
 }
 
 // === вкладка «Поиск отклонений» (до 20.10.2026 — «Ключевые отклонения») ===
@@ -1049,6 +1037,8 @@ async function renderDevTable(){
     const cls=v=>v<-0.5?'dev-neg':(v>0.5?'dev-pos':'dev-neutral');
     const sgn=v=>(v>0?'+':'')+fmt(Math.round(v));
     const pair=(a,b)=>`${fmt(Math.round(a))} / ${fmt(Math.round(b))}`;
+    const kRub=v=>(v/1000).toLocaleString('ru-RU',{minimumFractionDigits:1,maximumFractionDigits:1});
+    const pairK=(a,b)=>`${kRub(a)} / ${kRub(b)}`; // реклама в тыс ₽ — узкие колонки
     const ordDev=r=>`${(Math.round(r.oDev)>0?'+':'')+fmt0(Math.round(r.oDev)||0)}${r.oPlan>0?` <span class="dev-neutral">(${(r.oDev>0?'+':'')+fmt0(r.oDev/r.oPlan*100)}%)</span>`:''}`;
     // вертикальные разделители блоков: первая видимая колонка блока
     const bl=DEV_OPEN?['bl',''] :['',' bl'];const isPlan=DEV_BASIS==='d7p';DEV_NCOLS=1+2+2*(DEV_OPEN?4:3)+5+(isPlan?2:0); // «К плану» — только при группировке 7 дн к плану
@@ -1076,8 +1066,8 @@ async function renderDevTable(){
       +`<th colspan="${DEV_OPEN?4:3}" class="dev-hgrp bl">Выручка: вчера к позавчера</th><th colspan="${(DEV_OPEN?4:3)+(isPlan?2:0)}" class="dev-hgrp bl">Выручка: 7 дн к пред. 7 дн${isPlan?' и к плану':''}</th>`
       +`<th colspan="4" class="dev-hgrp bl">Цена, маржинальность и ДРР</th><th rowspan="2" class="bl" title="Дата контроля; ✎ — есть заметка. Клик по строке — заметки">Контроль</th></tr><tr>`
       +`<th class="bl">Факт / план, шт</th><th>Откл., шт</th>`
-      +`<th class="c-det ${bl[0]}">Выручка, ₽</th><th class="${bl[1]}">Откл., ₽</th><th title="День с остатком: остаток ≥ план÷дней месяца × ${STOCK_DAYS} дн">Остаток</th><th>Реклама, ₽</th>`
-      +`<th class="c-det ${bl[0]}">Выручка, ₽</th><th class="${bl[1]}">Откл., ₽</th>${isPlan?'<th title="Факт выручки 7 дн − план 7 дн (план, шт × плановая цена ÷ эфф. дни, выходной ×0,7, без 0,95)">К плану, ₽</th><th title="(факт 7 дн − max(план 7 дн, пред. 7 дн)) × маржинальность CF недели × 0,95 (выкуп); * — по плановой маржинальности (нет факта). «—»: отставания нет или товар убыточный. Сортировка: убыточные сверху, затем худшие">Упущ. маржа, ₽</th>':''}<th title="Дней с остатком: 7 дн / пред. 7 дн">Дни с ост.</th><th>Реклама, ₽</th>`
+      +`<th class="c-det ${bl[0]}">Выручка, ₽</th><th class="${bl[1]}">Откл., ₽</th><th title="День с остатком: остаток ≥ план÷дней месяца × ${STOCK_DAYS} дн">Остаток</th><th title="Реклама, тыс ₽: период / сравниваемый период; точно — в подсказке ячейки">Реклама, тыс ₽</th>`
+      +`<th class="c-det ${bl[0]}">Выручка, ₽</th><th class="${bl[1]}">Откл., ₽</th>${isPlan?'<th title="Факт выручки 7 дн − план 7 дн (план, шт × плановая цена ÷ эфф. дни, выходной ×0,7, без 0,95)">К плану, ₽</th><th title="(факт 7 дн − max(план 7 дн, пред. 7 дн)) × маржинальность CF недели × 0,95 (выкуп); * — по плановой маржинальности (нет факта). «—»: отставания нет или товар убыточный. Сортировка: убыточные сверху, затем худшие">Упущ. маржа, ₽</th>':''}<th title="Дней с остатком: 7 дн / пред. 7 дн">Дни с ост.</th><th title="Реклама, тыс ₽: период / сравниваемый период; точно — в подсказке ячейки">Реклама, тыс ₽</th>`
       +`<th class="bl" title="Средняя цена PNL = выручка ÷ заказы, шт: 7 дн / пред. 7 дн">Ср. цена, ₽<br><span class="dev-neutral">7 дн / пред.</span></th><th title="Маржинальность CF: неделя ${fmtShort(D.wkD)}–${fmtShort(D.wkEnd)} / пред. неделя ${fmtShort(D.pwkD)}–${fmtShort(D.pwkEnd)}">Маржин., %<br><span class="dev-neutral">нед / пред.</span></th><th title="План маржинальности месяца">План, %</th><th title="Реклама ÷ выручка PNL: 7 дн / пред. 7 дн">ДРР, %<br><span class="dev-neutral">7 дн / пред.</span></th></tr></thead>`;
     // база группировки: знак списка и сортировка по модулю отклонения
     const bv=DEV_BASES[DEV_BASIS].v;
@@ -1102,8 +1092,8 @@ async function renderDevTable(){
         const tip=kinds.map(k=>ANA_KINDS[k].on.toLowerCase()).concat(rs?['остатки пополнились (> 10% плана за 2 дня)']:[]).join('; ');
         return `<tr class="${trCls}" onclick="${click}"><td class="dev-art" title="${escH(r.offer)}${tip?' — '+tip:''}">${ic}${first}</td>`
           +`<td class="bl">${fmt0(r.o1)} / ${fmt0(r.oPlan)}</td><td class="${cls(r.oDev)}">${ordDev(r)}</td>`
-          +`<td class="c-det ${bl[0]}">${pair(r.r1,r.r2)}</td><td class="${cls(r.dev1)}${bl[1]}">${sgn(r.dev1)}</td><td>${r.fam?noSt:st1(r.s1)+' / '+st1(r.s2)}</td><td>${pair(r.a1,r.a2)}</td>`
-          +`<td class="c-det ${bl[0]}">${pair(r.r7,r.rp7)}</td><td class="${cls(r.dev7)}${bl[1]}">${sgn(r.dev7)}</td>${isPlan?`<td class="${cls(r.dev7p)}" title="план 7 дн: ${fmt(Math.round(r.p7))} ₽">${sgn(r.dev7p)}</td>${lostTd(r)}`:''}<td>${r.fam?noSt:stN(r.s7)+' / '+stN(r.sp7)}</td><td>${pair(r.a7,r.ap7)}</td>`
+          +`<td class="c-det ${bl[0]}">${pair(r.r1,r.r2)}</td><td class="${cls(r.dev1)}${bl[1]}">${sgn(r.dev1)}</td><td>${r.fam?noSt:st1(r.s1)+' / '+st1(r.s2)}</td><td title="реклама: ${fmt(Math.round(r.a1))} / ${fmt(Math.round(r.a2))} ₽">${pairK(r.a1,r.a2)}</td>`
+          +`<td class="c-det ${bl[0]}">${pair(r.r7,r.rp7)}</td><td class="${cls(r.dev7)}${bl[1]}">${sgn(r.dev7)}</td>${isPlan?`<td class="${cls(r.dev7p)}" title="план 7 дн: ${fmt(Math.round(r.p7))} ₽">${sgn(r.dev7p)}</td>${lostTd(r)}`:''}<td>${r.fam?noSt:stN(r.s7)+' / '+stN(r.sp7)}</td><td title="реклама: ${fmt(Math.round(r.a7))} / ${fmt(Math.round(r.ap7))} ₽">${pairK(r.a7,r.ap7)}</td>`
           +`<td class="bl">${rub(r.pr7)} <span class="dev-neutral">/ ${rub(r.prp7)}</span>${arr(r.pr7,r.prp7,true,0.5)}</td><td>${pctTxt(r.marPct)} <span class="dev-neutral">/ ${pctTxt(r.marPrev)}</span>${arr(r.marPct,r.marPrev,true)}</td><td>${pctTxt(r.planPct)}</td>`
           +`<td><span class="${r.drr>DRR_LIMIT?'dev-neg':'dev-pos'}">${drrTxt(r.drr)}</span> <span class="dev-neutral">/ ${drrTxt(r.drrPrev)}</span>${arr(r.drr,r.drrPrev,false)}</td><td class="bl">${ctrl(r)}</td></tr>`;
     };
