@@ -245,6 +245,7 @@
         .dev-hist { margin: 2px 0; }
         .dev-anabox { margin-top: 8px; }
         .dev-ana { margin-right: 3px; }
+        .dev-restock { color: #4ade80; margin-right: 3px; }
         .dev-hypo { margin-top: 8px; padding: 6px 8px; border-left: 3px solid #fde047; background: rgba(28,13,46,.25); border-radius: 4px; }
         .dev-toggle.on { background: rgba(255,255,255,.35); }
         .dev-basis { margin-left: 8px; white-space: nowrap; }
@@ -782,6 +783,8 @@ const DRR_LIMIT=8,MARGIN_FLOOR=5;
 // менеджеры — как matrixOf в plan.html ИП (у ООО префиксы другие — при добавлении ООО брать его правило)
 function matrixOf(offer){ return (/^(CAP|GLV|SEAL|RNC)-/.test(offer))?'m1':'m2'; }
 const DEV_MANAGERS={all:'Все',m1:'Илья',m2:'Ольга'};
+// группировка верхнего уровня: по знаку отклонения (как раньше) или по дате контроля из заметки РОПа
+const DEV_GMODES={dev:'по отклонению',date:'по дате контроля'};
 // списки верхнего уровня — по знаку отклонения выручки выбранной базы (ноль — к положительным)
 const DEV_BASES={d1:{name:'вчера к позавчера',v:r=>r.dev1},d7:{name:'7 дн к пред. 7 дн',v:r=>r.dev7},d7p:{name:'7 дн к плану',v:r=>r.dev7p}};
 const DEV_SIDES=[
@@ -862,12 +865,36 @@ async function loadWatch(){
 // гипотезы из plan.html (product_protocol): гипотеза — запись с дедлайном без родителя, дополнения — дочерние записи.
 // Только чтение; если загрузить не удалось — отчёт работает без них
 // запросы аналитики (analytics_requests): РОП ставит и снимает здесь, plan.html подсвечивает товар; открытый — closed_at пуст
+// управленческие ходы РОПа (analytics_requests, kind: analytics — запрос аналитики ❗, ads — корректировка рекламных расходов 📣).
+// Ставит и снимает РОП здесь, plan.html подсвечивает товар. Нет колонки kind (до SQL) — все запросы считаются аналитикой
+const ANA_KINDS={analytics:{icon:'❗',btn:'Запрос аналитики',on:'Аналитика запрошена'},ads:{icon:'📣',btn:'Корректировка рекламы',on:'Корректировка рекламы запрошена'}};
 async function loadAnaReq(){
   try{
-    const rows=await fetchPages('analytics_requests?closed_at=is.null&select=id,product_id,created_at');
-    const by=new Map();rows.forEach(r=>{const k=String(r.product_id);const c=by.get(k);if(!c||r.created_at>c.created_at)by.set(k,r);});
-    return {ok:true,by};
-  }catch(e){console.warn('analytics_requests:',e.message);return {ok:false,by:new Map()};}
+    let rows,hasKind=true;
+    try{rows=await fetchPages('analytics_requests?closed_at=is.null&select=id,product_id,created_at,kind');}
+    catch(e){hasKind=false;rows=await fetchPages('analytics_requests?closed_at=is.null&select=id,product_id,created_at');}
+    const by=new Map();
+    rows.forEach(r=>{const k=String(r.product_id)+'|'+((hasKind&&r.kind)||'analytics');const c=by.get(k);if(!c||r.created_at>c.created_at)by.set(k,r);});
+    return {ok:true,hasKind,by,has:(pid,kind)=>by.has(String(pid)+'|'+kind),get:(pid,kind)=>by.get(String(pid)+'|'+kind)};
+  }catch(e){console.warn('analytics_requests:',e.message);return {ok:false,hasKind:false,by:new Map(),has:()=>false,get:()=>null};}
+}
+// пополнение остатков — копия правила plan.html (loadRestock / applyRowMarks): последний снимок stock_history против снимка
+// не позже чем за 2 дня до него; ▲, если рост > 10% плана месяца (plan_qty). Ошибка — без значков
+async function loadRestockPids(PLAN,mk,products){
+  try{
+    const r1=await fetch(SUPABASE_URL+'/rest/v1/stock_history?select=report_date&order=report_date.desc&limit=1',{headers:HD});
+    const last=r1.ok?((await r1.json())[0]||{}).report_date:null;
+    if(!last)return new Set();
+    const [ly,lm,ld]=last.split('-').map(Number),pd=keyOfMonday(new Date(ly,lm-1,ld-2));
+    const r2=await fetch(SUPABASE_URL+`/rest/v1/stock_history?report_date=lte.${pd}&select=report_date&order=report_date.desc&limit=1`,{headers:HD});
+    const prev=r2.ok?((await r2.json())[0]||{}).report_date:null;
+    const sum=rows=>{const m=new Map();rows.forEach(x=>m.set(x.offer_id,(m.get(x.offer_id)||0)+Number(x.stock||0)));return m;};
+    const [a,b]=await Promise.all([fetchPages(`stock_history?report_date=eq.${last}&select=offer_id,stock`),prev?fetchPages(`stock_history?report_date=eq.${prev}&select=offer_id,stock`):Promise.resolve([])]);
+    if(!prev)return new Set();
+    const now=sum(a),before=sum(b),out=new Set();
+    products.forEach(p=>{const pl=PLAN[mk+'|'+p.product_id],q=pl?Number(pl.plan_qty||0):0;const d=(now.get(p.offer_id)||0)-(before.get(p.offer_id)||0);if(q>0&&d>0.1*q)out.add(String(p.product_id));});
+    return out;
+  }catch(e){console.warn('restock:',e.message);return new Set();}
 }
 async function loadHypos(){
   try{
@@ -989,13 +1016,14 @@ async function loadDevTable(){
       grp:devGroupOf(marPct,planPct,drr),watch:w
     });
   });
-  const out={hypos,anaReq,rows:groupGloves(rows),watchOk:watch.ok,yD,y2D,cur7,prev7,wkD,wkEnd,pwkD,pwkEnd,mk,kY};
+  const restock=await loadRestockPids(PLAN,mk,products);
+  const out={hypos,anaReq,restock,rows:groupGloves(rows),watchOk:watch.ok,yD,y2D,cur7,prev7,wkD,wkEnd,pwkD,pwkEnd,mk,kY};
   DEV_CACHE[yKey]=out;
   return out;
 }
 // раскрытые группы и строка с заметками — удобство конкретного зрителя
-let DEV_OPEN_GRP={},DEV_NOTE_PID=null,DEV_NCOLS=14,DEV_BASIS='d1',DEV_MGR='all',DEV_FILTER='',DEV_FILTER_CLOSED=new Set(); // фильтр по артикулу и свёрнутое при нём — только на время просмотра
-try{const b=localStorage.getItem('ba_dev_basis');if(DEV_BASES[b])DEV_BASIS=b;const m=localStorage.getItem('ba_dev_mgr');if(DEV_MANAGERS[m])DEV_MGR=m;}catch(e){}
+let DEV_OPEN_GRP={},DEV_NOTE_PID=null,DEV_NCOLS=14,DEV_BASIS='d1',DEV_MGR='all',DEV_GMODE='dev',DEV_FILTER='',DEV_FILTER_CLOSED=new Set(); // фильтр по артикулу и свёрнутое при нём — только на время просмотра
+try{const b=localStorage.getItem('ba_dev_basis');if(DEV_BASES[b])DEV_BASIS=b;const m=localStorage.getItem('ba_dev_mgr');if(DEV_MANAGERS[m])DEV_MGR=m;const g=localStorage.getItem('ba_dev_gmode');if(DEV_GMODES[g])DEV_GMODE=g;}catch(e){}
 try{DEV_OPEN_GRP=JSON.parse(localStorage.getItem('ba_dev_groups')||'{}')||{};}catch(e){}
 let DEV_OPEN=false;
 try{DEV_OPEN=localStorage.getItem('ba_dev_details')==='1';}catch(e){}
@@ -1030,6 +1058,7 @@ async function renderDevTable(){
     // периоды — в подсказке строки фильтров (подпись скрыта 19.10.2026)
     let h=`<div class="dev-cap" title="Отклонения выручки PNL по позициям • вчера (${fmtShort(D.yD)}) к позавчера (${fmtShort(D.y2D)}) • 7 дн (${dd(D.cur7[0])}–${dd(D.cur7[6])}) к пред. 7 дн (${dd(D.prev7[0])}–${dd(D.prev7[6])}) • маржинальность CF — неделя ${fmtShort(D.wkD)}–${fmtShort(D.wkEnd)} к пред. неделе, ДРР — 7 дн к пред. 7 дн">`
       +`<span class="dev-basis" style="margin-left:0"><input type="search" id="devFilter" class="chip-glass dev-filter" placeholder="Артикул…" value="${escH(DEV_FILTER)}" oninput="setDevFilter(this.value)"></span>`
+      +` <span class="dev-basis">Группировка: ${Object.keys(DEV_GMODES).map(k=>`<button class="chip-glass dev-toggle${DEV_GMODE===k?' on':''}" onclick="setDevGMode('${k}')">${DEV_GMODES[k]}</button>`).join('')}</span>`
       +` <span class="dev-basis">Менеджер: ${Object.keys(DEV_MANAGERS).map(k=>`<button class="chip-glass dev-toggle${DEV_MGR===k?' on':''}" onclick="setDevMgr('${k}')">${DEV_MANAGERS[k]}</button>`).join('')}</span>`
       +`</div>`;
     if(!D.watchOk)h+=`<div class="dev-cap dev-warn">Заметки недоступны: нет таблицы product_watch в базе.</div>`;
@@ -1057,8 +1086,12 @@ async function renderDevTable(){
     const noSt='<span class="dev-neutral" title="Остатки — по размерам: раскройте группу">—</span>';
     const rowHtml=(r,trCls,click,first)=>{
         if(isPlan&&lossy(r))trCls+=' dev-lossy';
-        const ana=r.fam?r.members.some(m=>D.anaReq.by.has(String(m.pid))):D.anaReq.by.has(String(r.pid));
-        return `<tr class="${trCls}" onclick="${click}"><td class="dev-art" title="${escH(r.offer)}${ana?' — запрошена аналитика':''}">${ana?'<span class="dev-ana">❗</span>':''}${first}</td>`
+        // значки: управленческие ходы РОПа (❗/📣) и пополнение остатков (▲ — как в plan.html); у группы — если есть у любого размера
+        const ms=r.fam?r.members:[r],kinds=Object.keys(ANA_KINDS).filter(k=>ms.some(m=>D.anaReq.has(m.pid,k)));
+        const rs=ms.some(m=>D.restock.has(String(m.pid)));
+        const ic=kinds.map(k=>`<span class="dev-ana">${ANA_KINDS[k].icon}</span>`).join('')+(rs?'<span class="dev-restock">▲</span>':'');
+        const tip=kinds.map(k=>ANA_KINDS[k].on.toLowerCase()).concat(rs?['остатки пополнились (> 10% плана за 2 дня)']:[]).join('; ');
+        return `<tr class="${trCls}" onclick="${click}"><td class="dev-art" title="${escH(r.offer)}${tip?' — '+tip:''}">${ic}${first}</td>`
           +`<td class="bl">${fmt0(r.o1)} / ${fmt0(r.oPlan)}</td><td class="${cls(r.oDev)}">${ordDev(r)}</td>`
           +`<td class="c-det ${bl[0]}">${pair(r.r1,r.r2)}</td><td class="${cls(r.dev1)}${bl[1]}">${sgn(r.dev1)}</td><td>${r.fam?noSt:st1(r.s1)+' / '+st1(r.s2)}</td><td>${pair(r.a1,r.a2)}</td>`
           +`<td class="c-det ${bl[0]}">${pair(r.r7,r.rp7)}</td><td class="${cls(r.dev7)}${bl[1]}">${sgn(r.dev7)}</td>${isPlan?`<td class="${cls(r.dev7p)}" title="план 7 дн: ${fmt(Math.round(r.p7))} ₽">${sgn(r.dev7p)}</td>${lostTd(r)}`:''}<td>${r.fam?noSt:stN(r.s7)+' / '+stN(r.sp7)}</td><td>${pair(r.a7,r.ap7)}</td>`
@@ -1073,7 +1106,23 @@ async function renderDevTable(){
       if(fo)r.members.filter(m=>!fq||hit(m)||hit(r)).sort(cmp).forEach(m=>{x+=rowHtml(m,'dev-row dev-member'+(DEV_NOTE_PID===m.pid?' on':''),`toggleDevNote(${m.pid})`,escH(m.offer))+(DEV_NOTE_PID===m.pid?devNoteRow(m,D.watchOk):'');});
       return x;
     }).join('');
-    DEV_SIDES.forEach(sd=>{
+    // по дате контроля: просрочено / сегодня / каждая будущая дата / без даты; внутри — та же сортировка
+    const ctrlOf=r=>(r.watch[0]&&r.watch[0].control_date)||null;
+    const dateBuckets=()=>{
+      const b=new Map(),put=(k,name,r)=>{if(!b.has(k))b.set(k,{name,list:[]});b.get(k).list.push(r);};
+      sorted.forEach(r=>{const d=ctrlOf(r);
+        if(!d)put('9999','Без даты контроля',r);
+        else if(d<todayKey)put('0000','Просрочено',r);
+        else if(d===todayKey)put('0001','Сегодня, '+dd(d),r);
+        else put(d,dd(d)+' ('+['вс','пн','вт','ср','чт','пт','сб'][new Date(d+'T00:00').getDay()]+')',r);});
+      return [...b.entries()].sort((x,y)=>x[0]<y[0]?-1:1);
+    };
+    const topHead=(key,name,all)=>{
+      const t1=all.reduce((s,r)=>s+r.dev1,0),t7=all.reduce((s,r)=>s+r.dev7,0),tp=all.reduce((s,r)=>s+r.dev7p,0),tl=all.reduce((s,r)=>s+(devLost(r)||0),0),tlc=all.filter(lossy).length;
+      return `<tbody><tr class="dev-top" onclick="toggleDevGroup('${key}')"><td colspan="${DEV_NCOLS}">${isOpen(key)?'▾':'▸'} ${name} <span class="dev-neutral">• ${all.length} поз. • откл. вчера</span> <span class="${cls(t1)}">${sgn(t1)}</span> <span class="dev-neutral">• 7 дн</span> <span class="${cls(t7)}">${sgn(t7)}</span>${isPlan?` <span class="dev-neutral">• к плану</span> <span class="${cls(tp)}">${sgn(tp)}</span> <span class="dev-neutral">• упущ. маржа</span> <span class="${cls(tl)}">${sgn(tl)}</span>${tlc?` <span class="dev-neg">• убыточных: ${tlc}</span>`:''}`:''}</td></tr></tbody>`;
+    };
+    if(DEV_GMODE==='date')dateBuckets().forEach(([k,g])=>{const key='date:'+k;h+=topHead(key,g.name,g.list);if(isOpen(key))h+='<tbody>'+listRows(g.list)+'</tbody>';});
+    else DEV_SIDES.forEach(sd=>{
       const all=sorted.filter(r=>sd.f(bv(r)));
       if(!all.length)return;
       const sOpen=isOpen(sd.key);
@@ -1107,10 +1156,13 @@ async function renderDevTable(){
 }
 function anaHtml(r){
   const A=(Object.values(DEV_CACHE)[0]||{}).anaReq;
-  if(!A||!A.ok)return '<div class="dev-anabox dev-neutral">Запрос аналитики недоступен: нет таблицы analytics_requests в базе.</div>';
-  const q=A.by.get(String(r.pid));
-  if(q)return `<div class="dev-anabox"><span class="dev-ana">❗</span> Аналитика запрошена ${escH((q.created_at||'').slice(8,10)+'.'+(q.created_at||'').slice(5,7))} — товар подсвечен в «Плане продаж» <button class="chip-glass" onclick="closeAnaReq(${q.id})">Снять запрос</button><span id="devAnaMsg" class="dev-neutral"></span></div>`;
-  return `<div class="dev-anabox"><button class="chip-glass" onclick="saveAnaReq(${r.pid},'${escH(r.offer)}')">❗ Запрос аналитики</button> <span class="dev-neutral">товар подсветится в «Плане продаж»</span><span id="devAnaMsg" class="dev-neutral"></span></div>`;
+  if(!A||!A.ok)return '<div class="dev-anabox dev-neutral">Управленческие ходы недоступны: нет таблицы analytics_requests в базе.</div>';
+  const dm=iso=>(iso||'').slice(8,10)+'.'+(iso||'').slice(5,7);
+  const one=kind=>{const K=ANA_KINDS[kind],q=A.get(r.pid,kind);
+    if(q)return `<div><span class="dev-ana">${K.icon}</span> ${K.on} ${escH(dm(q.created_at))} — товар подсвечен в «Плане продаж» <button class="chip-glass" onclick="closeAnaReq(${q.id})">Снять</button></div>`;
+    if(kind!=='analytics'&&!A.hasKind)return `<div class="dev-neutral">${K.icon} ${K.btn}: нужна колонка kind в analytics_requests (SQL).</div>`;
+    return `<div><button class="chip-glass" onclick="saveAnaReq(${r.pid},'${escH(r.offer)}','${kind}')">${K.icon} ${K.btn}</button> <span class="dev-neutral">товар подсветится в «Плане продаж»</span></div>`;};
+  return `<div class="dev-anabox">${Object.keys(ANA_KINDS).map(one).join('')}<span id="devAnaMsg" class="dev-neutral"></span></div>`;
 }
 async function anaWrite(url,method,body){
   const msg=document.getElementById('devAnaMsg');if(msg)msg.textContent=' Сохранение…';
@@ -1121,7 +1173,10 @@ async function anaWrite(url,method,body){
     renderDevTable();
   }catch(e){console.error('analytics_requests:',e);if(msg)msg.textContent=' Ошибка: '+e.message;}
 }
-function saveAnaReq(pid,offer){anaWrite('analytics_requests','POST',{product_id:pid,offer_id:offer});}
+function saveAnaReq(pid,offer,kind){
+  const A=(Object.values(DEV_CACHE)[0]||{}).anaReq;
+  anaWrite('analytics_requests','POST',A&&A.hasKind?{product_id:pid,offer_id:offer,kind}:{product_id:pid,offer_id:offer});
+}
 function closeAnaReq(id){anaWrite('analytics_requests?id=eq.'+id,'PATCH',{closed_at:new Date().toISOString()});}
 function hypoHtml(pid){
   const H=(Object.values(DEV_CACHE)[0]||{}).hypos;
@@ -1155,6 +1210,11 @@ function devNoteRow(r,ok){
     +(hist||'<div class="dev-neutral">Заметок пока нет.</div>')+anaHtml(r)+hypoHtml(r.pid)+`</td></tr>`;
 }
 function setDevFilter(v){DEV_FILTER=v;DEV_FILTER_CLOSED.clear();renderDevTable();}
+function setDevGMode(g){
+  DEV_GMODE=g;
+  try{localStorage.setItem('ba_dev_gmode',g);}catch(e){}
+  renderDevTable();
+}
 function setDevMgr(m){
   DEV_MGR=m;
   try{localStorage.setItem('ba_dev_mgr',m);}catch(e){}
