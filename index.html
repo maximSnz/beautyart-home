@@ -203,6 +203,7 @@
         .sw.dash-teal { background: repeating-linear-gradient(90deg, #5eead4 0 6px, transparent 6px 10px); }
         .sw.solid-teal { background: #5eead4; }
         .sw.solid-plum { background: #c084fc; }
+        .sw.avg-plum { background: #c084fc; opacity: 0.35; height: 7px; border-radius: 4px; }
         .sw.pale-blue { background: #7dd3fc; opacity: 0.55; }
         .sw.dash-paleblue { background: repeating-linear-gradient(90deg, #7dd3fc 0 6px, transparent 6px 10px); opacity: .85; }
 
@@ -388,6 +389,7 @@
                             <div class="legend-item"><span class="sw dash-white"></span>План маржи в день (CF)</div>
                             <div class="legend-item"><span class="sw solid-white"></span>Прогноз закрытия маржи ÷ дней месяца (CF)</div>
                             <div class="legend-item"><span class="sw solid-plum"></span>Маржа за день (CF)</div>
+                            <div class="legend-item"><span class="sw avg-plum"></span>Маржа: среднее в день за неделю (CF)</div>
                         </div>
                         <div class="legend-col">
                             <div class="legend-item"><span class="sw dash-yellow"></span>План маржинальности</div>
@@ -398,6 +400,7 @@
                             <div class="legend-item"><span class="sw dash-teal"></span>План выручки в день (PNL)</div>
                             <div class="legend-item"><span class="sw solid-teal"></span>Прогноз закрытия выручки ÷ дней месяца (PNL)</div>
                             <div class="legend-item"><span class="sw solid-plum"></span>Выручка за день (PNL)</div>
+                            <div class="legend-item"><span class="sw avg-plum"></span>Выручка: среднее в день за неделю (PNL)</div>
                             <div class="legend-item"><span class="sw pale-blue"></span>Заказы, шт (PNL, день)</div>
                             <div class="legend-item"><span class="sw dash-paleblue"></span>Средний темп продаж, шт/день (PNL)</div>
                         </div>
@@ -610,13 +613,13 @@ function drawChart(boxId,tooltipId,cfg){
     const fcs=ser.filter(p=>p.fc!=null);
     if(fcs.length>1)o+=`<path d="${fcs.map((p,k)=>`${k?'L':'M'} ${xDay(p.t).toFixed(1)} ${yBand(band,p.fc/DM,max,min).toFixed(1)}`).join(' ')}" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`;
     if(ser.length>1)o+=`<path d="${ser.map((p,k)=>`${k?'L':'M'} ${xDay(p.t).toFixed(1)} ${yBand(band,p.v,max,min).toFixed(1)}`).join(' ')}" fill="none" stroke="${C_FACT}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>`;
-    const fcTip=p=>{const d2=p.fc-planMonth;return `Прогноз закрытия: ${fmtRub(p.fc)}${planMonth>0?tipDev(d2,v=>fmtRubShort(v),d2/planMonth*100)+' к плану месяца':''} • в пересчёте на день: ${fmtRub(Math.round(p.fc/DM))}${planDay>0?' (план дня '+fmtRub(Math.round(planDay))+')':''} • Накопительно: ${fmtRub(Math.round(p.cum))}`;};
+    const fcTip=p=>{const d2=p.fc-planMonth;return `Прогноз закрытия: ${fmtRub(p.fc)}${planMonth>0?tipDev(d2,v=>fmtRubShort(v),d2/planMonth*100)+' к плану месяца':''}`;};
     // концы закрытых недель (воскресенье или последний день месяца) — подпись прогноза закрытия
     const weekEnd=new Set(weeks.filter((w,i)=>done(i)).map(w=>w.end.getTime()));
     fcs.forEach(p=>{
       const px=xDay(p.t),py=yBand(band,p.fc/DM,max,min),end=weekEnd.has(p.t);
-      const d2=p.fc-planMonth,bad=planMonth>0&&d2<0;
-      o+=`<circle class="chart-point" cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${end?5:2.5}" fill="rgba(28,13,46,0.85)" stroke="${bad?C_DOWN:color}" stroke-width="${end?2.5:1.5}" data-label="Прогноз закрытия, ${fmtShort(new Date(p.t))} (${wd(p.t)})" data-value="${fcTip(p)}"/>`;
+      const d2=p.fc-planMonth,bad=end&&planMonth>0&&d2<0; // красный и пульсация — только у недельных точек
+      o+=`<circle class="chart-point${bad?' pulse-bad':''}" cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${end?5:2.2}" fill="rgba(28,13,46,0.85)" stroke="${bad?C_DOWN:color}" stroke-width="${end?2.5:1.3}" data-label="Прогноз закрытия, ${fmtShort(new Date(p.t))} (${wd(p.t)})" data-value="${fcTip(p)}"/>`;
       if(end&&planMonth>0){const col=d2>=0?C_UP:C_DOWN,sg=d2>=0?'+':'−';
         let ly=py-19;if(ly<qTop(band)+10)ly=py+16;
         o+=`<text class="vlbl" x="${px.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" font-size="9" font-weight="700" fill="${color}" font-family="Forum">${fmtRubShort(p.fc)}<tspan x="${px.toFixed(1)}" dy="10" font-size="8.5" fill="${col}">(${sg}${fmtRubShort(Math.abs(d2))} / ${sg}${Math.abs(d2/planMonth*100).toLocaleString('ru-RU',{maximumFractionDigits:1})}%)</tspan></text>`;}
@@ -627,27 +630,33 @@ function drawChart(boxId,tooltipId,cfg){
       tip+=` • Накопительно: ${fmtRub(Math.round(p.cum))}`;
       if(planMonth>0)tip+=` • План месяца: ${fmtRub(Math.round(planMonth))}`;
       if(p.fc!=null){const d2=p.fc-planMonth;tip+=` • Прогноз закрытия: ${fmtRub(p.fc)}${planMonth>0?tipDev(d2,v=>fmtRubShort(v),d2/planMonth*100):''}`;}
-      const bad=planDay>0&&p.v<planDay;
-      o+=`<circle class="chart-point" cx="${xDay(p.t).toFixed(1)}" cy="${yBand(band,p.v,max,min).toFixed(1)}" r="3" fill="${bad?C_DOWN:C_FACT}" stroke="rgba(28,13,46,0.85)" stroke-width="1" data-label="${label}, ${fmtShort(new Date(p.t))} (${wd(p.t)})" data-value="${tip}"/>`;
+      o+=`<circle class="chart-point" cx="${xDay(p.t).toFixed(1)}" cy="${yBand(band,p.v,max,min).toFixed(1)}" r="2.8" fill="${C_FACT}" stroke="rgba(28,13,46,0.85)" stroke-width="1" data-label="${label}, ${fmtShort(new Date(p.t))} (${wd(p.t)})" data-value="${tip}"/>`;
     });
     return o;
   };
-  const paceChips=(band,pace,color)=>{
-    let o='';
+  // среднее за закрытую неделю — полупрозрачная «ступенька» через всю неделю на уровне среднего в день (Σ за неделю ÷ дни
+  // с данными); значение и изменение к прошлой неделе — в подсказке
+  const weekAvg=(ser,band,max,min,label)=>{
+    let o='',prev=null;
     weeks.forEach((w,i)=>{
-      if(!done(i)||pace[i]==null)return;
-      const pp=i>0?pace[i-1]:null,dW=pp?pace[i]-pp:null;
-      const col=dW==null?color:(dW>=0?C_UP:C_DOWN),sg=dW>=0?'+':'−';
-      const txt=`ср. ${fmtRubShort(pace[i])}/день${dW!=null?` (${sg}${Math.abs(dW/pp*100).toLocaleString('ru-RU',{maximumFractionDigits:1})}%)`:''}`;
-      o+=`<text class="vlbl" x="${xDay((w.start.getTime()+w.end.getTime())/2+43200000)}" y="${qTop(band+1)-8}" text-anchor="middle" font-size="8.5" font-weight="700" fill="${col}" font-family="Forum">${txt}</text>`;
+      const a=w.start.getTime(),b2=w.end.getTime(),pts=ser.filter(p=>p.t>=a&&p.t<=b2);
+      if(!pts.length)return;
+      const avg=pts.reduce((s2,p)=>s2+p.v,0)/pts.length;
+      if(done(i)){
+        const y=yBand(band,avg,max,min),x1=xDay(a)-dataW/(spanEndMs-spanStartMs)*43200000,x2=xDay(b2)+dataW/(spanEndMs-spanStartMs)*43200000;
+        const dv=prev!=null?avg-prev:null;
+        const tip=`В среднем: ${fmtRub(Math.round(avg))}/день${dv!=null&&prev?' • к прошлой неделе'+tipDev(dv,v=>fmtRubShort(v),dv/prev*100):''}`;
+        o+=`<line x1="${x1.toFixed(1)}" y1="${y.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${C_FACT}" stroke-width="7" stroke-linecap="round" opacity="0.28"/>`;
+        o+=`<line class="chart-point" x1="${x1.toFixed(1)}" y1="${y.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y.toFixed(1)}" stroke="transparent" stroke-width="12" data-label="${label}: ${weekLabels[i]} (${fmtShort(w.start)}–${fmtShort(w.end)})" data-value="${tip}"/>`;
+      }
+      prev=avg;
     });
     return o;
   };
+  svg+=weekAvg(revDay,0,scaleA.max,0,'Выручка, среднее за неделю');
   svg+=daySeries(revDay,0,scaleA.max,0,C_PCS,planRevDay,'Выручка',planRev);
-  svg+=paceChips(0,revPace,C_PCS);
-  if(marDay.length)svg+=daySeries(marDay,1,scaleB.max,scaleBmin,C_MARGIN,planMarDay,'Маржа',plan);
+  if(marDay.length)svg+=weekAvg(marDay,1,scaleB.max,scaleBmin,'Маржа, среднее за неделю')+daySeries(marDay,1,scaleB.max,scaleBmin,C_MARGIN,planMarDay,'Маржа',plan);
   else svg+=`<text x="${(padL+plotRight)/2}" y="${qTop(1)+bandH/2}" text-anchor="middle" font-size="11" fill="${TXT_SUB}" font-family="Forum">${cfg.hasCfDaily===false?'Дневной маржи CF за месяц нет — появится после загрузки начислений в «Плане продаж»':''}</text>`;
-  if(marDay.length)svg+=paceChips(1,marPace,C_MARGIN);
   if(pctPlan>0){const ppY=yBand(2,pctPlan,scaleC.max);svg+=`<line x1="${padL}" y1="${ppY}" x2="${plotRight}" y2="${ppY}" stroke="${C_PCT}" stroke-width="1.8" stroke-dasharray="6 6"/>`;}
   const wp=weekPct.map((v,i)=>[i,v]).filter(a=>Number.isFinite(a[1]));
   if(wp.length>1)svg+=`<path d="${wp.map((a,k)=>`${k?'L':'M'} ${xp(a[0])} ${yBand(2,a[1],scaleC.max)}`).join(' ')}" fill="none" stroke="${C_PCT}" stroke-width="1.3" stroke-dasharray="2 4" opacity="0.8"/>`;
