@@ -127,6 +127,16 @@
             box-shadow: 0 8px 32px rgba(28, 13, 46, 0.2);
             color: #fff;
         }
+        /* разворот рабочего пространства на весь экран: кнопка в правом нижнем углу, анимация от места карточки */
+        #finCard { position: relative; }
+        .full-btn { position: absolute; right: 10px; bottom: 10px; z-index: 5; width: 34px; height: 34px; border-radius: 10px;
+            border: 1px solid rgba(255,255,255,.35); background: rgba(255,255,255,.12); color: #fff; font-size: 18px; line-height: 1;
+            cursor: pointer; opacity: .45; transition: opacity .2s, background .2s; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+        .full-btn:hover { opacity: 1; background: rgba(255,255,255,.25); }
+        .full-shade { position: fixed; inset: 0; z-index: 900; background: rgba(28,13,46,.45); opacity: 0; transition: opacity .35s ease; }
+        .full-shade.on { opacity: 1; }
+        #finCard.is-full { position: fixed; z-index: 901; margin: 0; background: rgba(60,30,80,.55); }
+        #finCard.full-anim { transition: top .35s ease, left .35s ease, width .35s ease, height .35s ease; }
         .card-head { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-family: 'Forum', serif; flex-wrap: wrap; }
         .tabs-glass { display: flex; gap: 6px; }
         .tab-glass {
@@ -304,7 +314,6 @@
                     <div class="section-body">
                         <details class="subsection">
                             <summary>👤 ИП Колдомов</summary>
-                            <a class="sub-link" href="https://maximsnz.github.io/beautyart/private.html" target="_blank">🔒 Сводный отчёт</a>
                             <a class="menu-item" href="https://maximsnz.github.io/beautyart/weekly.html" target="_blank">Управление остатками</a>
                             <a class="menu-item" href="https://maximsnz.github.io/beautyart/plan.html" target="_blank">Реализация плана продаж</a>
                             <a class="menu-item" href="https://docs.google.com/spreadsheets/d/144n5raWV8mKbBdRQ8pEEfcgc8T_WaNzQ7NDWhRLQnSw/edit?" target="_blank">Юнит-экономика 1.0</a>
@@ -313,7 +322,6 @@
                         </details>
                         <details class="subsection">
                             <summary>🏢 ООО Beauty Art</summary>
-                            <a class="sub-link" href="https://maximsnz.github.io/beautyart-ooo/private.html" target="_blank">🔒 Сводный отчёт</a>
                             <a class="menu-item" href="https://maximsnz.github.io/beautyart-ooo/weekly.html" target="_blank">Управление остатками</a>
                             <a class="menu-item" href="https://maximsnz.github.io/beautyart-ooo/plan.html" target="_blank">Реализация плана продаж</a>
                         </details>
@@ -368,8 +376,8 @@
                 <div class="glass-card hide" id="finCard">
                     <div class="card-head">
                         <div class="tabs-glass">
-                            <button id="tabFin" class="tab-glass on" onclick="setHomeTab('fin')">Финансовое здоровье</button>
-                            <button id="tabDev" class="tab-glass" onclick="setHomeTab('dev')">Ключевые отклонения</button>
+                            <button id="tabFin" class="tab-glass on" onclick="setHomeTab('fin')">Финансовая динамика</button>
+                            <button id="tabDev" class="tab-glass" onclick="setHomeTab('dev')">Поиск отклонений</button>
                         </div>
                         <button id="annotToggle" class="chip-glass" style="margin-left:auto" onclick="toggleAnnotations()" title="Показать / скрыть подписи недельных точек">Аннотации: Вкл</button>
                         <select class="chip-glass" id="monthSelect"></select>
@@ -395,6 +403,7 @@
                         </div>
                     </div>
                     <div class="dev-wrap hide" id="devBox"></div>
+                    <button class="full-btn" id="fullBtn" onclick="toggleFull()" title="Развернуть на весь экран (Esc — свернуть)">⤢</button>
                 </div>
             </div>
         </div>
@@ -776,8 +785,8 @@ async function renderMonth(mk){
   drawChart('chartBoxRub','tooltipRub',{weeks,weekLabels,plan:data.planRub,pctPlan:data.planPct,planRev:data.planRev||0,lineValues:fc,factValues:cum,factWeekly,pctValues:pctVals,ordersDaily,revForecast:fcRev,revFact:cumRev,revWeekly:weekRev,revFactDaily,revFcDaily,asOf:D,weekPct,revPace,marPace});
 }
 
-// === вкладка «Ключевые отклонения» ===
-// === «Ключевые отклонения»: выручка PNL вчера/позавчера и 7 дн/пред. 7 дн, группы по маржинальности CF и ДРР ===
+// === вкладка «Поиск отклонений» (до 20.10.2026 — «Ключевые отклонения») ===
+// === «Поиск отклонений»: выручка PNL вчера/позавчера и 7 дн/пред. 7 дн, группы по маржинальности CF и ДРР ===
 const STOCK_DAYS=4; // день с остатком: товара хватает на 4 дня продаж по плану
 const DRR_LIMIT=8,MARGIN_FLOOR=5;
 // менеджеры — как matrixOf в plan.html ИП (у ООО префиксы другие — при добавлении ООО брать его правило)
@@ -1293,6 +1302,29 @@ function toggleAnnotations(){
   localStorage.setItem('ba_home_annot',SHOW_ANNOT?'1':'0');
   applyAnnotations();
 }
+
+// === разворот рабочего пространства на весь экран и обратно (Esc — свернуть); внутри всё работает как обычно ===
+let FULL=false;
+function toggleFull(){
+  const c=document.getElementById('finCard'),btn=document.getElementById('fullBtn');
+  const place=(r)=>{c.style.top=r.top+'px';c.style.left=r.left+'px';c.style.width=r.width+'px';c.style.height=r.height+'px';};
+  const target=()=>({top:12,left:12,width:innerWidth-24,height:innerHeight-24});
+  if(!FULL){
+    const r=c.getBoundingClientRect();
+    const sh=document.createElement('div');sh.className='full-shade';sh.id='fullShade';sh.onclick=toggleFull;document.body.appendChild(sh);
+    c.classList.add('is-full');place(r);
+    requestAnimationFrame(()=>{c.classList.add('full-anim');sh.classList.add('on');place(target());});
+    FULL=true;btn.textContent='⤡';btn.title='Свернуть (Esc)';
+  }else{
+    const back=c.parentElement.getBoundingClientRect(); // карточка вернётся на место правой колонки
+    const sh=document.getElementById('fullShade');if(sh)sh.classList.remove('on');
+    place(back);
+    setTimeout(()=>{c.classList.remove('is-full','full-anim');['top','left','width','height'].forEach(k=>c.style[k]='');if(sh)sh.remove();},360);
+    FULL=false;btn.textContent='⤢';btn.title='Развернуть на весь экран (Esc — свернуть)';
+  }
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&FULL)toggleFull();});
+window.addEventListener('resize',()=>{if(FULL){const c=document.getElementById('finCard');c.classList.remove('full-anim');c.style.width=(innerWidth-24)+'px';c.style.height=(innerHeight-24)+'px';}});
 
 // === финансовый раздел: без пароля ===
 function showFin(){
