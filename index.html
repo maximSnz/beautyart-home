@@ -148,7 +148,7 @@
         }
         .tab-glass:hover { background: rgba(255,255,255,.2); }
         .tab-glass.on { background: rgba(255,255,255,.28); border-color: rgba(255,255,255,.55); }
-        .ent-switch { margin-left: auto; }
+        .ent-switch { padding-right: 10px; margin-right: 4px; border-right: 1px solid rgba(255,255,255,.3); }
         .chip-glass {
             display: inline-flex; align-items: center; justify-content: center;
             height: 34px; padding: 0 12px;
@@ -295,10 +295,6 @@
                 <img src="https://i.ibb.co/ZzbPQmQt/IMG-8031.png" alt="Beauty Art Logo" class="logo">
             </a>
             <div class="company-name">Beauty Art</div>
-            <div class="tabs-glass ent-switch" title="Юрлицо: данные главной панели (переключение перезагружает страницу)">
-                <button id="entIp" class="tab-glass" onclick="setEntity('ip')">ИП</button>
-                <button id="entOoo" class="tab-glass" onclick="setEntity('ooo')">ООО</button>
-            </div>
         </div>
 
         <div class="main-layout">
@@ -382,6 +378,10 @@
                 <!-- КАРТОЧКА ДАННЫХ -->
                 <div class="glass-card hide" id="finCard">
                     <div class="card-head">
+                        <div class="tabs-glass ent-switch" title="Юрлицо: данные рабочего пространства (переключение перезагружает страницу)">
+                            <button id="entIp" class="tab-glass" onclick="setEntity('ip')">ИП</button>
+                            <button id="entOoo" class="tab-glass" onclick="setEntity('ooo')">ООО</button>
+                        </div>
                         <div class="tabs-glass">
                             <button id="tabFin" class="tab-glass on" onclick="setHomeTab('fin')">Финансовая динамика</button>
                             <button id="tabDev" class="tab-glass" onclick="setHomeTab('dev')">Поиск отклонений</button>
@@ -559,11 +559,13 @@ function drawChart(boxId,tooltipId,cfg){
   // маржа за день бывает отрицательной — шкала полосы маржи от min (≤ 0) до max
   const scaleB=niceScale(Math.max(planMarDay,...marDay.map(p=>p.v),1));
   // полосы «месяц» — шкала по диапазону значений (прогноз и план), а не от нуля: так видно движение прогноза
-  const rangeScale=vals=>{vals=vals.filter(v=>Number.isFinite(v)&&v>0);if(!vals.length)return {min:0,max:1};const mn=Math.min(...vals),mx=Math.max(...vals),sp=(mx-mn)||mx*0.1;let lo=Math.max(0,mn-sp*0.35),hi=mx+sp*0.35;const st=niceScale(hi-lo,4).step;return {min:Math.floor(lo/st)*st,max:Math.ceil(hi/st)*st};};
+  const rangeScale=vals=>{vals=vals.filter(v=>Number.isFinite(v)&&v!==0);if(!vals.length)return {min:0,max:1};const mn=Math.min(...vals),mx=Math.max(...vals),sp=(mx-mn)||Math.abs(mx)*0.1;let lo=mn>=0?Math.max(0,mn-sp*0.35):mn-sp*0.35,hi=mx+sp*0.35;const st=niceScale(hi-lo,4).step;return {min:Math.floor(lo/st)*st,max:Math.ceil(hi/st)*st};};
   const scaleBm=rangeScale([plan,...marDay.filter(p=>p.fc!=null).map(p=>p.fc)]);
   const minB=Math.min(0,...marDay.map(p=>p.v));const scaleBmin=minB<0?-niceScale(-minB,2).max:0;
   const weekPct=cfg.weekPct||[],revPace=cfg.revPace||[],marPace=cfg.marPace||[];
   const scaleC=niceScale(Math.max(pctPlan,...fin(pctVals),...fin(weekPct)));
+  // маржинальность бывает отрицательной (убыточные недели) — шкала от min (≤ 0), как у дневной маржи
+  const minC=Math.min(0,...fin(pctVals),...fin(weekPct));const scaleCmin=minC<0?-niceScale(-minC,2).max:0;
   const revFactDaily=cfg.revFactDaily||[],revFcDaily=cfg.revFcDaily||[];
   const scaleA=niceScale(Math.max(planRevDay,...revDay.map(p=>p.v),1));
   const scaleAm=rangeScale([planRev,...revDay.filter(p=>p.fc!=null).map(p=>p.fc)]);
@@ -603,7 +605,7 @@ function drawChart(boxId,tooltipId,cfg){
   bandAxis(0,'right',C_PCS,scaleAm.max,v=>fmtMillions(v),'Прогноз месяца, млн ₽ (PNL)',planRev,scaleAm.min);
   bandAxis(1,'left',C_FACT,scaleB.max,v=>fmtMillions(v),'Маржа за день, млн ₽ (CF)',planMarDay,scaleBmin);
   bandAxis(1,'right',C_MARGIN,scaleBm.max,v=>fmtMillions(v),'Прогноз месяца, млн ₽ (CF)',plan,scaleBm.min);
-  bandAxis(2,'left',C_PCT,scaleC.max,v=>fmt1(v),'Маржинальность, % (CF)',pctPlan);
+  bandAxis(2,'left',C_PCT,scaleC.max,v=>fmt1(v),'Маржинальность, % (CF)',pctPlan,scaleCmin);
 
   const dailyPoints=(series,yMax,band,color,prefix,fmtV,devMode,planVal)=>{
     let out='';
@@ -679,11 +681,11 @@ function drawChart(boxId,tooltipId,cfg){
   svg+=monthSeries(revDay,0,scaleAm.max,C_PCS,planRev,scaleAm.min);
   if(marDay.length)svg+=weekAvg(marDay,1,scaleB.max,scaleBmin,'Маржа, среднее за неделю')+daySeries(marDay,1,scaleB.max,scaleBmin,C_FACT,planMarDay,'Маржа',plan)+monthSeries(marDay,1,scaleBm.max,C_MARGIN,plan,scaleBm.min);
   else svg+=`<text x="${(padL+plotRight)/2}" y="${qTop(1)+bandH/2}" text-anchor="middle" font-size="11" fill="${TXT_SUB}" font-family="Forum">${cfg.hasCfDaily===false?'Дневной маржи CF за месяц нет — появится после загрузки начислений в «Плане продаж»':''}</text>`;
-  if(pctPlan>0){const ppY=yBand(2,pctPlan,scaleC.max);svg+=`<line x1="${padL}" y1="${ppY}" x2="${plotRight}" y2="${ppY}" stroke="${C_PCT}" stroke-width="1.8" stroke-dasharray="6 6"/>`;}
+  if(pctPlan>0){const ppY=yBand(2,pctPlan,scaleC.max,scaleCmin);svg+=`<line x1="${padL}" y1="${ppY}" x2="${plotRight}" y2="${ppY}" stroke="${C_PCT}" stroke-width="1.8" stroke-dasharray="6 6"/>`;}
   const wp=weekPct.map((v,i)=>[i,v]).filter(a=>Number.isFinite(a[1]));
-  if(wp.length>1)svg+=`<path d="${wp.map((a,k)=>`${k?'L':'M'} ${xp(a[0])} ${yBand(2,a[1],scaleC.max)}`).join(' ')}" fill="none" stroke="${C_PCT}" stroke-width="1.3" stroke-dasharray="2 4" opacity="0.8"/>`;
+  if(wp.length>1)svg+=`<path d="${wp.map((a,k)=>`${k?'L':'M'} ${xp(a[0])} ${yBand(2,a[1],scaleC.max,scaleCmin)}`).join(' ')}" fill="none" stroke="${C_PCT}" stroke-width="1.3" stroke-dasharray="2 4" opacity="0.8"/>`;
   wp.forEach(([i,v])=>{
-    const py=yBand(2,v,scaleC.max);
+    const py=yBand(2,v,scaleC.max,scaleCmin);
     const prev=i>0&&Number.isFinite(weekPct[i-1])?weekPct[i-1]:null;
     const dev=v-pctPlan;
     let tip=`Маржинальность недели: ${fmtPct(v)}${pctPlan?tipDevPp(dev)+' к плану':''}`;
@@ -691,9 +693,9 @@ function drawChart(boxId,tooltipId,cfg){
     svg+=`<circle class="chart-point${done(i)?'':' wk-open'}" cx="${xp(i)}" cy="${py}" r="${done(i)?4:3}" fill="${C_PCT}" stroke="rgba(28,13,46,0.85)" stroke-width="1.5" data-label="Маржинальность недели ${weekLabels[i]} (${fmtShort(cfg.weeks[i].mo||cfg.weeks[i].start)}–${fmtShort(addDays(cfg.weeks[i].mo||cfg.weeks[i].start,6))})${onDate(i)}" data-value="${tip}"/>`;
     if(done(i))svg+=`<text class="vlbl" x="${xp(i)}" y="${py+17}" text-anchor="middle" font-size="8.5" font-weight="700" fill="${C_PCT}" font-family="Forum">нед. ${fmtPct(v)}</text>`;
   });
-  if(pctVals.length>1){let p=`M ${xp(0)} ${yBand(2,pctVals[0],scaleC.max)}`;pctVals.forEach((v,i)=>{if(i>0)p+=` L ${xp(i)} ${yBand(2,v,scaleC.max)}`;});svg+=`<path d="${p}" fill="none" stroke="${C_PCT}" stroke-width="2" stroke-linecap="round"/>`;}
+  if(pctVals.length>1){let p=`M ${xp(0)} ${yBand(2,pctVals[0],scaleC.max,scaleCmin)}`;pctVals.forEach((v,i)=>{if(i>0)p+=` L ${xp(i)} ${yBand(2,v,scaleC.max,scaleCmin)}`;});svg+=`<path d="${p}" fill="none" stroke="${C_PCT}" stroke-width="2" stroke-linecap="round"/>`;}
   pctVals.forEach((v,i)=>{
-    const py=yBand(2,v,scaleC.max);
+    const py=yBand(2,v,scaleC.max,scaleCmin);
     const dev=v-pctPlan;const bad=done(i)&&dev<0;
     const col=dev>=0?C_UP:C_DOWN;const sg=dev>=0?'+':'−';
     const paren=pctPlan?`(${sg}${Math.abs(dev).toLocaleString('ru-RU',{maximumFractionDigits:1})} п.п.)`:'';
