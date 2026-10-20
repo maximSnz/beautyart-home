@@ -148,6 +148,7 @@
         }
         .tab-glass:hover { background: rgba(255,255,255,.2); }
         .tab-glass.on { background: rgba(255,255,255,.28); border-color: rgba(255,255,255,.55); }
+        .ent-switch { margin-left: auto; }
         .chip-glass {
             display: inline-flex; align-items: center; justify-content: center;
             height: 34px; padding: 0 12px;
@@ -294,6 +295,10 @@
                 <img src="https://i.ibb.co/ZzbPQmQt/IMG-8031.png" alt="Beauty Art Logo" class="logo">
             </a>
             <div class="company-name">Beauty Art</div>
+            <div class="tabs-glass ent-switch" title="Юрлицо: данные главной панели (переключение перезагружает страницу)">
+                <button id="entIp" class="tab-glass" onclick="setEntity('ip')">ИП</button>
+                <button id="entOoo" class="tab-glass" onclick="setEntity('ooo')">ООО</button>
+            </div>
         </div>
 
         <div class="main-layout">
@@ -415,8 +420,22 @@
 
 <script>
 // === константы и доступ ===
-const SUPABASE_URL='https://jvoofakrkhzoblhhuyvr.supabase.co';
-const ANON='sb_publishable_IA4ReUU9xTL7hb_sbsHaFA_LPATJazE';
+// юрлицо: ИП / ООО — своя база и своё разделение товаров по менеджерам (matrixOf как в plan.html юрлица).
+// Выбор — ?e=ip|ooo в адресе, иначе последний выбор (localStorage), иначе ИП; переключение перезагружает страницу.
+const ENTITIES={
+  ip:{name:'ИП',url:'https://jvoofakrkhzoblhhuyvr.supabase.co',anon:'sb_publishable_IA4ReUU9xTL7hb_sbsHaFA_LPATJazE',m1:/^(CAP|GLV|SEAL|RNC)-/},
+  ooo:{name:'ООО',url:'https://jaruwkpugxybwcsalhgr.supabase.co',anon:'sb_publishable_09rFaH3adGXnEO3-cybX9A_eK_mCnW0',m1:/^(CAP|INS|FW|MS|ML|SE)-/}
+};
+let ENT='ip';
+try{const q=new URLSearchParams(location.search).get('e'),ls=localStorage.getItem('ba_home_entity');ENT=ENTITIES[q]?q:(ENTITIES[ls]?ls:'ip');}catch(e){}
+try{localStorage.setItem('ba_home_entity',ENT);}catch(e){}
+function setEntity(e){
+  if(!ENTITIES[e]||e===ENT)return;
+  try{localStorage.setItem('ba_home_entity',e);}catch(x){}
+  const u=new URL(location.href);u.searchParams.set('e',e);location.href=u.toString();
+}
+const SUPABASE_URL=ENTITIES[ENT].url;
+const ANON=ENTITIES[ENT].anon;
 const HD={apikey:ANON,Authorization:'Bearer '+ANON};
 const CHART_DATA={},REAL_CACHE={},DEV_CACHE={};
 const C_UP='#4ade80',C_DOWN='#f87171';
@@ -452,7 +471,7 @@ function generateDemoMonth(mk,weeksCount){
   return {planRub,planRev,planPct,factRub,factPct,ordersDaily,real:false};
 }
 
-// === реальные данные ИП: план месяца + CF-факты недель (СУММА по товарам) + PNL-дни ===
+// === реальные данные юрлица: план месяца + CF-факты недель (СУММА по товарам) + PNL-дни ===
 async function loadRealMonth(mk){
   if(REAL_CACHE[mk])return REAL_CACHE[mk];
   const [y,m]=mk.split('-').map(Number);
@@ -724,7 +743,7 @@ async function renderMonth(mk){
   const [y,m]=mk.split('-').map(Number);
   const mondays=calWeeksOfMonth(y,m);
   let data=CHART_DATA[mk];
-  if(!data){try{data=await loadRealMonth(mk);}catch(e){console.error('данные ИП недоступны:',e);const box=document.getElementById('chartBoxRub');box.querySelectorAll('svg').forEach(el=>el.remove());const msg=String(e.message).replace(/[<>&]/g,'');box.insertAdjacentHTML('beforeend',`<svg viewBox="0 0 900 470" xmlns="http://www.w3.org/2000/svg"><text x="450" y="235" text-anchor="middle" font-size="14" fill="#ffd7dd" font-family="Forum">Ошибка загрузки: ${msg}</text></svg>`);return;}}
+  if(!data){try{data=await loadRealMonth(mk);}catch(e){console.error('данные '+ENTITIES[ENT].name+' недоступны:',e);const box=document.getElementById('chartBoxRub');box.querySelectorAll('svg').forEach(el=>el.remove());const msg=String(e.message).replace(/[<>&]/g,'');box.insertAdjacentHTML('beforeend',`<svg viewBox="0 0 900 470" xmlns="http://www.w3.org/2000/svg"><text x="450" y="235" text-anchor="middle" font-size="14" fill="#ffd7dd" font-family="Forum">Ошибка загрузки: ${msg}</text></svg>`);return;}}
   if(!data)data=generateDemoMonth(mk,getWeeksInMonth(y,m-1).length);
   const today=new Date();today.setHours(0,0,0,0);
   const mStartMs=new Date(y,m-1,1).getTime(),mEndMs=new Date(y,m,0).getTime();
@@ -807,8 +826,8 @@ async function renderMonth(mk){
 // === «Поиск отклонений»: выручка PNL вчера/позавчера и 7 дн/пред. 7 дн, группы по маржинальности CF и ДРР ===
 const STOCK_DAYS=4; // день с остатком: товара хватает на 4 дня продаж по плану
 const DRR_LIMIT=8,MARGIN_FLOOR=5;
-// менеджеры — как matrixOf в plan.html ИП (у ООО префиксы другие — при добавлении ООО брать его правило)
-function matrixOf(offer){ return (/^(CAP|GLV|SEAL|RNC)-/.test(offer))?'m1':'m2'; }
+// менеджеры — как matrixOf в plan.html выбранного юрлица (ENTITIES[ENT].m1 — префиксы Ильи, остальные — Ольга)
+function matrixOf(offer){ return ENTITIES[ENT].m1.test(offer)?'m1':'m2'; }
 const DEV_MANAGERS={all:'Все',m1:'Илья',m2:'Ольга'};
 // группировка верхнего уровня: по знаку отклонения (как раньше) или по дате контроля из заметки РОПа
 const DEV_GMODES={dev:'по отклонению',date:'по дате контроля'};
@@ -1352,7 +1371,7 @@ function showFin(){
   applyAnnotations();
   buildMonthOptions();
 }
-document.addEventListener('DOMContentLoaded',()=>{ showFin(); });
+document.addEventListener('DOMContentLoaded',()=>{ document.getElementById(ENT==='ooo'?'entOoo':'entIp').classList.add('on'); document.title=document.title.replace(/( — (ИП|ООО))?$/,' — '+ENTITIES[ENT].name); showFin(); });
 </script>
 </body>
 </html>
