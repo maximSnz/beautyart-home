@@ -181,7 +181,7 @@
             position: absolute; display: none; pointer-events: none;
             background: rgba(28, 13, 46, 0.92); color: white; padding: 8px 12px; border-radius: 8px;
             font-family: 'Forum', serif; font-size: 0.85em; line-height: 1.4;
-            transform: translate(-50%, -100%); white-space: nowrap;
+            transform: translate(-50%, -100%); white-space: normal; max-width: 360px; width: max-content;
             box-shadow: 0 4px 12px rgba(28, 13, 46, 0.4); z-index: 5;
             backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
         }
@@ -386,7 +386,8 @@
                     <div class="legend-bottom" id="legendBottom">
                         <div class="legend-col">
                             <div class="legend-item"><span class="sw dash-white"></span>План маржи в день (CF)</div>
-                            <div class="legend-item"><span class="sw solid-white"></span>Маржа за день (CF)</div>
+                            <div class="legend-item"><span class="sw solid-white"></span>Прогноз закрытия маржи ÷ дней месяца (CF)</div>
+                            <div class="legend-item"><span class="sw solid-plum"></span>Маржа за день (CF)</div>
                         </div>
                         <div class="legend-col">
                             <div class="legend-item"><span class="sw dash-yellow"></span>План маржинальности</div>
@@ -395,7 +396,8 @@
                         </div>
                         <div class="legend-col">
                             <div class="legend-item"><span class="sw dash-teal"></span>План выручки в день (PNL)</div>
-                            <div class="legend-item"><span class="sw solid-teal"></span>Выручка за день (PNL)</div>
+                            <div class="legend-item"><span class="sw solid-teal"></span>Прогноз закрытия выручки ÷ дней месяца (PNL)</div>
+                            <div class="legend-item"><span class="sw solid-plum"></span>Выручка за день (PNL)</div>
                             <div class="legend-item"><span class="sw pale-blue"></span>Заказы, шт (PNL, день)</div>
                             <div class="legend-item"><span class="sw dash-paleblue"></span>Средний темп продаж, шт/день (PNL)</div>
                         </div>
@@ -530,12 +532,12 @@ function drawChart(boxId,tooltipId,cfg){
   const fin=a=>a.filter(v=>Number.isFinite(v));
   const revDay=cfg.revDay||[],marDay=cfg.marDay||[],planRevDay=cfg.planRevDay||0,planMarDay=cfg.planMarDay||0;
   // маржа за день бывает отрицательной — шкала полосы маржи от min (≤ 0) до max
-  const scaleB=niceScale(Math.max(planMarDay,...marDay.map(p=>p.v),1));
+  const scaleB=niceScale(Math.max(planMarDay,...marDay.map(p=>p.v),...marDay.filter(p=>p.fc!=null).map(p=>p.fc/(cfg.dim||30)),1));
   const minB=Math.min(0,...marDay.map(p=>p.v));const scaleBmin=minB<0?-niceScale(-minB,2).max:0;
   const weekPct=cfg.weekPct||[],revPace=cfg.revPace||[],marPace=cfg.marPace||[];
   const scaleC=niceScale(Math.max(pctPlan,...fin(pctVals),...fin(weekPct)));
   const revFactDaily=cfg.revFactDaily||[],revFcDaily=cfg.revFcDaily||[];
-  const scaleA=niceScale(Math.max(planRevDay,...revDay.map(p=>p.v),1));
+  const scaleA=niceScale(Math.max(planRevDay,...revDay.map(p=>p.v),...revDay.filter(p=>p.fc!=null).map(p=>p.fc/(cfg.dim||30)),1));
   const avgPcs=ordersDaily.length?ordersDaily.reduce((s,o)=>s+o.pcs,0)/ordersDaily.length:0;
   const scaleD=Math.max(...ordersDaily.map(o=>o.pcs),avgPcs,1);
 
@@ -598,11 +600,27 @@ function drawChart(boxId,tooltipId,cfg){
   if(avgPcs>0){const ay=yBand(0,avgPcs,scaleD);svg+=`<line x1="${padL}" y1="${ay}" x2="${plotRight}" y2="${ay}" stroke="${C_ORD}" stroke-width="1.5" stroke-dasharray="4 5" opacity="0.85"/>`;}
   // суточная полоса: факт дня (линия + точки), план дня (пунктир); подписи недель — средний темп ₽/день закрытой недели
   const wd=t=>['вс','пн','вт','ср','чт','пт','сб'][new Date(t).getDay()];
+  // суточная полоса: факт дня — сиреневый; план дня — пунктир цвета полосы; прогноз закрытия месяца «в пересчёте на день»
+  // (прогноз ÷ дней месяца — на той же оси, что план дня) — сплошная линия цвета полосы; подписи прогноза — по концам закрытых недель
+  const DM=cfg.dim||30;
   const daySeries=(ser,band,max,min,color,planDay,label,planMonth)=>{
     let o='';
     if(planDay>0){const py=yBand(band,planDay,max,min);o+=`<line x1="${padL}" y1="${py}" x2="${plotRight}" y2="${py}" stroke="${color}" stroke-width="1.8" stroke-dasharray="6 6" opacity="0.9"/>`;}
     if(min<0){const zy=yBand(band,0,max,min);o+=`<line x1="${padL}" y1="${zy}" x2="${plotRight}" y2="${zy}" stroke="${BASELINE}" stroke-width="1" opacity="0.5"/>`;}
-    if(ser.length>1)o+=`<path d="${ser.map((p,k)=>`${k?'L':'M'} ${xDay(p.t).toFixed(1)} ${yBand(band,p.v,max,min).toFixed(1)}`).join(' ')}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+    const fcs=ser.filter(p=>p.fc!=null);
+    if(fcs.length>1)o+=`<path d="${fcs.map((p,k)=>`${k?'L':'M'} ${xDay(p.t).toFixed(1)} ${yBand(band,p.fc/DM,max,min).toFixed(1)}`).join(' ')}" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`;
+    if(ser.length>1)o+=`<path d="${ser.map((p,k)=>`${k?'L':'M'} ${xDay(p.t).toFixed(1)} ${yBand(band,p.v,max,min).toFixed(1)}`).join(' ')}" fill="none" stroke="${C_FACT}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>`;
+    const fcTip=p=>{const d2=p.fc-planMonth;return `Прогноз закрытия: ${fmtRub(p.fc)}${planMonth>0?tipDev(d2,v=>fmtRubShort(v),d2/planMonth*100)+' к плану месяца':''} • в пересчёте на день: ${fmtRub(Math.round(p.fc/DM))}${planDay>0?' (план дня '+fmtRub(Math.round(planDay))+')':''} • Накопительно: ${fmtRub(Math.round(p.cum))}`;};
+    // концы закрытых недель (воскресенье или последний день месяца) — подпись прогноза закрытия
+    const weekEnd=new Set(weeks.filter((w,i)=>done(i)).map(w=>w.end.getTime()));
+    fcs.forEach(p=>{
+      const px=xDay(p.t),py=yBand(band,p.fc/DM,max,min),end=weekEnd.has(p.t);
+      const d2=p.fc-planMonth,bad=planMonth>0&&d2<0;
+      o+=`<circle class="chart-point" cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${end?5:2.5}" fill="rgba(28,13,46,0.85)" stroke="${bad?C_DOWN:color}" stroke-width="${end?2.5:1.5}" data-label="Прогноз закрытия, ${fmtShort(new Date(p.t))} (${wd(p.t)})" data-value="${fcTip(p)}"/>`;
+      if(end&&planMonth>0){const col=d2>=0?C_UP:C_DOWN,sg=d2>=0?'+':'−';
+        let ly=py-19;if(ly<qTop(band)+10)ly=py+16;
+        o+=`<text class="vlbl" x="${px.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" font-size="9" font-weight="700" fill="${color}" font-family="Forum">${fmtRubShort(p.fc)}<tspan x="${px.toFixed(1)}" dy="10" font-size="8.5" fill="${col}">(${sg}${fmtRubShort(Math.abs(d2))} / ${sg}${Math.abs(d2/planMonth*100).toLocaleString('ru-RU',{maximumFractionDigits:1})}%)</tspan></text>`;}
+    });
     ser.forEach(p=>{
       const dv=p.v-planDay;
       let tip=`${label} за день: ${fmtRub(Math.round(p.v))}${planDay>0?' • к плану дня'+tipDev(dv,v=>fmtRubShort(v),dv/planDay*100):''}`;
@@ -610,7 +628,7 @@ function drawChart(boxId,tooltipId,cfg){
       if(planMonth>0)tip+=` • План месяца: ${fmtRub(Math.round(planMonth))}`;
       if(p.fc!=null){const d2=p.fc-planMonth;tip+=` • Прогноз закрытия: ${fmtRub(p.fc)}${planMonth>0?tipDev(d2,v=>fmtRubShort(v),d2/planMonth*100):''}`;}
       const bad=planDay>0&&p.v<planDay;
-      o+=`<circle class="chart-point" cx="${xDay(p.t).toFixed(1)}" cy="${yBand(band,p.v,max,min).toFixed(1)}" r="3.2" fill="${bad?C_DOWN:color}" stroke="rgba(28,13,46,0.85)" stroke-width="1" data-label="${label}, ${fmtShort(new Date(p.t))} (${wd(p.t)})" data-value="${tip}"/>`;
+      o+=`<circle class="chart-point" cx="${xDay(p.t).toFixed(1)}" cy="${yBand(band,p.v,max,min).toFixed(1)}" r="3" fill="${bad?C_DOWN:C_FACT}" stroke="rgba(28,13,46,0.85)" stroke-width="1" data-label="${label}, ${fmtShort(new Date(p.t))} (${wd(p.t)})" data-value="${tip}"/>`;
     });
     return o;
   };
@@ -682,7 +700,7 @@ function drawChart(boxId,tooltipId,cfg){
 
   box.querySelectorAll('.chart-point').forEach(pt=>{
     pt.dataset.r0=pt.getAttribute('r');
-    const show=()=>{const b=box.getBoundingClientRect(),r=pt.getBoundingClientRect();tooltip.innerHTML=`<strong>${pt.dataset.label}</strong>${pt.dataset.value}`;tooltip.style.display='block';tooltip.style.left=(r.left-b.left+r.width/2)+'px';tooltip.style.top=(r.top-b.top-8)+'px';pt.setAttribute('r',String(parseFloat(pt.dataset.r0)+2));};
+    const show=()=>{const b=box.getBoundingClientRect(),r=pt.getBoundingClientRect();tooltip.innerHTML=`<strong>${pt.dataset.label}</strong>${String(pt.dataset.value).split(' • ').join('<br>')}`;tooltip.style.display='block';const tw=tooltip.offsetWidth,th=tooltip.offsetHeight,cx=r.left-b.left+r.width/2;tooltip.style.left=Math.min(Math.max(cx,tw/2+4),b.width-tw/2-4)+'px';const ty=r.top-b.top-8;tooltip.style.top=(ty-th<0?r.bottom-b.top+th+8:ty)+'px';pt.setAttribute('r',String(parseFloat(pt.dataset.r0)+2));};
     const hide=()=>{tooltip.style.display='none';pt.setAttribute('r',pt.dataset.r0);};
     pt.addEventListener('mouseenter',show);pt.addEventListener('mouseleave',hide);
     pt.addEventListener('touchstart',e=>{e.preventDefault();show();});
@@ -770,7 +788,7 @@ async function renderMonth(mk){
   const revDay=[],marDay=[];
   {let cr=0;(data.ordersDaily||[]).filter(o=>o.t>=mStartMs&&o.t<=Math.min(mEndMs,D.getTime())).forEach(o=>{cr+=o.rub;const E=effRange(mFirst,new Date(o.t));revDay.push({t:o.t,v:o.rub,cum:cr,fc:E>0?Math.round(cr/E*T):null});});}
   {let cm=0;(data.cfDaily||[]).filter(o=>o.t>=mStartMs&&o.t<=Math.min(mEndMs,D.getTime())).forEach(o=>{cm+=o.mar;const E=effRange(mFirst,new Date(o.t));marDay.push({t:o.t,v:o.mar,cum:cm,fc:E>0?Math.round(cm/E*T):null});});}
-  drawChart('chartBoxRub','tooltipRub',{revDay,marDay,planRevDay,planMarDay,hasCfDaily:!!data.cfDaily,weeks,weekLabels,plan:data.planRub,pctPlan:data.planPct,planRev:data.planRev||0,lineValues:fc,factValues:cum,factWeekly,pctValues:pctVals,ordersDaily,revForecast:fcRev,revFact:cumRev,revWeekly:weekRev,revFactDaily,revFcDaily,asOf:D,weekPct,revPace,marPace});
+  drawChart('chartBoxRub','tooltipRub',{dim:DM,revDay,marDay,planRevDay,planMarDay,hasCfDaily:!!data.cfDaily,weeks,weekLabels,plan:data.planRub,pctPlan:data.planPct,planRev:data.planRev||0,lineValues:fc,factValues:cum,factWeekly,pctValues:pctVals,ordersDaily,revForecast:fcRev,revFact:cumRev,revWeekly:weekRev,revFactDaily,revFcDaily,asOf:D,weekPct,revPace,marPace});
 }
 
 // === вкладка «Поиск отклонений» (до 20.10.2026 — «Ключевые отклонения») ===
