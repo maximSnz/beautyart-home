@@ -271,6 +271,16 @@
         .dev-neutral { color: rgba(255,255,255,.6); }
 
         .hide { display: none !important; }
+        /* вход — как в plan.html */
+        .login-box{max-width:400px;margin:60px auto;background:#fff;border-radius:16px;padding:40px;box-shadow:0 10px 40px rgba(28,13,46,.3);border:2px solid rgba(84,66,115,.2);text-align:center;box-sizing:border-box}
+        .login-logo{width:80px;height:auto;margin-bottom:15px}
+        .login-title{font-family:'Forum',serif;font-size:1.8em;color:#1C0D2E;margin-bottom:10px}
+        .login-subtitle{color:#666;font-size:.95em;margin-bottom:25px;font-family:'Forum',serif}
+        .password-input{width:100%;padding:14px 16px;border:2px solid rgba(84,66,115,.2);border-radius:10px;font-size:1em;font-family:'Forum',serif;margin-bottom:15px;box-sizing:border-box}
+        .password-input:focus{outline:none;border-color:#E33D78}
+        .login-btn{width:100%;padding:14px;background:linear-gradient(135deg,#78A6C7,#E33D78);color:#fff;border:none;border-radius:10px;font-size:1.05em;font-family:'Forum',serif;cursor:pointer;transition:all .3s}
+        .login-btn:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(227,61,120,.4)}
+        .error-message{display:none;color:#E33D78;font-size:.9em;margin-top:15px;font-family:'Forum',serif}
 
         @media (max-width: 1100px) { .main-layout { grid-template-columns: 260px 1fr; } }
         @media (max-width: 900px) {
@@ -297,7 +307,17 @@
             <div class="company-name">Beauty Art</div>
         </div>
 
-        <div class="main-layout">
+        <div class="login-box hide" id="login">
+            <img src="https://i.ibb.co/ZzbPQmQt/IMG-8031.png" alt="Beauty Art Logo" class="login-logo">
+            <div class="login-title">Закрытый раздел</div>
+            <div class="login-subtitle">Введите почту и пароль для доступа</div>
+            <input type="email" id="email" class="password-input" placeholder="Почта" autocomplete="username" onkeypress="if(event.key==='Enter')go()">
+            <input type="password" id="pwd" class="password-input" placeholder="Пароль" autocomplete="current-password" onkeypress="if(event.key==='Enter')go()">
+            <button class="login-btn" onclick="go()">Войти</button>
+            <div class="error-message" id="errorMessage"></div>
+        </div>
+
+        <div class="main-layout hide" id="app">
             <!-- ЛЕВОЕ МЕНЮ -->
             <aside class="sidebar">
                 <details class="menu-section">
@@ -418,6 +438,7 @@
         </div>
     </div>
 
+<script src="auth.js?v=20261021"></script>
 <script>
 // === константы и доступ ===
 // юрлицо: ИП / ООО — своя база и своё разделение товаров по менеджерам (matrixOf как в plan.html юрлица).
@@ -1367,13 +1388,19 @@ function toggleFull(){
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&FULL)toggleFull();});
 window.addEventListener('resize',()=>{if(FULL){const c=document.getElementById('finCard');c.classList.remove('full-anim');c.style.width=(innerWidth-24)+'px';c.style.height=(innerHeight-24)+'px';}});
 
-// === финансовый раздел: без пароля ===
+// === вход (auth.js — общий для всех страниц); после входа — финансовый раздел ===
+async function go(){
+  if(!await BA_AUTH.login(SUPABASE_URL,HD)){document.getElementById('login').classList.remove('hide');document.getElementById('pwd').value='';return;}
+  document.getElementById('login').classList.add('hide');
+  document.getElementById('app').classList.remove('hide');
+  showFin();
+}
 function showFin(){
   document.getElementById('finCard').classList.remove('hide');
   applyAnnotations();
   buildMonthOptions();
 }
-document.addEventListener('DOMContentLoaded',()=>{ document.getElementById(ENT==='ooo'?'entOoo':'entIp').classList.add('on'); document.title=document.title.replace(/( — (ИП|ООО))?$/,' — '+ENTITIES[ENT].name); showFin(); });
+document.addEventListener('DOMContentLoaded',()=>{ document.getElementById(ENT==='ooo'?'entOoo':'entIp').classList.add('on'); document.title=document.title.replace(/( — (ИП|ООО))?$/,' — '+ENTITIES[ENT].name); if(BA_AUTH.has(SUPABASE_URL))go(); else document.getElementById('login').classList.remove('hide'); });
 </script>
 </body>
 </html>
