@@ -182,7 +182,7 @@
                         <li>Сигналы (против границ выбранной базы): точка за ±3σ; 2 из 3 подряд за ±2σ с одной стороны; 7 подряд по одну сторону от CL; 6 подряд растут или падают.</li>
                         <li>Меньше 20 точек в базе — границы предварительные: с каждой новой точкой они уточняются.</li>
                         <li>Средняя цена (PNL) — Σ выручка ÷ Σ заказы, шт (<code>product_sales.qty</code>).</li>
-                        <li><b>Рекомендуемый план месяца</b> — по границам выбранного шага и базы: цель = медиана + ползунок × (UCL − медиана). Выручка и маржа за месяц = значение дня-будня × эфф. дни месяца (будни + 0,7 × выходные) или значение недели ÷ 6,4 × эфф. дни; маржинальность и цена — без пересчёта. Маржа — по своей карте (факт CF), а не «выручка × маржинальность»: выручка PNL — это заказы, а маржинальность CF — от GMV начислений. Заказы = выручка ÷ цена.</li>
+                        <li><b>Рекомендуемый план месяца</b> — по границам выбранного шага и базы; два ползунка: выручка и маржинальность, цель = медиана + ползунок × (UCL − медиана). Выручка за месяц = значение дня-будня × эфф. дни месяца (будни + 0,7 × выходные) или значение недели ÷ 6,4 × эфф. дни; маржинальность — без пересчёта. Маржа = выручка × маржинальность × κ, где κ = ΣGMV ÷ Σвыручка PNL в базе (маржинальность CF — от GMV, выручка PNL — заказы); коридор маржи — по её собственной карте, для сверки. Заказы, шт = выручка ÷ цена плана (нет плана — цена товара).</li>
                         <li>Действующий план — <code>sales_plan</code> месяца, неархивные товары, как «Итого» в plan.html и на главной: выручка = Σ план, шт × цена; маржинальность = Σ(выручка × маржинальность) ÷ Σ выручка; цена = выручка ÷ Σ план, шт. «Где план в коридоре» — в сигмах от медианы и в % пути до UCL.</li>
                     </ul>
                 </details>
@@ -426,6 +426,9 @@ function rebuildPlan(g){
   return g;
 }
 // === правка плана товара: сразу в sales_plan, как editField в plan.html (те же поля и upsert) ===
+// κ — доля GMV CF в выручке PNL за точки базы (будни): маржинальность CF — от GMV, выручка PNL — заказы;
+// маржа = выручка × маржинальность × κ (при медианах ≈ медиане маржи)
+function kappaOf(P,ra){let g=0,r=0;P.forEach((x,i)=>{if(i<ra[0]||i>ra[1]||x.we||x.rev==null||x.revn==null)return;g+=x.revn;r+=x.rev;});return r>0?g/r:null;}
 const curMonth=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;};
 const planEditable=()=>PLAN_MK>=curMonth();   // прошлые месяцы — только просмотр
 const PLAN_FIELDS={plan_qty:'План, шт',price:'Цена продажи, ₽',margin_pct:'План маржинальность, %'};
@@ -455,9 +458,9 @@ function editPlan(td,b,pidStr,field){
   inp.addEventListener('keydown',e=>{if(e.key==='Enter')finish(true);else if(e.key==='Escape')finish(false);});
   inp.addEventListener('blur',()=>finish(true));
 }
-// цель по каждому показателю: % пути от медианы до UCL (0 — медиана); заказы — расчёт из выручки и цены
-const T_KEYS=[['rev','Выручка'],['mar','Маржа'],['pct','Маржинальность'],['price','Цена']];
-let PLAN_MK=null,PLAN_T={rev:0,mar:0,pct:0,price:0};
+// цель: % пути от медианы до UCL (0 — медиана) — у выручки и маржинальности; маржа и заказы — расчёт из них
+const T_KEYS=[['rev','Выручка'],['pct','Маржинальность']];
+let PLAN_MK=null,PLAN_T={rev:0,pct:0};
 try{const s=JSON.parse(localStorage.getItem('ba_shewhart_plan')||'{}');if(Number.isFinite(s.t))T_KEYS.forEach(([k])=>PLAN_T[k]=s.t);if(s.ts)T_KEYS.forEach(([k])=>{if(Number.isFinite(s.ts[k]))PLAN_T[k]=s.ts[k];});}catch(e){}
 function monthOptions(){const d=new Date();d.setDate(1);const out=[];for(let k=-1;k<=2;k++){const x=new Date(d.getFullYear(),d.getMonth()+k,1);out.push(`${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}`);}return out;}
 const MONTHS_RU=['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
@@ -506,22 +509,23 @@ async function renderPlan(fast){
   }
   document.getElementById('planMonth').value=PLAN_MK;
   const ra=baseRange(),eff=effDaysOfMonth(PLAN_MK),k=STEP==='day'?eff:eff/WEEK_EFF,t={};T_KEYS.forEach(([x])=>t[x]=PLAN_T[x]/100);
-  // суммы (выручка, маржа) — × коэффициент месяца; маржинальность и цена — без пересчёта
+  // суммы (выручка, маржа) — × коэффициент месяца; маржинальность — без пересчёта
   const lim=key=>{const {L}=limitsFor(key,P,ra);if(!L)return null;const f=key==='rev'||key==='mar'?k:1;return {cl:L.cl*f,ucl:L.ucl*f,lcl:L.lcl*f,sigma:L.sigma*f,n:L.n};};
-  const cR=lim('rev'),cM=lim('mar'),cP=lim('pct'),cC=lim('price');
+  const cR=lim('rev'),cM=lim('mar'),cP=lim('pct');
   const rec=(c,key)=>c?c.cl+t[key]*(c.ucl-c.cl):null;
-  const rR=rec(cR,'rev'),rM=rec(cM,'mar'),rP=rec(cP,'pct'),rC=rec(cC,'price');
+  const kap=kappaOf(P,ra);
+  const rR=rec(cR,'rev'),rP=rec(cP,'pct'),rM=rR!=null&&rP!=null&&kap!=null?rR*rP/100*kap:null;
   const has=plan.n>0,pR=has?plan.rev:null,pP=has&&plan.rev>0?plan.mar/plan.rev*100:null,pC=has&&plan.qty>0?plan.rev/plan.qty:null;
   const delta=(p,r,f,isPct)=>p==null||r==null?'—':(isPct?`${p>=r?'+':''}${(p-r).toLocaleString('ru-RU',{maximumFractionDigits:1})} п.п.`:`${p>=r?'+':''}${f(p-r)} (${p>=r?'+':''}${((p/r-1)*100).toLocaleString('ru-RU',{maximumFractionDigits:1})}%)`);
   const row=(name,c,r,p,f,isPct)=>`<tr><td>${name}</td><td class="num">${r!=null?f(r):'—'}</td><td class="muted">${c?f(c.lcl)+' – '+f(c.ucl):'—'}</td><td class="num">${p!=null?f(p):'—'}</td><td>${delta(p,r,f,isPct)}</td><td>${p!=null?placeText(p,c):'<span class="muted">плана нет</span>'}</td><td>${c&&r!=null?scaleSVG(c,r,p):''}</td></tr>`;
-  // маржа — по своей карте (факт CF), не «выручка PNL × маржинальность CF»: у них разные базы (заказы и GMV начислений)
-  const qR=rR!=null&&rC>0?rR/rC:null,qP=has?plan.qty:null,pM=has?plan.mar:null;
-  const rowD=(name,r,p,f)=>`<tr class="derived"><td>${name}</td><td class="num">${r!=null?f(r):'—'}</td><td class="muted">расчёт</td><td class="num">${p!=null?f(p):'—'}</td><td>${delta(p,r,f,false)}</td><td colspan="2" class="muted">= выручка ÷ цена</td></tr>`;
+  // заказы, шт = рекомендуемая выручка ÷ цена плана (средняя по плану месяца)
+  const qR=rR!=null&&pC>0?rR/pC:null,qP=has?plan.qty:null,pM=has?plan.mar:null;
+  const rowD=(name,r,p,f)=>`<tr class="derived"><td>${name}</td><td class="num">${r!=null?f(r):'—'}</td><td class="muted">расчёт</td><td class="num">${p!=null?f(p):'—'}</td><td>${delta(p,r,f,false)}</td><td colspan="2" class="muted">= выручка ÷ цена плана${pC?' ('+fC(pC)+')':''}</td></tr>`;
   const fR=v=>fmtRub(v),fP=v=>fmtPct(v),fC=v=>v.toLocaleString('ru-RU',{maximumFractionDigits:0})+' ₽';
   const baseTxt=`${STEP==='day'?'дни':'недели'} ${labelOf(P[ra[0]])} … ${labelOf(P[ra[1]])}`;
-  document.getElementById('planBody').innerHTML=`<div class="muted" style="font-size:.92em;margin-bottom:8px">${ENT==='all'?'ИП + ООО':BASES[ENT].name} · база границ: ${baseTxt} · эфф. дней в месяце ${eff.toLocaleString('ru-RU',{maximumFractionDigits:1})} (будни + 0,7 × выходные)${has?'':' · <span class="warn">плана на '+monthName(PLAN_MK)+' нет</span>'}</div>
+  document.getElementById('planBody').innerHTML=`<div class="muted" style="font-size:.92em;margin-bottom:8px">${ENT==='all'?'ИП + ООО':BASES[ENT].name} · база границ: ${baseTxt} · эфф. дней в месяце ${eff.toLocaleString('ru-RU',{maximumFractionDigits:1})} (будни + 0,7 × выходные) · κ (GMV ÷ выручка PNL в базе) ${kap!=null?kap.toLocaleString('ru-RU',{maximumFractionDigits:3}):'—'}${has?'':' · <span class="warn">плана на '+monthName(PLAN_MK)+' нет</span>'}</div>
     <div class="tbl-wrap" style="max-height:none"><table class="plan-tbl"><tr><th>Показатель</th><th>Рекомендуемый</th><th>Коридор LCL – UCL</th><th>Действующий план</th><th>План − рекоменд.</th><th>Где план в коридоре</th><th><span style="color:${C_CL}">▲</span> рекоменд. · <span style="color:#E33D78">●</span> план</th></tr>
-      ${row('Выручка (заказы, PNL)',cR,rR,pR,fR,false)}${row('Маржа (CF), ₽',cM,rM,pM,fR,false)}${row('Маржинальность (CF)',cP,rP,pP,fP,true)}${row('Средняя цена (PNL)',cC,rC,pC,fC,false)}
+      ${row('Выручка (заказы, PNL)',cR,rR,pR,fR,false)}${row('Маржинальность (CF)',cP,rP,pP,fP,true)}${row('Маржа (CF), ₽ <span class="muted">= выручка × маржин. × κ; коридор — карта маржи</span>',cM,rM,pM,fR,false)}
       ${rowD('Заказы, шт',qR,qP,fmtQty)}</table></div>`;
   renderProducts(ents,ps,k,t,ra);
 }
@@ -555,12 +559,14 @@ function prodPoints(D,pid){
 const sumPoints=list=>list[0].map((x,i)=>{const s=list.map(p=>p[i]),nn=f=>s.every(y=>y[f]==null)?null:s.reduce((a,y)=>a+(y[f]||0),0);
   return {key:x.key,we:x.we,rev:nn('rev'),qty:s.reduce((a,y)=>a+y.qty,0),mar:nn('mar'),revn:nn('revn'),prov:s.some(y=>y.prov)};});
 // рекомендация и план одной позиции (товар или группа перчаток)
-function itemCalc(P,plan,k,t,ra){
+// price — цена для перевода выручки в шт: цена плана товара (нет плана — цена товара)
+function itemCalc(P,plan,k,t,ra,price){
   const lim=key=>{const {L}=limitsFor(key,P,ra);if(!L)return null;const f=key==='rev'||key==='mar'?k:1;return {cl:L.cl*f,ucl:L.ucl*f,lcl:L.lcl*f,sigma:L.sigma*f};};
   const rec=(c,key)=>c?c.cl+t[key]*(c.ucl-c.cl):null;
-  const c={rev:lim('rev'),mar:lim('mar'),pct:lim('pct'),price:lim('price')},r={};
-  Object.keys(c).forEach(x=>r[x]=rec(c[x],x));
-  r.qty=r.rev!=null&&r.price>0?r.rev/r.price:null;
+  const c={rev:lim('rev'),mar:lim('mar'),pct:lim('pct')},r={rev:rec(c.rev,'rev'),pct:rec(c.pct,'pct')};
+  const kap=kappaOf(P,ra);
+  r.mar=r.rev!=null&&r.pct!=null&&kap!=null?r.rev*r.pct/100*kap:null;
+  r.qty=r.rev!=null&&price>0?r.rev/price:null;
   const p=plan?{rev:plan.rev,mar:plan.mar,qty:plan.qty,pct:plan.rev>0?plan.mar/plan.rev*100:null,price:plan.qty>0?plan.rev/plan.qty:null}:null;
   const base=P.slice(ra[0],ra[1]+1).reduce((s,x)=>s+(x.rev||0),0);
   return {c,r,p,base};
@@ -591,7 +597,7 @@ function renderProducts(ents,plans,k,t,ra){
     card.dataset.ready='1';
   }
   document.getElementById('prMgr').value=PR.mgr;document.getElementById('prSort').value=PR.sort;
-  document.getElementById('prHint').innerHTML=planEditable()?`<span class="ed-mark">✎</span> План, шт, цену и маржинальность товара можно изменить — нажмите на ячейку плана; правка <b>сразу сохраняется в план ${monthName(PLAN_MK)}</b> (plan.html). Группы перчаток — правка по размерам.`
+  document.getElementById('prHint').innerHTML=planEditable()?`<span class="ed-mark">✎</span> Маржинальность, план, шт и цену плана товара можно изменить — нажмите на ячейку плана; правка <b>сразу сохраняется в план ${monthName(PLAN_MK)}</b> (plan.html). Группы перчаток — правка по размерам.`
     :`План ${monthName(PLAN_MK)} — прошлый месяц, только просмотр.`;
   // позиции: неархивные товары с планом на месяц или продажами в базе; перчатки от 2 товаров — группой
   let items=[];
@@ -599,8 +605,9 @@ function renderProducts(ents,plans,k,t,ra){
     const D=DATA[b];if(!D)return;const plan=plans[bi];
     const list=[];
     D.prods.forEach(p=>{if(p.archived||!p.offer_id)return;
-      const P=prodPoints(D,p.product_id),pl=plan.byPid.get(p.product_id)||null;
-      const it={b,pid:p.product_id,offer:p.offer_id,P,plan:pl,...itemCalc(P,pl,k,t,ra)};
+      const P=prodPoints(D,p.product_id),pl=plan.byPid.get(p.product_id)||null,raw=plan.raw.get(p.product_id);
+      const price=raw&&raw.price>0?raw.price:plan.priceOf.get(p.product_id)||0;
+      const it={b,pid:p.product_id,offer:p.offer_id,P,plan:pl,price,...itemCalc(P,pl,k,t,ra,price)};
       if(pl||it.base>0)list.push(it);});
     const fam=new Map();
     list.forEach(it=>{const f=gloveFamily(it.offer);if(!f){items.push(it);return;}if(!fam.has(f))fam.set(f,[]);fam.get(f).push(it);});
@@ -608,7 +615,8 @@ function renderProducts(ents,plans,k,t,ra){
       if(mem.length<2){items.push(mem[0]);return;}
       const P=sumPoints(mem.map(m=>m.P)),pls=mem.filter(m=>m.plan).map(m=>m.plan);
       const pl=pls.length?{rev:pls.reduce((s,x)=>s+x.rev,0),qty:pls.reduce((s,x)=>s+x.qty,0),mar:pls.reduce((s,x)=>s+x.mar,0)}:null;
-      items.push({b,group:true,gkey:b+':'+f,offer:f,members:mem,P,plan:pl,...itemCalc(P,pl,k,t,ra)});
+      const price=pl&&pl.qty>0?pl.rev/pl.qty:mem.reduce((s,m)=>s+m.price,0)/mem.length;
+      items.push({b,group:true,gkey:b+':'+f,offer:f,members:mem,P,plan:pl,price,...itemCalc(P,pl,k,t,ra,price)});
     });
   });
   const q=PR.q.trim().toUpperCase();
@@ -628,9 +636,9 @@ function renderProducts(ents,plans,k,t,ra){
     return `<td class="ed" title="${PLAN_FIELDS[f]} — нажмите, чтобы изменить (сохраняется сразу в план)" onclick="editPlan(this,'${it.b}','${esc(it.pid)}','${f}')">${shown}</td>`;};
   const tr=(it,cls,label)=>`<tr class="${cls}"${it.group?` onclick="togglePr('${it.gkey}')" style="cursor:pointer"`:''}><td>${label}${ent(it.b)}</td>`+
     `<td class="num">${fR(it.r.rev)}</td><td>${fR(it.p&&it.p.rev)}</td><td>${placeTag(it.p&&it.p.rev,it.c.rev)}</td>`+
+    `<td class="num">${fP(it.r.pct)}</td>${ed(it,'margin_pct',fP(it.p&&it.p.pct))}`+
     `<td class="num">${fR(it.r.mar)}</td><td>${fR(it.p&&it.p.mar)}</td><td>${placeTag(it.p&&it.p.mar,it.c.mar)}</td>`+
-    `<td class="num">${fP(it.r.pct)}</td>${ed(it,'margin_pct',fP(it.p&&it.p.pct))}<td class="num">${fC(it.r.price)}</td>${ed(it,'price',fC(it.p&&it.p.price))}`+
-    `<td class="num">${fQ(it.r.qty)}</td>${ed(it,'plan_qty',fQ(it.p&&it.p.qty))}</tr>`;
+    `<td class="num">${fQ(it.r.qty)}</td>${ed(it,'plan_qty',fQ(it.p&&it.p.qty))}${ed(it,'price',fC(it.group?it.price:it.price))}</tr>`;
   let html='';
   items.forEach(it=>{
     if(!it.group){html+=tr(it,'',esc(it.offer));return;}
@@ -642,9 +650,9 @@ function renderProducts(ents,plans,k,t,ra){
   const S=f=>(src,key)=>items.reduce((s,it)=>s+((it[src]&&it[src][key])||0),0);
   const tot=S();
   const tRR=tot('r','rev'),tPR=tot('p','rev'),tRM=tot('r','mar'),tPM=tot('p','mar'),tRQ=tot('r','qty'),tPQ=tot('p','qty');
-  html+=`<tr class="pr-total"><td>Итого ${items.length} поз.</td><td class="num">${fR(tRR)}</td><td>${fR(tPR)}</td><td></td><td class="num">${fR(tRM)}</td><td>${fR(tPM)}</td><td></td><td class="num">${fP(tRR>0?tRM/tRR*100:null)}</td><td>${fP(tPR>0?tPM/tPR*100:null)}</td><td class="num">${fC(tRQ>0?tRR/tRQ:null)}</td><td>${fC(tPQ>0?tPR/tPQ:null)}</td><td class="num">${fQ(tRQ)}</td><td>${fQ(tPQ)}</td></tr>`;
-  document.getElementById('prBody').innerHTML=items.length?`<table class="plan-tbl pr-tbl"><tr><th rowspan="2">Артикул</th><th colspan="3">Выручка (PNL)</th><th colspan="3">Маржа (CF)</th><th colspan="2">Маржинальность</th><th colspan="2">Цена</th><th colspan="2">Заказы, шт</th></tr>
-    <tr><th>рекоменд.</th><th>план</th><th>место</th><th>рекоменд.</th><th>план</th><th>место</th><th>рекоменд.</th><th>план</th><th>рекоменд.</th><th>план</th><th>рекоменд.</th><th>план</th></tr>${html}</table>`
+  html+=`<tr class="pr-total"><td>Итого ${items.length} поз.</td><td class="num">${fR(tRR)}</td><td>${fR(tPR)}</td><td></td><td class="num">${fP(tRR>0?tRM/tRR*100:null)}</td><td>${fP(tPR>0?tPM/tPR*100:null)}</td><td class="num">${fR(tRM)}</td><td>${fR(tPM)}</td><td></td><td class="num">${fQ(tRQ)}</td><td>${fQ(tPQ)}</td><td>${fC(tPQ>0?tPR/tPQ:null)}</td></tr>`;
+  document.getElementById('prBody').innerHTML=items.length?`<table class="plan-tbl pr-tbl"><tr><th rowspan="2">Артикул</th><th colspan="3">Выручка (PNL)</th><th colspan="2">Маржинальность</th><th colspan="3">Маржа (CF) = выручка × маржин. × κ</th><th colspan="3">Заказы, шт = выручка ÷ цена плана</th></tr>
+    <tr><th>рекоменд.</th><th>план</th><th>место</th><th>рекоменд.</th><th>план</th><th>рекоменд.</th><th>план</th><th>место</th><th>рекоменд.</th><th>план</th><th>цена плана</th></tr>${html}</table>`
     :'<div class="empty">Нет товаров по фильтру</div>';
 }
 function togglePr(k){PR_OPEN.has(k)?PR_OPEN.delete(k):PR_OPEN.add(k);if(PR_ARGS)renderProducts(...PR_ARGS);}
