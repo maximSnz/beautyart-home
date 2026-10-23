@@ -75,6 +75,11 @@
         th:first-child, td:first-child { text-align: left; }
         tr.in-base td { background: rgba(120,166,199,.12); }
         tr.we td { color: #94a3b8; }
+        .plan-tbl td { white-space: normal; vertical-align: middle; }
+        .plan-tbl td.num { white-space: nowrap; font-weight: 700; }
+        .plan-tbl th { position: static; }
+        .plan-tbl tr.derived td { color: #544273; }
+        .pl-ok { color: #16a34a; } .pl-low { color: #b45309; } .pl-bad { color: #dc2626; }
         .muted { color: #94a3b8; }
         .warn { color: #b45309; }
         .method { margin-top: 10px; font-size: .95em; color: #544273; line-height: 1.55; }
@@ -133,6 +138,7 @@
                             <option value="rev">Выручка (PNL)</option>
                             <option value="mar">Маржа (CF)</option>
                             <option value="pct">Маржинальность (CF)</option>
+                            <option value="price">Средняя цена (PNL)</option>
                         </select>
                     </div>
                     <div class="ctl">
@@ -145,6 +151,7 @@
                 </div>
             </div>
             <div class="wrap" id="chart"></div>
+            <div class="wrap" id="planCard"></div>
             <div class="wrap">
                 <details>
                     <summary id="tblTitle">Недели</summary>
@@ -161,6 +168,9 @@
                         <li><b>День: выходные (сб, вс) в границы и сигналы не входят</b> — они системно ниже будней; на графике — пустые серые точки. Скользящий размах и серии считаются по соседним будням.</li>
                         <li>Сигналы (против границ выбранной базы): точка за ±3σ; 2 из 3 подряд за ±2σ с одной стороны; 7 подряд по одну сторону от CL; 6 подряд растут или падают.</li>
                         <li>Меньше 20 точек в базе — границы предварительные: с каждой новой точкой они уточняются.</li>
+                        <li>Средняя цена (PNL) — Σ выручка ÷ Σ заказы, шт (<code>product_sales.qty</code>).</li>
+                        <li><b>Рекомендуемый план месяца</b> — по границам выбранного шага и базы: цель = медиана + ползунок × (UCL − медиана). Выручка за месяц = значение дня-будня × эфф. дни месяца (будни + 0,7 × выходные) или значение недели ÷ 6,4 × эфф. дни; маржинальность и цена — без пересчёта. Заказы = выручка ÷ цена, маржа = выручка × маржинальность.</li>
+                        <li>Действующий план — <code>sales_plan</code> месяца, неархивные товары, как «Итого» в plan.html и на главной: выручка = Σ план, шт × цена; маржинальность = Σ(выручка × маржинальность) ÷ Σ выручка; цена = выручка ÷ Σ план, шт. «Где план в коридоре» — в сигмах от медианы и в % пути до UCL.</li>
                     </ul>
                 </details>
             </div>
@@ -182,7 +192,8 @@ const C_SIG='#dc2626',C_CL='#16a34a',C_TXT='#544273';
 const METRICS={
   rev:{name:'Выручка (PNL)',unit:'rub',color:'#0d9488',clip0:true},
   mar:{name:'Маржа (CF)',unit:'rub',color:'#7D3673',clip0:false},
-  pct:{name:'Маржинальность (CF)',unit:'pct',color:'#ca8a04',clip0:false}
+  pct:{name:'Маржинальность (CF)',unit:'pct',color:'#ca8a04',clip0:false},
+  price:{name:'Средняя цена (PNL)',unit:'price',color:'#2563eb',clip0:true}
 };
 const STEPS={week:{per:'за неделю',unitN:'нед.',title:'Недели',def:{mode:'all',n:4}},day:{per:'за день',unitN:'дн.',title:'Дни',def:{mode:'all',n:20}}};
 let AVAIL={ip:false,ooo:false},ENT='ip',MET='rev',STEP='week',DATA={},WEEKS=[],DAYS=[];
@@ -213,9 +224,10 @@ const fmtTys=v=>Math.round(v/1e3).toLocaleString('ru-RU')+' тыс';
 const fmtRub=v=>Math.round(v).toLocaleString('ru-RU')+' ₽';
 const fmtPct=v=>v.toLocaleString('ru-RU',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';
 // дневные суммы — в тыс ₽, недельные — в млн ₽
-const fmtV=(m,v)=>m.unit==='pct'?fmtPct(v):STEP==='day'?fmtTys(v):fmtMln(v);
-const fmtAxis=(m,v)=>m.unit==='pct'?fmtPct(v):STEP==='day'?Math.round(v/1e3).toLocaleString('ru-RU'):(v/1e6).toLocaleString('ru-RU',{maximumFractionDigits:2});
-const fmtExact=(m,v)=>m.unit==='pct'?v.toLocaleString('ru-RU',{maximumFractionDigits:2})+'%':fmtRub(v);
+const fmtV=(m,v)=>m.unit==='pct'?fmtPct(v):m.unit==='price'?fmtRub(v):STEP==='day'?fmtTys(v):fmtMln(v);
+const fmtAxis=(m,v)=>m.unit==='pct'?fmtPct(v):m.unit==='price'?Math.round(v).toLocaleString('ru-RU'):STEP==='day'?Math.round(v/1e3).toLocaleString('ru-RU'):(v/1e6).toLocaleString('ru-RU',{maximumFractionDigits:2});
+const fmtExact=(m,v)=>m.unit==='pct'?v.toLocaleString('ru-RU',{maximumFractionDigits:2})+'%':m.unit==='price'?v.toLocaleString('ru-RU',{maximumFractionDigits:2})+' ₽':fmtRub(v);
+const fmtQty=v=>Math.round(v).toLocaleString('ru-RU')+' шт';
 const esc=s=>String(s).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
 
 // === загрузка: постранично, сортировка по уникальному ключу ===
@@ -225,9 +237,9 @@ async function loadBase(b){
   if(DATA[b])return DATA[b];
   // выручка PNL по дням — запросы по неделям параллельно (у артикула за день много строк — по складам)
   const chunks=[];for(let i=0;i<DAYS.length;i+=7)chunks.push([DAYS[i],DAYS[Math.min(i+6,DAYS.length-1)]]);
-  const rev={};
-  (await Promise.all(chunks.map(([a,z])=>fetchPages(b,`product_sales?sale_date=gte.${a}&sale_date=lte.${z}&select=sale_date,revenue`)))).flat()
-    .forEach(x=>{rev[x.sale_date]=(rev[x.sale_date]||0)+Number(x.revenue||0);});
+  const rev={},qty={};
+  (await Promise.all(chunks.map(([a,z])=>fetchPages(b,`product_sales?sale_date=gte.${a}&sale_date=lte.${z}&select=sale_date,revenue,qty`)))).flat()
+    .forEach(x=>{rev[x.sale_date]=(rev[x.sale_date]||0)+Number(x.revenue||0);qty[x.sale_date]=(qty[x.sale_date]||0)+Number(x.qty||0);});
   // CF недели — sales_plan_weeks (ключ — понедельник), CF дня — cf_daily; итог = сумма по товарам
   const cfW={},cfD={};
   const addCf=(g,mar,revn,prov)=>{g.mar+=Number(mar||0);g.revn+=Number(revn||0);if(prov)g.prov=true;};
@@ -240,8 +252,8 @@ async function loadBase(b){
   dRows.forEach(r=>addCf(cfD[r.day]=cfD[r.day]||{mar:0,revn:0,prov:false},r.mar,r.revn,r.cost_provisional));
   const adsShort=end=>!lastAd||lastAd<end;
   const week=WEEKS.map(w=>{const ds=DAYS.filter(d=>d>=w&&d<=weekEnd(w)).filter(d=>rev[d]!=null);const c=cfW[w];
-    return {key:w,rev:ds.length?ds.reduce((s,d)=>s+rev[d],0):null,days:ds.length,mar:c?c.mar:null,revn:c?c.revn:null,prov:!!(c&&c.prov),adsShort:!!c&&adsShort(weekEnd(w)),we:false};});
-  const day=DAYS.map(d=>{const c=cfD[d];return {key:d,rev:rev[d]!=null?rev[d]:null,days:rev[d]!=null?1:0,mar:c?c.mar:null,revn:c?c.revn:null,prov:!!(c&&c.prov),adsShort:!!c&&adsShort(d),we:isWeekend(d)};});
+    return {key:w,rev:ds.length?ds.reduce((s,d)=>s+rev[d],0):null,qty:ds.reduce((s,d)=>s+qty[d],0),days:ds.length,mar:c?c.mar:null,revn:c?c.revn:null,prov:!!(c&&c.prov),adsShort:!!c&&adsShort(weekEnd(w)),we:false};});
+  const day=DAYS.map(d=>{const c=cfD[d];return {key:d,rev:rev[d]!=null?rev[d]:null,qty:qty[d]||0,days:rev[d]!=null?1:0,mar:c?c.mar:null,revn:c?c.revn:null,prov:!!(c&&c.prov),adsShort:!!c&&adsShort(d),we:isWeekend(d)};});
   DATA[b]={week,day};
   return DATA[b];
 }
@@ -250,10 +262,10 @@ function combine(A,B){
   const sum=(x,y)=>x==null?y:y==null?x:x+y;
   return A.map((x,i)=>{const y=B[i];
     const only=x.rev==null&&x.mar==null?'ООО':y.rev==null&&y.mar==null?'ИП':'';
-    return {key:x.key,we:x.we,rev:sum(x.rev,y.rev),days:x.rev==null?y.days:y.rev==null?x.days:Math.min(x.days,y.days),mar:sum(x.mar,y.mar),revn:sum(x.revn,y.revn),
+    return {key:x.key,we:x.we,rev:sum(x.rev,y.rev),qty:(x.qty||0)+(y.qty||0),days:x.rev==null?y.days:y.rev==null?x.days:Math.min(x.days,y.days),mar:sum(x.mar,y.mar),revn:sum(x.revn,y.revn),
       prov:(x.mar!=null&&x.prov)||(y.mar!=null&&y.prov),adsShort:x.adsShort||y.adsShort,only};});
 }
-const valOf=(k,x)=>k==='rev'?x.rev:k==='mar'?x.mar:(x.revn>0&&x.mar!=null?x.mar/x.revn*100:null);
+const valOf=(k,x)=>k==='rev'?x.rev:k==='mar'?x.mar:k==='price'?(x.rev!=null&&x.qty>0?x.rev/x.qty:null):(x.revn>0&&x.mar!=null?x.mar/x.revn*100:null);
 
 // === математика Шухарта (как в прототипе shewhart.html) ===
 const median=a=>{const s=[...a].sort((x,y)=>x-y),m=s.length>>1;return s.length%2?s[m]:(s[m-1]+s[m])/2;};
@@ -349,17 +361,14 @@ function render(){
   ['day','week'].forEach(k=>document.getElementById('step_'+k).classList.toggle('on',k===STEP));
   document.getElementById('metricSel').value=MET;
   if(!P)return;
-  const series=P.map(x=>valOf(MET,x));
-  const inBase=i=>i>=ra[0]&&i<=ra[1];
-  const baseVals=series.map((v,i)=>({v,i})).filter(p=>p.v!=null&&!P[p.i].we&&inBase(p.i)).map(p=>p.v);
-  const L=baseVals.length>=3?shewhart(baseVals,m.clip0):null;
+  const {series,L}=limitsFor(MET,P,ra);
   const pts=series.map((v,i)=>({i,v})).filter(p=>p.v!=null&&!P[p.i].we);
   const sig=L?findSignals(pts,L):{list:[],mark:new Set()};
   const pre=L&&L.n<20;
   const stats=L?[['CL',fmtV(m,L.cl)],['MR̄',fmtV(m,L.avgMR)],['σ',fmtV(m,L.sigma)],['UCL',fmtV(m,L.ucl)],['LCL',fmtV(m,L.lcl)]].map(([a,b])=>`<div class="stat"><span>${a}</span>${b}</div>`).join('')+
     `<div class="stat${pre?' pre':''}" title="${pre?'Меньше 20 точек — границы уточняются с каждой новой точкой':''}"><span>${STEP==='day'?'будних дней':'недель'} в базе</span>${L.n}${pre?' · предварительно':''}</div>`:'';
   const box=document.getElementById('chart');
-  box.innerHTML=`<div class="chart-head"><h2>${m.name} ${m.unit==='pct'?(STEP==='day'?'дня':'недели'):st.per}</h2>`+
+  box.innerHTML=`<div class="chart-head"><h2>${m.name} ${m.unit!=='rub'?(STEP==='day'?'дня':'недели'):st.per}</h2>`+
     (L?`<span class="badge ${sig.list.length?'alert':'ok'}">${sig.list.length?'Сигналов: '+sig.list.length:'Сигналов нет — обычный разброс'}</span>`:'')+
     `<div class="stats">${stats}</div></div>`+
     (series.some(v=>v!=null)?`<div class="chart-box">${chartSVG(m,P,series,L,sig,ra)}<div class="tooltip"></div></div>`:`<div class="empty">Нет данных за этот период</div>`)+
@@ -368,6 +377,90 @@ function render(){
   const cb=box.querySelector('.chart-box');
   if(cb)bindTip(cb,m,P,series,L);
   renderTable(P,ra);
+  renderPlan();
+}
+// ряд показателя и границы по базе (выходные дни в базу не входят)
+function limitsFor(k,P,ra){
+  const series=P.map(x=>valOf(k,x));
+  const baseVals=series.map((v,i)=>({v,i})).filter(p=>p.v!=null&&!P[p.i].we&&p.i>=ra[0]&&p.i<=ra[1]).map(p=>p.v);
+  return {series,L:baseVals.length>=3?shewhart(baseVals,METRICS[k].clip0):null};
+}
+
+// === рекомендуемый план месяца ===
+// месяц из точек: эфф. дни месяца = будни + 0,7 × выходные (как в планах и темпах); день-будни = 1 эфф. день, неделя = 6,4
+const WEEK_EFF=5+0.7*2;
+function effDaysOfMonth(mk){const [y,m]=mk.split('-').map(Number),last=new Date(y,m,0).getDate();let e=0;for(let d=1;d<=last;d++){const g=new Date(y,m-1,d).getDay();e+=g===0||g===6?0.7:1;}return e;}
+const PLAN_CACHE={};
+// действующий план — как «Итого» в plan.html и на главной: только неархивные товары; выручка = Σ plan_qty × price
+async function loadPlan(b,mk){
+  const key=b+mk;if(PLAN_CACHE[key])return PLAN_CACHE[key];
+  const [prods,rows]=await Promise.all([fetchPages(b,'products?select=product_id,archived&order=product_id'),fetchPages(b,`sales_plan?month=eq.${mk}&select=product_id,plan_qty,price,margin_pct&order=product_id`)]);
+  const arch=new Set(prods.filter(p=>p.archived).map(p=>p.product_id));
+  const g={rev:0,qty:0,mar:0,n:0};
+  rows.forEach(r=>{if(arch.has(r.product_id))return;const q=Number(r.plan_qty||0),p=Number(r.price||0),pc=Number(r.margin_pct||0);if(!q)return;g.rev+=q*p;g.qty+=q;g.mar+=q*p*pc/100;g.n++;});
+  return PLAN_CACHE[key]=g;
+}
+let PLAN_MK=null,PLAN_T=0;
+try{const s=JSON.parse(localStorage.getItem('ba_shewhart_plan')||'{}');if(Number.isFinite(s.t))PLAN_T=s.t;}catch(e){}
+function monthOptions(){const d=new Date();d.setDate(1);const out=[];for(let k=-1;k<=2;k++){const x=new Date(d.getFullYear(),d.getMonth()+k,1);out.push(`${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}`);}return out;}
+const MONTHS_RU=['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
+const monthName=mk=>{const [y,m]=mk.split('-').map(Number);return MONTHS_RU[m-1]+' '+y;};
+function setPlanMonth(mk){PLAN_MK=mk;renderPlan();}
+function setPlanT(v){PLAN_T=Math.max(0,Math.min(100,+v||0));try{localStorage.setItem('ba_shewhart_plan',JSON.stringify({t:PLAN_T}));}catch(e){}renderPlan(true);}
+// положение плана в коридоре: z — в сигмах от медианы, pos — % пути от медианы до UCL
+function placeText(v,c,unit){
+  if(!c)return '<span class="muted">границ нет</span>';
+  const z=(v-c.cl)/c.sigma,pos=(v-c.cl)/(c.ucl-c.cl)*100,zt=Math.abs(z).toLocaleString('ru-RU',{maximumFractionDigits:1});
+  if(v>c.ucl)return `<span class="pl-bad">выше UCL (медиана + ${zt}σ) — без изменения процесса недостижим</span>`;
+  if(v>=c.cl)return `<span class="pl-ok">медиана + ${zt}σ · ${Math.round(pos)}% пути до UCL</span>`;
+  if(v>=c.lcl)return `<span class="pl-low">ниже медианы на ${zt}σ — процесс даёт сам</span>`;
+  return `<span class="pl-bad">ниже LCL — план занижен</span>`;
+}
+// шкала коридора: LCL — медиана — UCL, ▲ рекомендуемый, ● план
+function scaleSVG(c,rec,plan){
+  const W=320,H=34,pad=10,vals=[c.lcl,c.ucl,rec].concat(plan!=null?[plan]:[]);
+  let lo=Math.min(...vals),hi=Math.max(...vals);const sp=(hi-lo)||1;lo-=sp*.06;hi+=sp*.06;
+  const X=v=>pad+(v-lo)/(hi-lo)*(W-2*pad);
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">`;
+  s+=`<rect x="${X(c.lcl)}" y="13" width="${X(c.ucl)-X(c.lcl)}" height="8" rx="4" fill="rgba(120,166,199,0.25)"/>`;
+  s+=`<rect x="${X(c.cl)}" y="13" width="${X(c.ucl)-X(c.cl)}" height="8" rx="4" fill="rgba(22,163,74,0.22)"/>`;
+  [[c.lcl,C_SIG],[c.ucl,C_SIG],[c.cl,C_CL]].forEach(([v,col])=>{s+=`<line x1="${X(v)}" x2="${X(v)}" y1="8" y2="26" stroke="${col}" stroke-width="2"/>`;});
+  s+=`<path d="M${X(rec)} 12 l-6 -10 h12 z" fill="${C_CL}"/>`;
+  if(plan!=null)s+=`<circle cx="${X(plan)}" cy="17" r="6" fill="#E33D78" stroke="#fff" stroke-width="2"/>`;
+  return s+'</svg>';
+}
+async function renderPlan(fast){
+  const card=document.getElementById('planCard');const P=current();if(!P||!card)return;
+  const months=monthOptions();if(!PLAN_MK)PLAN_MK=months[1];
+  const ents=ENT==='all'?['ip','ooo']:[ENT];
+  let plan;
+  try{const ps=await Promise.all(ents.map(b=>loadPlan(b,PLAN_MK)));plan=ps.reduce((a,g)=>({rev:a.rev+g.rev,qty:a.qty+g.qty,mar:a.mar+g.mar,n:a.n+g.n}),{rev:0,qty:0,mar:0,n:0});}
+  catch(e){card.innerHTML=`<h2>Рекомендуемый план месяца</h2><div class="err">План не загрузился: ${esc(e.message)}</div>`;delete card.dataset.ready;return;}
+  // шапка (месяц, ползунок) строится один раз — перетаскивание ползунка не сбивается
+  if(!card.dataset.ready){
+    card.innerHTML=`<div class="chart-head"><h2>Рекомендуемый план месяца</h2>
+      <div class="ctl"><span class="ctl-label">Месяц</span><select id="planMonth" onchange="setPlanMonth(this.value)">${months.map(mk=>`<option value="${mk}">${monthName(mk)}</option>`).join('')}</select></div>
+      <div class="ctl"><span class="ctl-label">Цель: медиана +</span><input type="range" id="planT" min="0" max="100" step="5" value="${PLAN_T}" oninput="setPlanT(this.value)" style="width:160px;accent-color:#E33D78"><b id="planTv"></b><span class="ctl-label">пути до UCL</span></div></div>
+      <div id="planBody"></div>`;
+    card.dataset.ready='1';
+  }
+  document.getElementById('planMonth').value=PLAN_MK;document.getElementById('planTv').textContent=PLAN_T+'%';
+  const ra=baseRange(),eff=effDaysOfMonth(PLAN_MK),k=STEP==='day'?eff:eff/WEEK_EFF,t=PLAN_T/100;
+  const lim=key=>{const {L}=limitsFor(key,P,ra);if(!L)return null;const f=key==='rev'?k:1;return {cl:L.cl*f,ucl:L.ucl*f,lcl:L.lcl*f,sigma:L.sigma*f,n:L.n};};
+  const cR=lim('rev'),cP=lim('pct'),cC=lim('price');
+  const rec=c=>c?c.cl+t*(c.ucl-c.cl):null;
+  const rR=rec(cR),rP=rec(cP),rC=rec(cC);
+  const has=plan.n>0,pR=has?plan.rev:null,pP=has&&plan.rev>0?plan.mar/plan.rev*100:null,pC=has&&plan.qty>0?plan.rev/plan.qty:null;
+  const delta=(p,r,f,isPct)=>p==null||r==null?'—':(isPct?`${p>=r?'+':''}${(p-r).toLocaleString('ru-RU',{maximumFractionDigits:1})} п.п.`:`${p>=r?'+':''}${f(p-r)} (${p>=r?'+':''}${((p/r-1)*100).toLocaleString('ru-RU',{maximumFractionDigits:1})}%)`);
+  const row=(name,c,r,p,f,isPct)=>`<tr><td>${name}</td><td class="num">${r!=null?f(r):'—'}</td><td class="muted">${c?f(c.lcl)+' – '+f(c.ucl):'—'}</td><td class="num">${p!=null?f(p):'—'}</td><td>${delta(p,r,f,isPct)}</td><td>${p!=null?placeText(p,c):'<span class="muted">плана нет</span>'}</td><td>${c&&r!=null?scaleSVG(c,r,p):''}</td></tr>`;
+  const qR=rR!=null&&rC>0?rR/rC:null,qP=has?plan.qty:null,mR=rR!=null&&rP!=null?rR*rP/100:null,mP=has?plan.mar:null;
+  const rowD=(name,r,p,f)=>`<tr class="derived"><td>${name}</td><td class="num">${r!=null?f(r):'—'}</td><td class="muted">расчёт</td><td class="num">${p!=null?f(p):'—'}</td><td>${delta(p,r,f,false)}</td><td colspan="2" class="muted">${name.startsWith('Заказы')?'= выручка ÷ цена':'= выручка × маржинальность'}</td></tr>`;
+  const fR=v=>fmtRub(v),fP=v=>fmtPct(v),fC=v=>v.toLocaleString('ru-RU',{maximumFractionDigits:0})+' ₽';
+  const baseTxt=`${STEP==='day'?'дни':'недели'} ${labelOf(P[ra[0]])} … ${labelOf(P[ra[1]])}`;
+  document.getElementById('planBody').innerHTML=`<div class="muted" style="font-size:.92em;margin-bottom:8px">${ENT==='all'?'ИП + ООО':BASES[ENT].name} · база границ: ${baseTxt} · эфф. дней в месяце ${eff.toLocaleString('ru-RU',{maximumFractionDigits:1})} (будни + 0,7 × выходные)${has?'':' · <span class="warn">плана на '+monthName(PLAN_MK)+' нет</span>'}</div>
+    <div class="tbl-wrap" style="max-height:none"><table class="plan-tbl"><tr><th>Показатель</th><th>Рекомендуемый</th><th>Коридор LCL – UCL</th><th>Действующий план</th><th>План − рекоменд.</th><th>Где план в коридоре</th><th><span style="color:${C_CL}">▲</span> рекоменд. · <span style="color:#E33D78">●</span> план</th></tr>
+      ${row('Выручка (заказы, PNL)',cR,rR,pR,fR,false)}${row('Маржинальность (CF)',cP,rP,pP,fP,true)}${row('Средняя цена (PNL)',cC,rC,pC,fC,false)}
+      ${rowD('Заказы, шт',qR,qP,fmtQty)}${rowD('Маржа (CF), ₽',mR,mP,fR)}</table></div>`;
 }
 function bindTip(cb,m,P,series,L){
   const tip=cb.querySelector('.tooltip');
@@ -389,8 +482,8 @@ function bindTip(cb,m,P,series,L){
 function renderTable(P,ra){
   document.getElementById('tblTitle').textContent=STEPS[STEP].title;
   const rows=P.map((x,i)=>{const p=valOf('pct',x);
-    return `<tr class="${i>=ra[0]&&i<=ra[1]&&!x.we?'in-base':''}${x.we?' we':''}"><td>${labelOf(x)}${x.only?' <span class="muted">(только '+x.only+')</span>':''}</td><td>${x.rev!=null?fmtRub(x.rev):'—'}${STEP==='week'&&x.rev!=null&&x.days<7?' <span class="warn" title="дней с заказами">('+x.days+' дн)</span>':''}</td><td>${x.mar!=null?fmtRub(x.mar):'—'}${x.mar!=null&&x.prov?' *':''}${x.mar!=null&&x.adsShort?' <span class="warn" title="реклама загружена не полностью — маржа завышена">⚠</span>':''}</td><td>${x.revn!=null?fmtRub(x.revn):'—'}</td><td>${p!=null?fmtPct(p):'—'}</td></tr>`;}).reverse().join('');
-  document.getElementById('pointTable').innerHTML=`<table><tr><th>${STEP==='day'?'День':'Неделя'}</th><th>Выручка (PNL)</th><th>Маржа (CF)</th><th>GMV (CF)</th><th>Маржинальность</th></tr>${rows}</table>`+
+    return `<tr class="${i>=ra[0]&&i<=ra[1]&&!x.we?'in-base':''}${x.we?' we':''}"><td>${labelOf(x)}${x.only?' <span class="muted">(только '+x.only+')</span>':''}</td><td>${x.rev!=null?fmtRub(x.rev):'—'}${STEP==='week'&&x.rev!=null&&x.days<7?' <span class="warn" title="дней с заказами">('+x.days+' дн)</span>':''}</td><td>${x.mar!=null?fmtRub(x.mar):'—'}${x.mar!=null&&x.prov?' *':''}${x.mar!=null&&x.adsShort?' <span class="warn" title="реклама загружена не полностью — маржа завышена">⚠</span>':''}</td><td>${x.revn!=null?fmtRub(x.revn):'—'}</td><td>${p!=null?fmtPct(p):'—'}</td><td>${x.qty?fmtQty(x.qty):'—'}</td><td>${valOf('price',x)!=null?fmtRub(valOf('price',x)):'—'}</td></tr>`;}).reverse().join('');
+  document.getElementById('pointTable').innerHTML=`<table><tr><th>${STEP==='day'?'День':'Неделя'}</th><th>Выручка (PNL)</th><th>Маржа (CF)</th><th>GMV (CF)</th><th>Маржинальность</th><th>Заказы</th><th>Ср. цена</th></tr>${rows}</table>`+
     `<div class="muted" style="margin-top:6px;font-size:.9em">${P.some(x=>x.prov)?'* у части товаров себестоимость предварительная (cost_provisional); ':''}подсвечены точки базы границ${STEP==='day'?'; серым — выходные':''}</div>`;
 }
 
