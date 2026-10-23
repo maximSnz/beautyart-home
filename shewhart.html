@@ -23,11 +23,12 @@
         .logo-link:hover .logo { transform: scale(1.1); }
         .company-name { font-family: 'Forum', serif; font-size: 1.8em; font-weight: 400; color: #fff; text-shadow: 0 2px 8px rgba(28,13,46,.4); letter-spacing: 2px; }
 
-        /* === БЕЛАЯ ПОДЛОЖКА — как .wrap в plan.html === */
-        .wrap { background: #fff; border-radius: 16px; padding: 24px 28px; box-shadow: 0 10px 30px rgba(28,13,46,.3); }
+        /* === БЕЛЫЕ КАРТОЧКИ — как .wrap в plan.html; каждый блок — отдельно === */
+        #app { display: flex; flex-direction: column; gap: 16px; }
+        .wrap { background: #fff; border-radius: 16px; padding: 20px 26px; box-shadow: 0 10px 30px rgba(28,13,46,.3); }
         h1 { font-weight: 400; font-size: 1.6em; color: #1C0D2E; margin-bottom: 14px; }
         h2 { font-weight: 400; font-size: 1.25em; color: #1C0D2E; }
-        .controls { display: flex; gap: 14px 22px; align-items: center; flex-wrap: wrap; padding-bottom: 14px; border-bottom: 1px dashed #cbd5e1; }
+        .controls { display: flex; gap: 14px 22px; align-items: center; flex-wrap: wrap; }
         .ctl { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
         .ctl-label { font-size: .92em; color: #666; }
         .tabs { display: inline-flex; border: 2px solid rgba(84,66,115,.2); border-radius: 10px; padding: 2px; gap: 2px; }
@@ -41,7 +42,7 @@
         input[type=number] { width: 66px; }
 
         /* === КАРТА === */
-        .chart-head { display: flex; align-items: center; gap: 12px 14px; flex-wrap: wrap; margin: 16px 0 10px; }
+        .chart-head { display: flex; align-items: center; gap: 12px 14px; flex-wrap: wrap; margin-bottom: 10px; }
         .badge { font-size: .9em; border-radius: 999px; padding: 3px 12px; border: 1px solid; }
         .badge.ok { color: #16a34a; border-color: rgba(22,163,74,.4); background: rgba(22,163,74,.07); }
         .badge.alert { color: #dc2626; border-color: rgba(220,38,38,.4); background: rgba(220,38,38,.07); }
@@ -53,27 +54,30 @@
         .chart-box svg { width: 100%; height: auto; display: block; }
         .tooltip { position: absolute; pointer-events: none; background: #1C0D2E; color: #fff; border-radius: 8px;
             padding: 7px 10px; font-size: .9em; line-height: 1.4; white-space: nowrap; display: none; z-index: 5; box-shadow: 0 6px 18px rgba(28,13,46,.25); }
+        .legend { display: flex; gap: 6px 18px; flex-wrap: wrap; font-size: .9em; color: #666; margin-top: 4px; }
+        .legend i { display: inline-block; width: 18px; height: 0; border-top: 2px dashed; vertical-align: middle; margin-right: 6px; }
+        .legend i.dot { width: 10px; height: 10px; border: 2px solid #94a3b8; border-radius: 50%; }
         .signals { list-style: none; margin-top: 8px; font-size: .95em; }
         .signals li { padding: 5px 10px; margin-top: 4px; border-left: 3px solid #dc2626; background: rgba(220,38,38,.06); border-radius: 0 6px 6px 0; }
         .signals li.none { border-left-color: #16a34a; background: rgba(22,163,74,.06); }
         .empty { padding: 40px; text-align: center; color: #94a3b8; }
         .err { color: #E33D78; padding: 20px 0; }
 
-        /* === ТАБЛИЦА НЕДЕЛЬ И МЕТОДИКА === */
-        details.block { margin-top: 18px; border-top: 1px dashed #cbd5e1; padding-top: 12px; }
-        details.block > summary { cursor: pointer; font-size: 1.15em; color: #544273; list-style: none; }
-        details.block > summary::before { content: '▸ '; }
-        details.block[open] > summary::before { content: '▾ '; }
-        details.block > summary::-webkit-details-marker { display: none; }
-        .tbl-wrap { overflow-x: auto; margin-top: 8px; }
+        /* === ТАБЛИЦА И МЕТОДИКА === */
+        details > summary { cursor: pointer; font-size: 1.25em; color: #1C0D2E; list-style: none; }
+        details > summary::before { content: '▸ '; color: #544273; }
+        details[open] > summary::before { content: '▾ '; }
+        details > summary::-webkit-details-marker { display: none; }
+        .tbl-wrap { overflow-x: auto; margin-top: 10px; max-height: 520px; overflow-y: auto; }
         table { border-collapse: collapse; width: 100%; font-size: .92em; }
         th, td { padding: 5px 9px; text-align: right; border-bottom: 1px dashed #cbd5e1; white-space: nowrap; }
-        th { font-weight: 400; color: #666; }
+        th { font-weight: 400; color: #666; position: sticky; top: 0; background: #fff; }
         th:first-child, td:first-child { text-align: left; }
         tr.in-base td { background: rgba(120,166,199,.12); }
+        tr.we td { color: #94a3b8; }
         .muted { color: #94a3b8; }
         .warn { color: #b45309; }
-        .method { margin-top: 8px; font-size: .95em; color: #544273; line-height: 1.55; }
+        .method { margin-top: 10px; font-size: .95em; color: #544273; line-height: 1.55; }
         .method li { margin-left: 18px; }
         code { font-size: .9em; background: rgba(84,66,115,.07); padding: 0 4px; border-radius: 4px; }
 
@@ -110,49 +114,56 @@
             <div class="error-message" id="errorMessage"></div>
         </div>
 
-        <div class="wrap hide" id="app">
-            <h1>Карты Шухарта · Ozon по неделям</h1>
-            <div class="controls">
-                <div class="tabs" title="Юрлицо">
-                    <button class="tab" id="ent_ip" onclick="setEnt('ip')">ИП</button>
-                    <button class="tab" id="ent_ooo" onclick="setEnt('ooo')">ООО</button>
-                    <button class="tab" id="ent_all" onclick="setEnt('all')">Вместе</button>
-                </div>
-                <div class="ctl">
-                    <span class="ctl-label">Показатель</span>
-                    <select id="metricSel" onchange="setMetric(this.value)">
-                        <option value="rev">Выручка (PNL) за неделю</option>
-                        <option value="mar">Маржа (CF) за неделю</option>
-                        <option value="pct">Маржинальность (CF) недели</option>
-                    </select>
-                </div>
-                <div class="ctl">
-                    <span class="ctl-label">Границы по</span>
-                    <select id="baseMode" onchange="setBase()">
-                        <option value="all">всем неделям</option>
-                        <option value="last">последним N неделям</option>
-                        <option value="range">неделям с … по …</option>
-                    </select>
-                    <input type="number" id="baseN" min="3" value="4" class="hide" onchange="setBase()" title="Сколько последних закрытых недель">
-                    <select id="baseFrom" class="hide" onchange="setBase()" title="Первая неделя базы"></select>
-                    <select id="baseTo" class="hide" onchange="setBase()" title="Последняя неделя базы"></select>
+        <div class="hide" id="app">
+            <div class="wrap">
+                <h1>Карты Шухарта · Ozon</h1>
+                <div class="controls">
+                    <div class="tabs" title="Юрлицо">
+                        <button class="tab" id="ent_ip" onclick="setEnt('ip')">ИП</button>
+                        <button class="tab" id="ent_ooo" onclick="setEnt('ooo')">ООО</button>
+                        <button class="tab" id="ent_all" onclick="setEnt('all')">Вместе</button>
+                    </div>
+                    <div class="tabs" title="Шаг точки на карте">
+                        <button class="tab" id="step_day" onclick="setStep('day')">День</button>
+                        <button class="tab" id="step_week" onclick="setStep('week')">Неделя</button>
+                    </div>
+                    <div class="ctl">
+                        <span class="ctl-label">Показатель</span>
+                        <select id="metricSel" onchange="setMetric(this.value)">
+                            <option value="rev">Выручка (PNL)</option>
+                            <option value="mar">Маржа (CF)</option>
+                            <option value="pct">Маржинальность (CF)</option>
+                        </select>
+                    </div>
+                    <div class="ctl">
+                        <span class="ctl-label">Границы по</span>
+                        <select id="baseMode" onchange="setBase()"></select>
+                        <input type="number" id="baseN" min="3" value="4" class="hide" onchange="setBase()">
+                        <select id="baseFrom" class="hide" onchange="setBase()" title="Начало базы"></select>
+                        <select id="baseTo" class="hide" onchange="setBase()" title="Конец базы"></select>
+                    </div>
                 </div>
             </div>
-            <div id="chart"></div>
-            <details class="block">
-                <summary>Недели</summary>
-                <div class="tbl-wrap" id="weekTable"></div>
-            </details>
-            <details class="block">
-                <summary>Как считается</summary>
-                <ul class="method">
-                    <li>Точка — закрытая календарная неделя (пн–вс) с 31.08.2026; текущая неделя не показывается. Значения — <b>за неделю</b>, не за месяц.</li>
-                    <li>Выручка (PNL) — Σ <code>product_sales.revenue</code> за неделю, все товары; маржа (CF) — Σ <code>sales_plan_weeks.mar</code> по товарам (расчёт <code>syncPnl</code>, как в plan.html); маржинальность — Σмаржа ÷ ΣGMV (<code>revn</code>) × 100.</li>
-                    <li>Средняя линия CL — медиана недель базы; скользящий размах MRᵢ = |Xᵢ − Xᵢ₋₁|, σ = средний MR ÷ 1,128; границы UCL / LCL = CL ± 3σ (у выручки нижняя — не ниже 0). Пунктир ±2σ — для правила «2 из 3».</li>
-                    <li>Сигналы (по всем неделям, против границ выбранной базы): точка за ±3σ; 2 из 3 подряд за ±2σ с одной стороны; 7 подряд по одну сторону от CL; 6 подряд растут или падают.</li>
-                    <li>Меньше 20 недель в базе — границы предварительные: с каждой новой неделей они уточняются.</li>
-                </ul>
-            </details>
+            <div class="wrap" id="chart"></div>
+            <div class="wrap">
+                <details>
+                    <summary id="tblTitle">Недели</summary>
+                    <div class="tbl-wrap" id="pointTable"></div>
+                </details>
+            </div>
+            <div class="wrap">
+                <details>
+                    <summary>Как считается</summary>
+                    <ul class="method">
+                        <li>Шаг «Неделя» — закрытая календарная неделя (пн–вс) с 31.08.2026, текущая не показывается; шаг «День» — каждый день с 31.08.2026 по вчера. Значения — <b>за неделю</b> или <b>за день</b>, не за месяц.</li>
+                        <li>Выручка (PNL) — Σ <code>product_sales.revenue</code>, все товары. Маржа (CF): неделя — Σ <code>sales_plan_weeks.mar</code>, день — Σ <code>cf_daily.mar</code> по товарам (оба — расчёт <code>syncPnl</code>, как в plan.html; маржа дня — по дате начисления). Маржинальность — Σмаржа ÷ ΣGMV (<code>revn</code>) × 100.</li>
+                        <li>Средняя линия CL — медиана точек базы; скользящий размах MRᵢ = |Xᵢ − Xᵢ₋₁|, σ = средний MR ÷ 1,128; границы UCL / LCL = CL ± 3σ (у выручки нижняя — не ниже 0). Пунктир ±2σ — для правила «2 из 3».</li>
+                        <li><b>День: выходные (сб, вс) в границы и сигналы не входят</b> — они системно ниже будней; на графике — пустые серые точки. Скользящий размах и серии считаются по соседним будням.</li>
+                        <li>Сигналы (против границ выбранной базы): точка за ±3σ; 2 из 3 подряд за ±2σ с одной стороны; 7 подряд по одну сторону от CL; 6 подряд растут или падают.</li>
+                        <li>Меньше 20 точек в базе — границы предварительные: с каждой новой точкой они уточняются.</li>
+                    </ul>
+                </details>
+            </div>
         </div>
     </div>
 
@@ -165,19 +176,21 @@ const BASES={
 };
 const HDS={ip:{apikey:BASES.ip.anon,Authorization:'Bearer '+BASES.ip.anon},ooo:{apikey:BASES.ooo.anon,Authorization:'Bearer '+BASES.ooo.anon}};
 const SUPABASE_URL=BASES.ip.url;
-const START='2026-08-31';   // начало работы в инструменте — первая неделя карт
+const START='2026-08-31';   // начало работы в инструменте — первая точка карт
 const D2=1.128;
 const C_SIG='#dc2626',C_CL='#16a34a',C_TXT='#544273';
 const METRICS={
-  rev:{name:'Выручка (PNL) за неделю',unit:'rub',color:'#0d9488',clip0:true},
-  mar:{name:'Маржа (CF) за неделю',unit:'rub',color:'#7D3673',clip0:false},
-  pct:{name:'Маржинальность (CF) недели',unit:'pct',color:'#ca8a04',clip0:false}
+  rev:{name:'Выручка (PNL)',unit:'rub',color:'#0d9488',clip0:true},
+  mar:{name:'Маржа (CF)',unit:'rub',color:'#7D3673',clip0:false},
+  pct:{name:'Маржинальность (CF)',unit:'pct',color:'#ca8a04',clip0:false}
 };
-let AVAIL={ip:false,ooo:false},ENT='ip',MET='rev',DATA={},WEEKS=[];
-let BASE={mode:'all',n:4,from:0,to:0};
-try{const s=JSON.parse(localStorage.getItem('ba_shewhart')||'{}');if(s.ent)ENT=s.ent;if(METRICS[s.met])MET=s.met;if(s.base)BASE={...BASE,...s.base};}catch(e){}
+const STEPS={week:{per:'за неделю',unitN:'нед.',title:'Недели',def:{mode:'all',n:4}},day:{per:'за день',unitN:'дн.',title:'Дни',def:{mode:'all',n:20}}};
+let AVAIL={ip:false,ooo:false},ENT='ip',MET='rev',STEP='week',DATA={},WEEKS=[],DAYS=[];
+let BASE={week:{...STEPS.week.def,from:0,to:0},day:{...STEPS.day.def,from:0,to:0}};
+try{const s=JSON.parse(localStorage.getItem('ba_shewhart')||'{}');if(s.ent)ENT=s.ent;if(METRICS[s.met])MET=s.met;if(STEPS[s.step])STEP=s.step;
+  ['week','day'].forEach(k=>{if(s.bases&&s.bases[k])BASE[k]={...BASE[k],mode:s.bases[k].mode,n:s.bases[k].n};});}catch(e){}
 const q=new URLSearchParams(location.search).get('e');if(['ip','ooo','all'].includes(q))ENT=q;
-const save=()=>{try{localStorage.setItem('ba_shewhart',JSON.stringify({ent:ENT,met:MET,base:{mode:BASE.mode,n:BASE.n}}));}catch(e){}};
+const save=()=>{try{localStorage.setItem('ba_shewhart',JSON.stringify({ent:ENT,met:MET,step:STEP,bases:{week:{mode:BASE.week.mode,n:BASE.week.n},day:{mode:BASE.day.mode,n:BASE.day.n}}}));}catch(e){}};
 
 // === даты ===
 const localISO=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -186,45 +199,59 @@ const addDays=(d,n)=>{const r=new Date(d);r.setDate(r.getDate()+n);return r;};
 const ddmm=s=>s.slice(8,10)+'.'+s.slice(5,7);
 const weekEnd=w=>localISO(addDays(parseISO(w),6));
 const weekLabel=w=>ddmm(w)+'–'+ddmm(weekEnd(w));
-// закрытые недели: воскресенье — раньше сегодняшнего дня
+const WD=['вс','пн','вт','ср','чт','пт','сб'];
+const dayLabel=d=>ddmm(d)+' '+WD[parseISO(d).getDay()];
+const isWeekend=d=>{const g=parseISO(d).getDay();return g===0||g===6;};
+const labelOf=x=>STEP==='week'?weekLabel(x.key):dayLabel(x.key);
+// закрытые недели — воскресенье раньше сегодня; дни — по вчера
 function closedMondays(){const today=new Date();today.setHours(0,0,0,0);const out=[];let d=parseISO(START);while(addDays(d,6)<today){out.push(localISO(d));d=addDays(d,7);}return out;}
+function pastDays(){const today=new Date();today.setHours(0,0,0,0);const out=[];let d=parseISO(START);while(d<today){out.push(localISO(d));d=addDays(d,1);}return out;}
 
 // === формат ===
 const fmtMln=v=>(v/1e6).toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2})+' млн';
+const fmtTys=v=>Math.round(v/1e3).toLocaleString('ru-RU')+' тыс';
 const fmtRub=v=>Math.round(v).toLocaleString('ru-RU')+' ₽';
 const fmtPct=v=>v.toLocaleString('ru-RU',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';
-const fmtV=(m,v)=>m.unit==='pct'?fmtPct(v):fmtMln(v);
+// дневные суммы — в тыс ₽, недельные — в млн ₽
+const fmtV=(m,v)=>m.unit==='pct'?fmtPct(v):STEP==='day'?fmtTys(v):fmtMln(v);
+const fmtAxis=(m,v)=>m.unit==='pct'?fmtPct(v):STEP==='day'?Math.round(v/1e3).toLocaleString('ru-RU'):(v/1e6).toLocaleString('ru-RU',{maximumFractionDigits:2});
 const fmtExact=(m,v)=>m.unit==='pct'?v.toLocaleString('ru-RU',{maximumFractionDigits:2})+'%':fmtRub(v);
 const esc=s=>String(s).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
 
-// === загрузка: постранично, сортировка по уникальному id ===
+// === загрузка: постранично, сортировка по уникальному ключу ===
 async function fetchPages(b,q){let out=[],off=0;while(true){const r=await fetch(BASES[b].url+'/rest/v1/'+q+`${q.includes('order=')?'':'&order=id'}&limit=1000&offset=${off}`,{headers:HDS[b]});if(!r.ok)throw new Error(`${BASES[b].name}: HTTP ${r.status} ${q.split('?')[0]}`);const j=await r.json();out=out.concat(j);if(j.length<1000)break;off+=1000;}return out;}
 async function lastDate(b,table,col){const r=await fetch(BASES[b].url+`/rest/v1/${table}?select=${col}&order=${col}.desc&limit=1`,{headers:HDS[b]});if(!r.ok)return null;const j=await r.json();return j[0]?j[0][col]:null;}
 async function loadBase(b){
   if(DATA[b])return DATA[b];
-  const lastMon=WEEKS[WEEKS.length-1];
-  // выручка PNL — по неделям параллельно (у артикула за день много строк — по складам)
-  const revW=await Promise.all(WEEKS.map(async w=>{
-    const rows=await fetchPages(b,`product_sales?sale_date=gte.${w}&sale_date=lte.${weekEnd(w)}&select=sale_date,revenue`);
-    return {rev:rows.reduce((s,x)=>s+Number(x.revenue||0),0),days:new Set(rows.map(x=>x.sale_date)).size};
-  }));
-  // CF — недельные факты по товарам (ключ — понедельник; итог недели = сумма по товарам)
-  const cf={};
-  (await fetchPages(b,`sales_plan_weeks?week=gte.${START}&week=lte.${lastMon}&metric=in.(mar,revn)&fact=not.is.null&select=week,metric,fact,cost_provisional`)).forEach(r=>{
-    const g=cf[r.week]=cf[r.week]||{mar:0,revn:0,prov:false};
-    g[r.metric]+=Number(r.fact||0);if(r.cost_provisional)g.prov=true;
-  });
-  const lastAd=await lastDate(b,'ozon_ad_spend','spend_date');
-  DATA[b]={weeks:WEEKS.map((w,i)=>({w,rev:revW[i].days?revW[i].rev:null,days:revW[i].days,mar:cf[w]?cf[w].mar:null,revn:cf[w]?cf[w].revn:null,prov:!!(cf[w]&&cf[w].prov),adsShort:!!cf[w]&&(!lastAd||lastAd<weekEnd(w))}))};
+  // выручка PNL по дням — запросы по неделям параллельно (у артикула за день много строк — по складам)
+  const chunks=[];for(let i=0;i<DAYS.length;i+=7)chunks.push([DAYS[i],DAYS[Math.min(i+6,DAYS.length-1)]]);
+  const rev={};
+  (await Promise.all(chunks.map(([a,z])=>fetchPages(b,`product_sales?sale_date=gte.${a}&sale_date=lte.${z}&select=sale_date,revenue`)))).flat()
+    .forEach(x=>{rev[x.sale_date]=(rev[x.sale_date]||0)+Number(x.revenue||0);});
+  // CF недели — sales_plan_weeks (ключ — понедельник), CF дня — cf_daily; итог = сумма по товарам
+  const cfW={},cfD={};
+  const addCf=(g,mar,revn,prov)=>{g.mar+=Number(mar||0);g.revn+=Number(revn||0);if(prov)g.prov=true;};
+  const [wRows,dRows,lastAd]=await Promise.all([
+    WEEKS.length?fetchPages(b,`sales_plan_weeks?week=gte.${START}&week=lte.${WEEKS[WEEKS.length-1]}&metric=in.(mar,revn)&fact=not.is.null&select=week,metric,fact,cost_provisional`):[],
+    fetchPages(b,`cf_daily?day=gte.${START}&select=day,mar,revn,cost_provisional&order=product_id,day`).catch(e=>{console.warn('cf_daily:',e.message);return [];}),
+    lastDate(b,'ozon_ad_spend','spend_date')
+  ]);
+  wRows.forEach(r=>{const g=cfW[r.week]=cfW[r.week]||{mar:0,revn:0,prov:false};g[r.metric]+=Number(r.fact||0);if(r.cost_provisional)g.prov=true;});
+  dRows.forEach(r=>addCf(cfD[r.day]=cfD[r.day]||{mar:0,revn:0,prov:false},r.mar,r.revn,r.cost_provisional));
+  const adsShort=end=>!lastAd||lastAd<end;
+  const week=WEEKS.map(w=>{const ds=DAYS.filter(d=>d>=w&&d<=weekEnd(w)).filter(d=>rev[d]!=null);const c=cfW[w];
+    return {key:w,rev:ds.length?ds.reduce((s,d)=>s+rev[d],0):null,days:ds.length,mar:c?c.mar:null,revn:c?c.revn:null,prov:!!(c&&c.prov),adsShort:!!c&&adsShort(weekEnd(w)),we:false};});
+  const day=DAYS.map(d=>{const c=cfD[d];return {key:d,rev:rev[d]!=null?rev[d]:null,days:rev[d]!=null?1:0,mar:c?c.mar:null,revn:c?c.revn:null,prov:!!(c&&c.prov),adsShort:!!c&&adsShort(d),we:isWeekend(d)};});
+  DATA[b]={week,day};
   return DATA[b];
 }
-// «Вместе»: суммы двух баз; у юрлица нет данных за неделю (ООО — с 01.10.2026) — берём только второе, с пометкой only
-function combine(a,o){
+// «Вместе»: суммы двух баз; у юрлица нет данных за точку (ООО — с 01.10.2026) — берём только второе, с пометкой only
+function combine(A,B){
   const sum=(x,y)=>x==null?y:y==null?x:x+y;
-  return {weeks:a.weeks.map((x,i)=>{const y=o.weeks[i];
+  return A.map((x,i)=>{const y=B[i];
     const only=x.rev==null&&x.mar==null?'ООО':y.rev==null&&y.mar==null?'ИП':'';
-    return {w:x.w,rev:sum(x.rev,y.rev),days:x.rev==null?y.days:y.rev==null?x.days:Math.min(x.days,y.days),mar:sum(x.mar,y.mar),revn:sum(x.revn,y.revn),
-      prov:(x.mar!=null&&x.prov)||(y.mar!=null&&y.prov),adsShort:x.adsShort||y.adsShort,only};})};
+    return {key:x.key,we:x.we,rev:sum(x.rev,y.rev),days:x.rev==null?y.days:y.rev==null?x.days:Math.min(x.days,y.days),mar:sum(x.mar,y.mar),revn:sum(x.revn,y.revn),
+      prov:(x.mar!=null&&x.prov)||(y.mar!=null&&y.prov),adsShort:x.adsShort||y.adsShort,only};});
 }
 const valOf=(k,x)=>k==='rev'?x.rev:k==='mar'?x.mar:(x.revn>0&&x.mar!=null?x.mar/x.revn*100:null);
 
@@ -236,7 +263,7 @@ function shewhart(vals,clip0){
   const lcl=cl-3*sigma;
   return {cl,avgMR,sigma,ucl:cl+3*sigma,lcl:clip0?Math.max(0,lcl):lcl,n:vals.length};
 }
-// сигналы по всем неделям против границ базы; pts — [{i,v}] без пропусков данных
+// сигналы против границ базы; pts — [{i,v}] без пропусков данных и без выходных
 function findSignals(pts,L){
   const out=[],mark=new Set();
   const add=(rule,ids,text)=>{ids.forEach(i=>mark.add(i));out.push({rule,ids,text});};
@@ -262,16 +289,16 @@ function findSignals(pts,L){
   return {list:out,mark};
 }
 
-// === окно базы ===
+// === окно базы (индексы точек выбранного шага) ===
 function baseRange(){
-  const n=WEEKS.length;
-  if(BASE.mode==='last'){const k=Math.max(3,Math.min(n,BASE.n|0||3));return [n-k,n-1];}
-  if(BASE.mode==='range'){const a=Math.max(0,Math.min(BASE.from,n-1)),b=Math.max(0,Math.min(BASE.to,n-1));return a<=b?[a,b]:[b,a];}
+  const n=(STEP==='week'?WEEKS:DAYS).length,B=BASE[STEP];
+  if(B.mode==='last'){const k=Math.max(3,Math.min(n,B.n|0||3));return [n-k,n-1];}
+  if(B.mode==='range'){const a=Math.max(0,Math.min(B.from,n-1)),b=Math.max(0,Math.min(B.to,n-1));return a<=b?[a,b]:[b,a];}
   return [0,n-1];
 }
 
 // === график (SVG) ===
-function chartSVG(m,series,L,sig,ra){
+function chartSVG(m,P,series,L,sig,ra){
   const W=1000,H=360,pl=70,pr=104,pt=22,pb=40,n=series.length;
   const vals=series.filter(v=>v!=null);
   let lo=Math.min(...vals,L?L.lcl:Infinity,L?L.cl-2*L.sigma:Infinity),hi=Math.max(...vals,L?L.ucl:-Infinity);
@@ -286,77 +313,85 @@ function chartSVG(m,series,L,sig,ra){
   s+=`<rect x="${bx0}" y="${pt}" width="${Math.max(16,bx1-bx0)}" height="${H-pt-pb}" fill="rgba(120,166,199,0.12)" rx="6"/>`;
   s+=`<text x="${(bx0+bx1)/2}" y="${pt+14}" text-anchor="middle" font-size="12" fill="#94a3b8">база границ</text>`;
   // сетка
-  for(let k=0;k<=4;k++){const v=lo+(hi-lo)*k/4,y=Y(v);s+=`<line x1="${pl}" x2="${W-pr}" y1="${y}" y2="${y}" stroke="rgba(84,66,115,0.1)"/><text x="${pl-8}" y="${y+4}" text-anchor="end" font-size="13" fill="${C_TXT}">${m.unit==='pct'?fmtPct(v):(v/1e6).toLocaleString('ru-RU',{maximumFractionDigits:2})}</text>`;}
-  if(m.unit!=='pct')s+=`<text x="${pl-8}" y="${pt-7}" text-anchor="end" font-size="12" fill="#94a3b8">млн ₽</text>`;
+  for(let k=0;k<=4;k++){const v=lo+(hi-lo)*k/4,y=Y(v);s+=`<line x1="${pl}" x2="${W-pr}" y1="${y}" y2="${y}" stroke="rgba(84,66,115,0.1)"/><text x="${pl-8}" y="${y+4}" text-anchor="end" font-size="13" fill="${C_TXT}">${fmtAxis(m,v)}</text>`;}
+  if(m.unit!=='pct')s+=`<text x="${pl-8}" y="${pt-7}" text-anchor="end" font-size="12" fill="#94a3b8">${STEP==='day'?'тыс ₽':'млн ₽'}</text>`;
   if(lo<0&&hi>0)s+=`<line x1="${pl}" x2="${W-pr}" y1="${Y(0)}" y2="${Y(0)}" stroke="rgba(28,13,46,0.45)"/>`;
   // линии карты
   if(L){
-    const hl=(v,col,dash,w,lab)=>{if(v<lo||v>hi)return;const y=Y(v);s+=`<line x1="${pl}" x2="${W-pr}" y1="${y}" y2="${y}" stroke="${col}" stroke-width="${w}" stroke-dasharray="${dash}"/>`;if(lab)s+=`<text x="${W-pr+6}" y="${y+4}" font-size="13" fill="${col}">${lab}</text>`;};
+    const lab=v=>fmtV(m,v).replace(/ (млн|тыс)$/,'');
+    const hl=(v,col,dash,w,t)=>{if(v<lo||v>hi)return;const y=Y(v);s+=`<line x1="${pl}" x2="${W-pr}" y1="${y}" y2="${y}" stroke="${col}" stroke-width="${w}" stroke-dasharray="${dash}"/>`;if(t)s+=`<text x="${W-pr+6}" y="${y+4}" font-size="13" fill="${col}">${t}</text>`;};
     hl(L.cl+2*L.sigma,'rgba(84,66,115,0.3)','2 5',1,'');hl(L.cl-2*L.sigma,'rgba(84,66,115,0.3)','2 5',1,'');
-    hl(L.ucl,C_SIG,'6 5',2,'UCL '+fmtV(m,L.ucl).replace(' млн',''));
-    hl(L.lcl,C_SIG,'6 5',2,'LCL '+fmtV(m,L.lcl).replace(' млн',''));
-    hl(L.cl,C_CL,'10 6',2,'CL '+fmtV(m,L.cl).replace(' млн',''));
+    hl(L.ucl,C_SIG,'6 5',2,'UCL '+lab(L.ucl));hl(L.lcl,C_SIG,'6 5',2,'LCL '+lab(L.lcl));hl(L.cl,C_CL,'10 6',2,'CL '+lab(L.cl));
   }
-  // ряд: разрывы на неделях без данных
-  let path='',pen=false;series.forEach((v,i)=>{if(v==null){pen=false;return;}path+=(pen?'L':'M')+X(i)+' '+Y(v)+' ';pen=true;});
-  s+=`<path d="${path}" fill="none" stroke="${m.color}" stroke-width="3" stroke-linejoin="round"/>`;
-  series.forEach((v,i)=>{if(v==null)return;const hot=sig.mark.has(i);
-    s+=`<circle cx="${X(i)}" cy="${Y(v)}" r="${hot?8:6}" fill="${hot?C_SIG:m.color}" stroke="#fff" stroke-width="2" data-i="${i}" style="cursor:pointer"/>`;});
-  // подписи недель (при тесноте — через одну)
-  const every=Math.ceil(n/14);
-  WEEKS.forEach((w,i)=>{if(i%every&&i!==n-1)return;s+=`<text x="${X(i)}" y="${H-pb+22}" text-anchor="middle" font-size="13" fill="${C_TXT}">${ddmm(w)}</text>`;});
+  // ряд будних точек (выходные линию не прерывают и в неё не входят); разрыв — точка без данных
+  let path='',pen=false;series.forEach((v,i)=>{if(P[i].we)return;if(v==null){pen=false;return;}path+=(pen?'L':'M')+X(i)+' '+Y(v)+' ';pen=true;});
+  s+=`<path d="${path}" fill="none" stroke="${m.color}" stroke-width="${STEP==='day'?2:3}" stroke-linejoin="round"/>`;
+  const r0=STEP==='day'?4:6;
+  series.forEach((v,i)=>{if(v==null)return;
+    if(P[i].we){s+=`<circle cx="${X(i)}" cy="${Y(v)}" r="${r0}" fill="#fff" stroke="#94a3b8" stroke-width="2" data-i="${i}" style="cursor:pointer"/>`;return;}
+    const hot=sig.mark.has(i);
+    s+=`<circle cx="${X(i)}" cy="${Y(v)}" r="${hot?r0+2:r0}" fill="${hot?C_SIG:m.color}" stroke="#fff" stroke-width="2" data-i="${i}" style="cursor:pointer"/>`;});
+  // подписи оси (при тесноте — реже; у дней — понедельники)
+  P.forEach((x,i)=>{const show=STEP==='day'?parseISO(x.key).getDay()===1:(i%Math.ceil(n/14)===0||i===n-1);if(!show)return;
+    s+=`<text x="${X(i)}" y="${H-pb+22}" text-anchor="middle" font-size="13" fill="${C_TXT}">${ddmm(x.key)}</text>`;});
   return s+'</svg>';
 }
 
 // === отрисовка ===
 function current(){
-  if(ENT==='all')return DATA.ip&&DATA.ooo?combine(DATA.ip,DATA.ooo):null;
-  return DATA[ENT]||null;
+  const pick=b=>DATA[b]&&DATA[b][STEP];
+  if(ENT==='all')return pick('ip')&&pick('ooo')?combine(pick('ip'),pick('ooo')):null;
+  return pick(ENT)||null;
 }
 function render(){
-  const D=current(),ra=baseRange(),m=METRICS[MET];
+  const P=current(),ra=baseRange(),m=METRICS[MET],st=STEPS[STEP];
   ['ip','ooo','all'].forEach(e=>{const b=document.getElementById('ent_'+e);b.classList.toggle('on',e===ENT);b.disabled=e==='all'?!(AVAIL.ip&&AVAIL.ooo):!AVAIL[e];});
+  ['day','week'].forEach(k=>document.getElementById('step_'+k).classList.toggle('on',k===STEP));
   document.getElementById('metricSel').value=MET;
-  if(!D)return;
-  const series=D.weeks.map(x=>valOf(MET,x));
-  const baseVals=series.slice(ra[0],ra[1]+1).filter(v=>v!=null);
+  if(!P)return;
+  const series=P.map(x=>valOf(MET,x));
+  const inBase=i=>i>=ra[0]&&i<=ra[1];
+  const baseVals=series.map((v,i)=>({v,i})).filter(p=>p.v!=null&&!P[p.i].we&&inBase(p.i)).map(p=>p.v);
   const L=baseVals.length>=3?shewhart(baseVals,m.clip0):null;
-  const pts=series.map((v,i)=>({i,v})).filter(p=>p.v!=null);
+  const pts=series.map((v,i)=>({i,v})).filter(p=>p.v!=null&&!P[p.i].we);
   const sig=L?findSignals(pts,L):{list:[],mark:new Set()};
   const pre=L&&L.n<20;
   const stats=L?[['CL',fmtV(m,L.cl)],['MR̄',fmtV(m,L.avgMR)],['σ',fmtV(m,L.sigma)],['UCL',fmtV(m,L.ucl)],['LCL',fmtV(m,L.lcl)]].map(([a,b])=>`<div class="stat"><span>${a}</span>${b}</div>`).join('')+
-    `<div class="stat${pre?' pre':''}" title="${pre?'Меньше 20 недель — границы уточняются с каждой новой неделей':''}"><span>недель в базе</span>${L.n}${pre?' · предварительно':''}</div>`:'';
+    `<div class="stat${pre?' pre':''}" title="${pre?'Меньше 20 точек — границы уточняются с каждой новой точкой':''}"><span>${STEP==='day'?'будних дней':'недель'} в базе</span>${L.n}${pre?' · предварительно':''}</div>`:'';
   const box=document.getElementById('chart');
-  box.innerHTML=`<div class="chart-head"><h2>${m.name}</h2>`+
+  box.innerHTML=`<div class="chart-head"><h2>${m.name} ${m.unit==='pct'?(STEP==='day'?'дня':'недели'):st.per}</h2>`+
     (L?`<span class="badge ${sig.list.length?'alert':'ok'}">${sig.list.length?'Сигналов: '+sig.list.length:'Сигналов нет — обычный разброс'}</span>`:'')+
     `<div class="stats">${stats}</div></div>`+
-    (pts.length?`<div class="chart-box">${chartSVG(m,series,L,sig,ra)}<div class="tooltip"></div></div>`:`<div class="empty">Нет данных за эти недели</div>`)+
-    (L?`<ul class="signals">${sig.list.length?sig.list.map(s=>`<li>${s.ids.map(i=>weekLabel(WEEKS[i])).join(', ')}: ${esc(s.text)}</li>`).join(''):'<li class="none">Все точки внутри границ, серий нет — реагировать на колебания не нужно.</li>'}</ul>`:(pts.length?'<ul class="signals"><li>В базе меньше 3 недель с данными — границы не считаются.</li></ul>':''));
+    (series.some(v=>v!=null)?`<div class="chart-box">${chartSVG(m,P,series,L,sig,ra)}<div class="tooltip"></div></div>`:`<div class="empty">Нет данных за этот период</div>`)+
+    (STEP==='day'?'<div class="legend"><span><i class="dot"></i>выходной — в границы и сигналы не входит</span></div>':'')+
+    (L?`<ul class="signals">${sig.list.length?sig.list.map(s=>`<li>${s.ids.map(i=>labelOf(P[i])).join(', ')}: ${esc(s.text)}</li>`).join(''):'<li class="none">Все точки внутри границ, серий нет — реагировать на колебания не нужно.</li>'}</ul>`:(series.some(v=>v!=null)?`<ul class="signals"><li>В базе меньше 3 ${STEP==='day'?'будних дней':'недель'} с данными — границы не считаются.</li></ul>`:''));
   const cb=box.querySelector('.chart-box');
-  if(cb)bindTip(cb,m,series,L,D);
-  renderTable(D,ra);
+  if(cb)bindTip(cb,m,P,series,L);
+  renderTable(P,ra);
 }
-function bindTip(cb,m,series,L,D){
+function bindTip(cb,m,P,series,L){
   const tip=cb.querySelector('.tooltip');
   cb.addEventListener('mousemove',e=>{
     const c=e.target.closest('circle[data-i]');if(!c){tip.style.display='none';return;}
-    const i=+c.dataset.i,v=series[i],x=D.weeks[i];
-    let h=`<b>${weekLabel(x.w)}</b>${x.only?' (только '+x.only+')':''}<br>${m.name}: ${fmtExact(m,v)}`;
-    if(L)h+=`<br>к CL: ${v>=L.cl?'+':''}${m.unit==='pct'?(v-L.cl).toLocaleString('ru-RU',{maximumFractionDigits:1})+' п.п.':fmtRub(v-L.cl)}`;
-    if(MET!=='rev'&&x.adsShort)h+='<br>⚠ реклама загружена не за всю неделю — маржа завышена';
+    const i=+c.dataset.i,v=series[i],x=P[i];
+    let h=`<b>${labelOf(x)}</b>${x.only?' (только '+x.only+')':''}<br>${m.name}: ${fmtExact(m,v)}`;
+    if(x.we)h+='<br>выходной — в границы и сигналы не входит';
+    else if(L)h+=`<br>к CL: ${v>=L.cl?'+':''}${m.unit==='pct'?(v-L.cl).toLocaleString('ru-RU',{maximumFractionDigits:1})+' п.п.':fmtRub(v-L.cl)}`;
+    if(MET!=='rev'&&x.adsShort)h+=`<br>⚠ реклама загружена не за ${STEP==='day'?'этот день':'всю неделю'} — маржа завышена`;
     if(MET!=='rev'&&x.prov)h+='<br>* себестоимость части товаров — предварительная';
-    if(MET==='rev'&&x.days<7)h+=`<br>дней с заказами: ${x.days} из 7`;
+    if(STEP==='week'&&MET==='rev'&&x.days<7)h+=`<br>дней с заказами: ${x.days} из 7`;
     tip.innerHTML=h;tip.style.display='block';
     const r=cb.getBoundingClientRect();let lx=e.clientX-r.left+14;if(lx+tip.offsetWidth>r.width)lx=e.clientX-r.left-tip.offsetWidth-14;
     tip.style.left=lx+'px';tip.style.top=Math.max(0,e.clientY-r.top-tip.offsetHeight-10)+'px';
   });
   cb.addEventListener('mouseleave',()=>{tip.style.display='none';});
 }
-function renderTable(D,ra){
-  const rows=D.weeks.map((x,i)=>{const p=valOf('pct',x);
-    return `<tr class="${i>=ra[0]&&i<=ra[1]?'in-base':''}"><td>${weekLabel(x.w)}${x.only?' <span class="muted">(только '+x.only+')</span>':''}</td><td>${x.rev!=null?fmtRub(x.rev):'—'}${x.rev!=null&&x.days<7?' <span class="warn" title="дней с заказами">('+x.days+' дн)</span>':''}</td><td>${x.mar!=null?fmtRub(x.mar):'—'}${x.mar!=null&&x.prov?' *':''}${x.mar!=null&&x.adsShort?' <span class="warn" title="реклама загружена не за всю неделю — маржа завышена">⚠</span>':''}</td><td>${x.revn!=null?fmtRub(x.revn):'—'}</td><td>${p!=null?fmtPct(p):'—'}</td></tr>`;}).reverse().join('');
-  document.getElementById('weekTable').innerHTML=`<table><tr><th>Неделя</th><th>Выручка (PNL)</th><th>Маржа (CF)</th><th>GMV (CF)</th><th>Маржинальность</th></tr>${rows}</table>`+
-    (D.weeks.some(x=>x.prov)?'<div class="muted" style="margin-top:6px;font-size:.9em">* у части товаров себестоимость предварительная (cost_provisional); подсвечены недели базы границ</div>':'<div class="muted" style="margin-top:6px;font-size:.9em">подсвечены недели базы границ</div>');
+function renderTable(P,ra){
+  document.getElementById('tblTitle').textContent=STEPS[STEP].title;
+  const rows=P.map((x,i)=>{const p=valOf('pct',x);
+    return `<tr class="${i>=ra[0]&&i<=ra[1]&&!x.we?'in-base':''}${x.we?' we':''}"><td>${labelOf(x)}${x.only?' <span class="muted">(только '+x.only+')</span>':''}</td><td>${x.rev!=null?fmtRub(x.rev):'—'}${STEP==='week'&&x.rev!=null&&x.days<7?' <span class="warn" title="дней с заказами">('+x.days+' дн)</span>':''}</td><td>${x.mar!=null?fmtRub(x.mar):'—'}${x.mar!=null&&x.prov?' *':''}${x.mar!=null&&x.adsShort?' <span class="warn" title="реклама загружена не полностью — маржа завышена">⚠</span>':''}</td><td>${x.revn!=null?fmtRub(x.revn):'—'}</td><td>${p!=null?fmtPct(p):'—'}</td></tr>`;}).reverse().join('');
+  document.getElementById('pointTable').innerHTML=`<table><tr><th>${STEP==='day'?'День':'Неделя'}</th><th>Выручка (PNL)</th><th>Маржа (CF)</th><th>GMV (CF)</th><th>Маржинальность</th></tr>${rows}</table>`+
+    `<div class="muted" style="margin-top:6px;font-size:.9em">${P.some(x=>x.prov)?'* у части товаров себестоимость предварительная (cost_provisional); ':''}подсвечены точки базы границ${STEP==='day'?'; серым — выходные':''}</div>`;
 }
 
 // === управление ===
@@ -368,17 +403,25 @@ async function setEnt(e){
   render();
 }
 function setMetric(k){if(!METRICS[k])return;MET=k;save();render();}
-function syncBaseUI(){
+function setStep(k){if(!STEPS[k]||k===STEP)return;STEP=k;save();syncBaseUI(true);render();}
+function syncBaseUI(rebuild){
+  const B=BASE[STEP],list=STEP==='week'?WEEKS:DAYS,lab=STEP==='week'?weekLabel:dayLabel;
   const md=document.getElementById('baseMode'),bn=document.getElementById('baseN'),bf=document.getElementById('baseFrom'),bt=document.getElementById('baseTo');
-  md.value=BASE.mode;bn.value=BASE.n;bn.max=WEEKS.length;
-  bn.classList.toggle('hide',BASE.mode!=='last');bf.classList.toggle('hide',BASE.mode!=='range');bt.classList.toggle('hide',BASE.mode!=='range');
-  if(!bf.options.length){const o=WEEKS.map((w,i)=>`<option value="${i}">${weekLabel(w)}</option>`).join('');bf.innerHTML=o;bt.innerHTML=o;}
-  bf.value=Math.min(BASE.from,WEEKS.length-1);bt.value=Math.min(BASE.to,WEEKS.length-1);
+  if(rebuild||!md.options.length){
+    md.innerHTML=STEP==='week'?'<option value="all">всем неделям</option><option value="last">последним N неделям</option><option value="range">неделям с … по …</option>'
+      :'<option value="all">всем дням</option><option value="last">последним N дням</option><option value="range">дням с … по …</option>';
+    const o=list.map((w,i)=>`<option value="${i}">${lab(w)}</option>`).join('');bf.innerHTML=o;bt.innerHTML=o;
+    bn.title=STEP==='week'?'Сколько последних закрытых недель':'Сколько последних дней (выходные в расчёт не входят)';
+  }
+  md.value=B.mode;bn.value=B.n;bn.max=list.length;
+  bn.classList.toggle('hide',B.mode!=='last');bf.classList.toggle('hide',B.mode!=='range');bt.classList.toggle('hide',B.mode!=='range');
+  bf.value=Math.min(B.from,list.length-1);bt.value=Math.min(B.to,list.length-1);
 }
 function setBase(){
-  BASE.mode=document.getElementById('baseMode').value;
-  BASE.n=Math.max(3,Math.min(WEEKS.length,parseInt(document.getElementById('baseN').value,10)||3));
-  if(BASE.mode==='range'){BASE.from=+document.getElementById('baseFrom').value;BASE.to=+document.getElementById('baseTo').value;}
+  const B=BASE[STEP],n=(STEP==='week'?WEEKS:DAYS).length;
+  B.mode=document.getElementById('baseMode').value;
+  B.n=Math.max(3,Math.min(n,parseInt(document.getElementById('baseN').value,10)||3));
+  if(B.mode==='range'){B.from=+document.getElementById('baseFrom').value;B.to=+document.getElementById('baseTo').value;}
   save();syncBaseUI();render();
 }
 
@@ -389,10 +432,11 @@ async function go(){
   try{AVAIL.ooo=await BA_AUTH.login(BASES.ooo.url,HDS.ooo);}catch(e){AVAIL.ooo=false;}
   document.getElementById('login').classList.add('hide');
   document.getElementById('app').classList.remove('hide');
-  WEEKS=closedMondays();
-  if(!WEEKS.length){document.getElementById('chart').innerHTML='<div class="empty">Закрытых недель с '+ddmm(START)+' ещё нет.</div>';return;}
-  BASE.from=0;BASE.to=WEEKS.length-1;
-  syncBaseUI();
+  WEEKS=closedMondays();DAYS=pastDays();
+  if(!DAYS.length){document.getElementById('chart').innerHTML='<div class="empty">Данных с '+ddmm(START)+' ещё нет.</div>';return;}
+  if(!WEEKS.length)STEP='day';
+  BASE.week.from=0;BASE.week.to=Math.max(0,WEEKS.length-1);BASE.day.from=0;BASE.day.to=DAYS.length-1;
+  syncBaseUI(true);
   if(ENT==='all'&&!AVAIL.ooo)ENT='ip';
   if(ENT==='ooo'&&!AVAIL.ooo)ENT='ip';
   setEnt(ENT);
