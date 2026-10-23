@@ -80,6 +80,12 @@
         .plan-tbl th { position: static; }
         .plan-tbl tr.derived td { color: #544273; }
         .pl-ok { color: #16a34a; } .pl-low { color: #b45309; } .pl-bad { color: #dc2626; }
+        .pr-tbl td { white-space: nowrap; }
+        .pr-tbl th { position: sticky; top: 0; background: #fff; text-align: center; }
+        .pr-tbl tr:nth-child(2) th { top: 27px; }
+        .pr-tbl tr.pr-group td { background: rgba(120,166,199,.1); }
+        .pr-tbl tr.pr-member td:first-child { padding-left: 24px; color: #544273; }
+        .pr-tbl tr.pr-total td { font-weight: 700; border-top: 2px solid rgba(84,66,115,.25); position: sticky; bottom: 0; background: #fff; }
         .muted { color: #94a3b8; }
         .warn { color: #b45309; }
         .method { margin-top: 10px; font-size: .95em; color: #544273; line-height: 1.55; }
@@ -152,6 +158,7 @@
             </div>
             <div class="wrap" id="chart"></div>
             <div class="wrap" id="planCard"></div>
+            <div class="wrap" id="prodCard"></div>
             <div class="wrap">
                 <details>
                     <summary id="tblTitle">Недели</summary>
@@ -238,23 +245,30 @@ async function loadBase(b){
   // выручка PNL по дням — запросы по неделям параллельно (у артикула за день много строк — по складам)
   const chunks=[];for(let i=0;i<DAYS.length;i+=7)chunks.push([DAYS[i],DAYS[Math.min(i+6,DAYS.length-1)]]);
   const rev={},qty={};
-  (await Promise.all(chunks.map(([a,z])=>fetchPages(b,`product_sales?sale_date=gte.${a}&sale_date=lte.${z}&select=sale_date,revenue,qty`)))).flat()
-    .forEach(x=>{rev[x.sale_date]=(rev[x.sale_date]||0)+Number(x.revenue||0);qty[x.sale_date]=(qty[x.sale_date]||0)+Number(x.qty||0);});
+  const prods=await fetchPages(b,'products?select=product_id,offer_id,archived&order=product_id');
+  const PID={};prods.forEach(p=>{if(p.offer_id)PID[p.offer_id]=p.product_id;});
+  const pd=new Map();   // по товарам: product_id → день → {rev,qty,mar,revn,prov}
+  const cell=(pid,d)=>{let m=pd.get(pid);if(!m){m=new Map();pd.set(pid,m);}let g=m.get(d);if(!g){g={rev:0,qty:0,mar:0,revn:0,prov:false};m.set(d,g);}return g;};
+  (await Promise.all(chunks.map(([a,z])=>fetchPages(b,`product_sales?sale_date=gte.${a}&sale_date=lte.${z}&select=sale_date,offer_id,revenue,qty`)))).flat()
+    .forEach(x=>{const r=Number(x.revenue||0),qn=Number(x.qty||0);rev[x.sale_date]=(rev[x.sale_date]||0)+r;qty[x.sale_date]=(qty[x.sale_date]||0)+qn;
+      const pid=PID[x.offer_id];if(pid!=null){const g=cell(pid,x.sale_date);g.rev+=r;g.qty+=qn;}});
   // CF недели — sales_plan_weeks (ключ — понедельник), CF дня — cf_daily; итог = сумма по товарам
   const cfW={},cfD={};
   const addCf=(g,mar,revn,prov)=>{g.mar+=Number(mar||0);g.revn+=Number(revn||0);if(prov)g.prov=true;};
   const [wRows,dRows,lastAd]=await Promise.all([
-    WEEKS.length?fetchPages(b,`sales_plan_weeks?week=gte.${START}&week=lte.${WEEKS[WEEKS.length-1]}&metric=in.(mar,revn)&fact=not.is.null&select=week,metric,fact,cost_provisional`):[],
-    fetchPages(b,`cf_daily?day=gte.${START}&select=day,mar,revn,cost_provisional&order=product_id,day`).catch(e=>{console.warn('cf_daily:',e.message);return [];}),
+    WEEKS.length?fetchPages(b,`sales_plan_weeks?week=gte.${START}&week=lte.${WEEKS[WEEKS.length-1]}&metric=in.(mar,revn)&fact=not.is.null&select=product_id,week,metric,fact,cost_provisional`):[],
+    fetchPages(b,`cf_daily?day=gte.${START}&select=product_id,day,mar,revn,cost_provisional&order=product_id,day`).catch(e=>{console.warn('cf_daily:',e.message);return [];}),
     lastDate(b,'ozon_ad_spend','spend_date')
   ]);
-  wRows.forEach(r=>{const g=cfW[r.week]=cfW[r.week]||{mar:0,revn:0,prov:false};g[r.metric]+=Number(r.fact||0);if(r.cost_provisional)g.prov=true;});
-  dRows.forEach(r=>addCf(cfD[r.day]=cfD[r.day]||{mar:0,revn:0,prov:false},r.mar,r.revn,r.cost_provisional));
+  const pw=new Map();   // по товарам: product_id → неделя → {mar,revn,prov} (sales_plan_weeks)
+  wRows.forEach(r=>{const g=cfW[r.week]=cfW[r.week]||{mar:0,revn:0,prov:false};g[r.metric]+=Number(r.fact||0);if(r.cost_provisional)g.prov=true;
+    let m=pw.get(r.product_id);if(!m){m=new Map();pw.set(r.product_id,m);}const h=m.get(r.week)||{mar:0,revn:0,prov:false};h[r.metric]+=Number(r.fact||0);if(r.cost_provisional)h.prov=true;m.set(r.week,h);});
+  dRows.forEach(r=>{addCf(cfD[r.day]=cfD[r.day]||{mar:0,revn:0,prov:false},r.mar,r.revn,r.cost_provisional);addCf(cell(r.product_id,r.day),r.mar,r.revn,r.cost_provisional);});
   const adsShort=end=>!lastAd||lastAd<end;
   const week=WEEKS.map(w=>{const ds=DAYS.filter(d=>d>=w&&d<=weekEnd(w)).filter(d=>rev[d]!=null);const c=cfW[w];
     return {key:w,rev:ds.length?ds.reduce((s,d)=>s+rev[d],0):null,qty:ds.reduce((s,d)=>s+qty[d],0),days:ds.length,mar:c?c.mar:null,revn:c?c.revn:null,prov:!!(c&&c.prov),adsShort:!!c&&adsShort(weekEnd(w)),we:false};});
   const day=DAYS.map(d=>{const c=cfD[d];return {key:d,rev:rev[d]!=null?rev[d]:null,qty:qty[d]||0,days:rev[d]!=null?1:0,mar:c?c.mar:null,revn:c?c.revn:null,prov:!!(c&&c.prov),adsShort:!!c&&adsShort(d),we:isWeekend(d)};});
-  DATA[b]={week,day};
+  DATA[b]={week,day,prods,pd,pw};
   return DATA[b];
 }
 // «Вместе»: суммы двух баз; у юрлица нет данных за точку (ООО — с 01.10.2026) — берём только второе, с пометкой only
@@ -396,8 +410,8 @@ async function loadPlan(b,mk){
   const key=b+mk;if(PLAN_CACHE[key])return PLAN_CACHE[key];
   const [prods,rows]=await Promise.all([fetchPages(b,'products?select=product_id,archived&order=product_id'),fetchPages(b,`sales_plan?month=eq.${mk}&select=product_id,plan_qty,price,margin_pct&order=product_id`)]);
   const arch=new Set(prods.filter(p=>p.archived).map(p=>p.product_id));
-  const g={rev:0,qty:0,mar:0,n:0};
-  rows.forEach(r=>{if(arch.has(r.product_id))return;const q=Number(r.plan_qty||0),p=Number(r.price||0),pc=Number(r.margin_pct||0);if(!q)return;g.rev+=q*p;g.qty+=q;g.mar+=q*p*pc/100;g.n++;});
+  const g={rev:0,qty:0,mar:0,n:0,byPid:new Map()};
+  rows.forEach(r=>{if(arch.has(r.product_id))return;const q=Number(r.plan_qty||0),p=Number(r.price||0),pc=Number(r.margin_pct||0);if(!q)return;g.rev+=q*p;g.qty+=q;g.mar+=q*p*pc/100;g.n++;g.byPid.set(r.product_id,{rev:q*p,qty:q,mar:q*p*pc/100});});
   return PLAN_CACHE[key]=g;
 }
 let PLAN_MK=null,PLAN_T=0;
@@ -433,8 +447,8 @@ async function renderPlan(fast){
   const card=document.getElementById('planCard');const P=current();if(!P||!card)return;
   const months=monthOptions();if(!PLAN_MK)PLAN_MK=months[1];
   const ents=ENT==='all'?['ip','ooo']:[ENT],tok=ENT+STEP+PLAN_MK;
-  let plan;
-  try{const ps=await Promise.all(ents.map(b=>loadPlan(b,PLAN_MK)));
+  let plan,ps;
+  try{ps=await Promise.all(ents.map(b=>loadPlan(b,PLAN_MK)));
     if(tok!==ENT+STEP+PLAN_MK)return;/* за время загрузки сменили юрлицо, шаг или месяц — отрисует свежий вызов */plan=ps.reduce((a,g)=>({rev:a.rev+g.rev,qty:a.qty+g.qty,mar:a.mar+g.mar,n:a.n+g.n}),{rev:0,qty:0,mar:0,n:0});}
   catch(e){card.innerHTML=`<h2>Рекомендуемый план месяца</h2><div class="err">План не загрузился: ${esc(e.message)}</div>`;delete card.dataset.ready;return;}
   // шапка (месяц, ползунок) строится один раз — перетаскивание ползунка не сбивается
@@ -464,7 +478,122 @@ async function renderPlan(fast){
     <div class="tbl-wrap" style="max-height:none"><table class="plan-tbl"><tr><th>Показатель</th><th>Рекомендуемый</th><th>Коридор LCL – UCL</th><th>Действующий план</th><th>План − рекоменд.</th><th>Где план в коридоре</th><th><span style="color:${C_CL}">▲</span> рекоменд. · <span style="color:#E33D78">●</span> план</th></tr>
       ${row('Выручка (заказы, PNL)',cR,rR,pR,fR,false)}${row('Маржа (CF), ₽',cM,rM,pM,fR,false)}${row('Маржинальность (CF)',cP,rP,pP,fP,true)}${row('Средняя цена (PNL)',cC,rC,pC,fC,false)}
       ${rowD('Заказы, шт',qR,qP,fmtQty)}</table></div>`;
+  renderProducts(ents,ps,k,t,ra);
 }
+
+// === рекомендуемый план по товарам ===
+// менеджеры — как matrixOf в plan.html юрлица: префиксы Ильи, остальные — Ольга
+const MANAGER_M1={ip:/^(CAP|GLV|SEAL|RNC)-/,ooo:/^(CAP|INS|FW|MS|ML|SE)-/};
+const matrixOf=(b,offer)=>MANAGER_M1[b].test(offer)?'m1':'m2';
+// перчатки — группа по производителю и цвету, как gloveFamily в index.html / plan.html
+const GLV_COLORS=new Set(['BLK','BLU','PNK','GRY','YLW','PUR','CLR','WHT','GRN','RED','ORG','BRN','BEG']);
+function gloveFamily(offer){
+  const s=String(offer).split('-');
+  if(s[0]!=='GLV')return null;
+  for(let i=2;i<s.length;i++)if(GLV_COLORS.has(s[i]))return i<s.length-1?s.slice(0,i+1).join('-'):null;
+  return null;
+}
+let PR={mgr:'all',q:'',sort:'marGap'};const PR_OPEN=new Set();
+try{const s=JSON.parse(localStorage.getItem('ba_shewhart_prod')||'{}');if(s.mgr)PR.mgr=s.mgr;if(s.sort)PR.sort=s.sort;}catch(e){}
+let PR_ARGS=null;
+function setPr(k,v){PR[k]=v;try{localStorage.setItem('ba_shewhart_prod',JSON.stringify({mgr:PR.mgr,sort:PR.sort}));}catch(e){}if(PR_ARGS)renderProducts(...PR_ARGS);}
+// ряд товара по точкам юрлица: нет строки за день/неделю, а у юрлица данные есть — 0 (товар не продавался), иначе нет данных
+function prodPoints(D,pid){
+  const pd=D.pd.get(pid),pw=D.pw.get(pid);
+  return D[STEP].map(x=>{
+    let rev=0,qty=0,mar=0,revn=0,prov=false;
+    if(STEP==='day'){const g=pd&&pd.get(x.key);if(g){rev=g.rev;qty=g.qty;mar=g.mar;revn=g.revn;prov=g.prov;}}
+    else{if(pd)for(let i=0;i<7;i++){const g=pd.get(localISO(addDays(parseISO(x.key),i)));if(g){rev+=g.rev;qty+=g.qty;}}const h=pw&&pw.get(x.key);if(h){mar=h.mar;revn=h.revn;prov=h.prov;}}
+    return {key:x.key,we:x.we,rev:x.rev==null?null:rev,qty,mar:x.mar==null?null:mar,revn:x.mar==null?null:revn,prov};
+  });
+}
+const sumPoints=list=>list[0].map((x,i)=>{const s=list.map(p=>p[i]),nn=f=>s.every(y=>y[f]==null)?null:s.reduce((a,y)=>a+(y[f]||0),0);
+  return {key:x.key,we:x.we,rev:nn('rev'),qty:s.reduce((a,y)=>a+y.qty,0),mar:nn('mar'),revn:nn('revn'),prov:s.some(y=>y.prov)};});
+// рекомендация и план одной позиции (товар или группа перчаток)
+function itemCalc(P,plan,k,t,ra){
+  const lim=key=>{const {L}=limitsFor(key,P,ra);if(!L)return null;const f=key==='rev'||key==='mar'?k:1;return {cl:L.cl*f,ucl:L.ucl*f,lcl:L.lcl*f,sigma:L.sigma*f};};
+  const rec=c=>c?c.cl+t*(c.ucl-c.cl):null;
+  const c={rev:lim('rev'),mar:lim('mar'),pct:lim('pct'),price:lim('price')},r={};
+  Object.keys(c).forEach(x=>r[x]=rec(c[x]));
+  r.qty=r.rev!=null&&r.price>0?r.rev/r.price:null;
+  const p=plan?{rev:plan.rev,mar:plan.mar,qty:plan.qty,pct:plan.rev>0?plan.mar/plan.rev*100:null,price:plan.qty>0?plan.rev/plan.qty:null}:null;
+  const base=P.slice(ra[0],ra[1]+1).reduce((s,x)=>s+(x.rev||0),0);
+  return {c,r,p,base};
+}
+// место плана в коридоре — коротко (полный текст — в подсказке)
+function placeTag(v,c){
+  if(v==null)return '<span class="muted">—</span>';
+  if(!c)return '<span class="muted" title="мало точек в базе">н/д</span>';
+  const full=placeText(v,c).replace(/<[^>]+>/g,'');
+  if(v>c.ucl)return `<span class="pl-bad" title="${full}">&gt;UCL</span>`;
+  if(v>=c.cl)return `<span class="pl-ok" title="${full}">${Math.round((v-c.cl)/(c.ucl-c.cl)*100)}%</span>`;
+  if(v>=c.lcl)return `<span class="pl-low" title="${full}">&lt;мед</span>`;
+  return `<span class="pl-bad" title="${full}">&lt;LCL</span>`;
+}
+function renderProducts(ents,plans,k,t,ra){
+  PR_ARGS=[ents,plans,k,t,ra];
+  const card=document.getElementById('prodCard');if(!card)return;
+  if(!card.dataset.ready){
+    card.innerHTML=`<div class="chart-head"><h2>Рекомендуемый план по товарам</h2>
+      <div class="ctl"><span class="ctl-label">Менеджер</span><select id="prMgr" onchange="setPr('mgr',this.value)"><option value="all">Все</option><option value="m1">Илья</option><option value="m2">Ольга</option></select></div>
+      <div class="ctl"><input type="text" id="prQ" placeholder="Артикул…" oninput="setPr('q',this.value)" style="font-family:Forum;font-size:1em;padding:5px 8px;border:2px solid rgba(84,66,115,.2);border-radius:8px;width:170px"></div>
+      <div class="ctl"><span class="ctl-label">Сортировка</span><select id="prSort" onchange="setPr('sort',this.value)">
+        <option value="marGap">разрыв маржи: план − рекоменд. ↓</option><option value="revGap">разрыв выручки: план − рекоменд. ↓</option>
+        <option value="planRev">план выручки ↓</option><option value="recRev">рекоменд. выручка ↓</option><option value="offer">артикул</option></select></div></div>
+      <div class="muted" style="font-size:.92em;margin-bottom:6px">Те же шаг, база границ, месяц и ползунок, что выше. Место плана: <span class="pl-ok">N%</span> — пути от медианы до UCL, <span class="pl-bad">&gt;UCL</span> — выше верхней границы, <span class="pl-low">&lt;мед</span> — ниже медианы (процесс даёт сам), <span class="pl-bad">&lt;LCL</span> — ниже нижней. Сумма товаров ≠ общему блоку: медиана суммы не равна сумме медиан.</div>
+      <div class="tbl-wrap" id="prBody" style="max-height:640px"></div>`;
+    card.dataset.ready='1';
+  }
+  document.getElementById('prMgr').value=PR.mgr;document.getElementById('prSort').value=PR.sort;
+  // позиции: неархивные товары с планом на месяц или продажами в базе; перчатки от 2 товаров — группой
+  let items=[];
+  ents.forEach((b,bi)=>{
+    const D=DATA[b];if(!D)return;const plan=plans[bi];
+    const list=[];
+    D.prods.forEach(p=>{if(p.archived||!p.offer_id)return;
+      const P=prodPoints(D,p.product_id),pl=plan.byPid.get(p.product_id)||null;
+      const it={b,pid:p.product_id,offer:p.offer_id,P,plan:pl,...itemCalc(P,pl,k,t,ra)};
+      if(pl||it.base>0)list.push(it);});
+    const fam=new Map();
+    list.forEach(it=>{const f=gloveFamily(it.offer);if(!f){items.push(it);return;}if(!fam.has(f))fam.set(f,[]);fam.get(f).push(it);});
+    fam.forEach((mem,f)=>{
+      if(mem.length<2){items.push(mem[0]);return;}
+      const P=sumPoints(mem.map(m=>m.P)),pls=mem.filter(m=>m.plan).map(m=>m.plan);
+      const pl=pls.length?{rev:pls.reduce((s,x)=>s+x.rev,0),qty:pls.reduce((s,x)=>s+x.qty,0),mar:pls.reduce((s,x)=>s+x.mar,0)}:null;
+      items.push({b,group:true,gkey:b+':'+f,offer:f,members:mem,P,plan:pl,...itemCalc(P,pl,k,t,ra)});
+    });
+  });
+  const q=PR.q.trim().toUpperCase();
+  const okMgr=it=>PR.mgr==='all'||matrixOf(it.b,it.offer)===PR.mgr;
+  const okQ=it=>!q||it.offer.toUpperCase().includes(q)||(it.group&&it.members.some(m=>m.offer.toUpperCase().includes(q)));
+  items=items.filter(it=>okMgr(it)&&okQ(it));
+  const gap=(it,f)=>it.p&&it.r[f]!=null?it.p[f]-it.r[f]:-Infinity;
+  const sorters={marGap:it=>-gap(it,'mar'),revGap:it=>-gap(it,'rev'),planRev:it=>-(it.p?it.p.rev:-1),recRev:it=>-(it.r.rev||0)};
+  items.sort(PR.sort==='offer'?(a,b)=>a.offer.localeCompare(b.offer):(a,b)=>sorters[PR.sort](a)-sorters[PR.sort](b)||a.offer.localeCompare(b.offer));
+  const fR=v=>v==null?'—':fmtRub(v),fP=v=>v==null?'—':fmtPct(v),fC=v=>v==null?'—':Math.round(v).toLocaleString('ru-RU')+' ₽',fQ=v=>v==null?'—':Math.round(v).toLocaleString('ru-RU');
+  const ent=b=>ents.length>1?`<span class="muted"> · ${BASES[b].name}</span>`:'';
+  const tr=(it,cls,label)=>`<tr class="${cls}"${it.group?` onclick="togglePr('${it.gkey}')" style="cursor:pointer"`:''}><td>${label}${ent(it.b)}</td>`+
+    `<td class="num">${fR(it.r.rev)}</td><td>${fR(it.p&&it.p.rev)}</td><td>${placeTag(it.p&&it.p.rev,it.c.rev)}</td>`+
+    `<td class="num">${fR(it.r.mar)}</td><td>${fR(it.p&&it.p.mar)}</td><td>${placeTag(it.p&&it.p.mar,it.c.mar)}</td>`+
+    `<td class="num">${fP(it.r.pct)}</td><td>${fP(it.p&&it.p.pct)}</td><td class="num">${fC(it.r.price)}</td><td>${fC(it.p&&it.p.price)}</td>`+
+    `<td class="num">${fQ(it.r.qty)}</td><td>${fQ(it.p&&it.p.qty)}</td></tr>`;
+  let html='';
+  items.forEach(it=>{
+    if(!it.group){html+=tr(it,'',esc(it.offer));return;}
+    const open=PR_OPEN.has(it.gkey)||!!q;
+    html+=tr(it,'pr-group',`${open?'▾':'▸'} ${esc(it.offer)} <span class="muted">(${it.members.length} шт)</span>`);
+    if(open)it.members.forEach(m=>{html+=tr(m,'pr-member',esc(m.offer));});
+  });
+  // итог: суммы рекомендаций и планов по позициям (не медиана итога — см. общий блок)
+  const S=f=>(src,key)=>items.reduce((s,it)=>s+((it[src]&&it[src][key])||0),0);
+  const tot=S();
+  const tRR=tot('r','rev'),tPR=tot('p','rev'),tRM=tot('r','mar'),tPM=tot('p','mar'),tRQ=tot('r','qty'),tPQ=tot('p','qty');
+  html+=`<tr class="pr-total"><td>Итого ${items.length} поз.</td><td class="num">${fR(tRR)}</td><td>${fR(tPR)}</td><td></td><td class="num">${fR(tRM)}</td><td>${fR(tPM)}</td><td></td><td class="num">${fP(tRR>0?tRM/tRR*100:null)}</td><td>${fP(tPR>0?tPM/tPR*100:null)}</td><td class="num">${fC(tRQ>0?tRR/tRQ:null)}</td><td>${fC(tPQ>0?tPR/tPQ:null)}</td><td class="num">${fQ(tRQ)}</td><td>${fQ(tPQ)}</td></tr>`;
+  document.getElementById('prBody').innerHTML=items.length?`<table class="plan-tbl pr-tbl"><tr><th rowspan="2">Артикул</th><th colspan="3">Выручка (PNL)</th><th colspan="3">Маржа (CF)</th><th colspan="2">Маржинальность</th><th colspan="2">Цена</th><th colspan="2">Заказы, шт</th></tr>
+    <tr><th>рекоменд.</th><th>план</th><th>место</th><th>рекоменд.</th><th>план</th><th>место</th><th>рекоменд.</th><th>план</th><th>рекоменд.</th><th>план</th><th>рекоменд.</th><th>план</th></tr>${html}</table>`
+    :'<div class="empty">Нет товаров по фильтру</div>';
+}
+function togglePr(k){PR_OPEN.has(k)?PR_OPEN.delete(k):PR_OPEN.add(k);if(PR_ARGS)renderProducts(...PR_ARGS);}
 function bindTip(cb,m,P,series,L){
   const tip=cb.querySelector('.tooltip');
   cb.addEventListener('mousemove',e=>{
