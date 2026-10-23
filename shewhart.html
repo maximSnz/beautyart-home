@@ -79,6 +79,11 @@
         .plan-tbl td.num { white-space: nowrap; font-weight: 700; }
         .plan-tbl th { position: static; }
         .plan-tbl tr.derived td { color: #544273; }
+        details.rules { margin-top: 14px; border-top: 1px dashed #cbd5e1; padding-top: 10px; font-size: .95em; color: #544273; line-height: 1.5; }
+        details.rules > summary { font-size: 1.05em; }
+        details.rules ol { margin: 8px 0 6px 20px; }
+        details.rules li { margin-bottom: 4px; }
+        details.rules b { color: #1C0D2E; font-weight: 400; text-decoration: underline; text-decoration-color: rgba(227,61,120,.5); text-underline-offset: 3px; }
         .sliders { display: flex; gap: 8px 22px; flex-wrap: wrap; align-items: center; margin: 4px 0 10px; }
         .pl-ok { color: #16a34a; } .pl-low { color: #b45309; } .pl-bad { color: #dc2626; }
         .pr-tbl td { white-space: nowrap; }
@@ -159,8 +164,20 @@
                         <input type="number" id="baseN" min="3" value="4" class="hide" onchange="setBase()">
                         <select id="baseFrom" class="hide" onchange="setBase()" title="Начало базы"></select>
                         <select id="baseTo" class="hide" onchange="setBase()" title="Конец базы"></select>
+                        <span class="ctl-label" id="baseAuto"></span>
                     </div>
                 </div>
+                <details class="rules" open>
+                    <summary>Правила подбора базы для плана</summary>
+                    <ol>
+                        <li><b>Последний стабильный период, а не самый длинный.</b> База — непрерывный отрезок без сигналов сдвига. Если на карте был сдвиг уровня, база начинается после него: иначе медиана смешает старый и новый процесс и не опишет ни один.</li>
+                        <li><b>Достаточно точек.</b> Надёжные границы — от 20–25 точек, рабочие предварительные — от 10–12. План строить по шагу «День» (будни), шаг «Неделя» — для контроля крупных сдвигов, пока недель мало.</li>
+                        <li><b>Без особых причин.</b> Дни без остатков, сбои загрузки, разовые акции и распродажи не описывают обычный процесс — уводить их за границы базы («с … по …»).</li>
+                        <li><b>Условия базы — как в плановом месяце.</b> Коридор описывает процесс «как есть». Если в плановом месяце будут распродажи, новые цены или ассортимент, план выше коридора должен опираться на конкретное действие (SMART-гипотезу) с ожидаемым эффектом.</li>
+                        <li><b>Границы фиксировать.</b> Выбрали стабильную базу — сравниваем новые точки с ней; пересчитывать — после подтверждённого сдвига, а не каждый день.</li>
+                    </ol>
+                    <p><b>Режим «с последнего сдвига (авто)»</b> делает правило 1 сам — отдельно для каждого показателя и каждого товара: ищет на карте сдвиг уровня (7 и больше точек подряд по одну сторону медианы) и начинает базу там, где начался последний уровень: с первой точки такой серии, а если серия стоит в самом начале периода и обрывается — сразу после неё (это был старый уровень). Проверка повторяется на новой базе, пока сдвигов нет. Если после сдвига осталось меньше 10 будних дней (5 недель), берутся последние 10 (5) с пометкой «мало данных». Выходные в поиск не входят. Правила 3–5 авторежим не делает — особые причины и условия месяца видны только вам.</p>
+                </details>
             </div>
             <div class="wrap" id="chart"></div>
             <div class="wrap" id="planCard"></div>
@@ -329,6 +346,31 @@ function baseRange(){
   return [0,n-1];
 }
 
+// === база «с последнего сдвига» (авто): своя у каждого показателя и товара ===
+// сдвиг уровня — 7+ точек подряд по одну сторону медианы (правило 3). Начало нового уровня: серия в середине базы — её первая
+// точка; серия с начала базы, оборвавшаяся раньше конца, — точка после неё (это старый уровень). Берём самое позднее начало,
+// повторяем проверку на новой базе, пока сдвигов нет; после сдвига меньше MIN точек — последние MIN («мало данных»)
+const SHIFT_MIN={day:10,week:5};
+function autoRange(k,P){
+  const idx=[];P.forEach((x,i)=>{const v=valOf(k,x);if(v!=null&&!x.we)idx.push(i);});
+  const vals=idx.map(i=>valOf(k,P[i])),MIN=SHIFT_MIN[STEP],last=P.length-1;
+  if(vals.length<3)return {ra:[0,last],from:null,n:vals.length,shifts:0,short:false,auto:true};
+  let st=0,shifts=0,short=false;
+  for(let it=0;it<10;it++){
+    const sub=vals.slice(st);if(sub.length<3)break;
+    const L=shewhart(sub,false),sig=findSignals(sub.map((v,i)=>({i,v})),L).list.filter(x=>x.rule===3);
+    if(!sig.length)break;
+    const n=sub.length,ns=Math.max(...sig.map(x=>{const a=x.ids[0],z=x.ids[x.ids.length-1];return a>0?a:(z<n-1?z+1:0);}));
+    if(ns<=0)break;                               // серия на всю базу — база уже на одном уровне
+    if(vals.length-(st+ns)<MIN){if(!shifts){st=Math.max(0,vals.length-MIN);short=true;shifts++;}break;}
+    st+=ns;shifts++;
+  }
+  return {ra:[idx[st],last],from:P[idx[st]].key,n:vals.length-st,shifts,short,auto:true};
+}
+const isAuto=()=>BASE[STEP].mode==='shift';
+function rangeOf(k,P){return isAuto()?autoRange(k,P):{ra:baseRange(),auto:false};}
+const fromTxt=R=>R&&R.auto?(R.from?`с ${ddmm(R.from)}${R.short?' (мало данных)':''}`:'—'):'';
+
 // === график (SVG) ===
 function chartSVG(m,P,series,L,sig,ra){
   const W=1000,H=360,pl=70,pr=104,pt=22,pb=40,n=series.length;
@@ -376,12 +418,13 @@ function current(){
   return pick(ENT)||null;
 }
 function render(){
-  const P=current(),ra=baseRange(),m=METRICS[MET],st=STEPS[STEP];
+  const P0=current(),m=METRICS[MET],st=STEPS[STEP];
   ['ip','ooo','all'].forEach(e=>{const b=document.getElementById('ent_'+e);b.classList.toggle('on',e===ENT);b.disabled=e==='all'?!(AVAIL.ip&&AVAIL.ooo):!AVAIL[e];});
   ['day','week'].forEach(k=>document.getElementById('step_'+k).classList.toggle('on',k===STEP));
   document.getElementById('metricSel').value=MET;
-  if(!P)return;
-  const {series,L}=limitsFor(MET,P,ra);
+  if(!P0)return;
+  const P=P0,{series,L,R}=limitsFor(MET,P),ra=R.ra;
+  document.getElementById('baseAuto').textContent=R.auto?`база ${METRICS[MET].name}: ${fromTxt(R)} · ${R.n} ${STEP==='day'?'будн. дн.':'нед.'}${R.shifts?' · сдвигов найдено: '+R.shifts:' · сдвигов нет'}`:'';
   const pts=series.map((v,i)=>({i,v})).filter(p=>p.v!=null&&!P[p.i].we);
   const sig=L?findSignals(pts,L):{list:[],mark:new Set()};
   const pre=L&&L.n<20;
@@ -401,9 +444,10 @@ function render(){
 }
 // ряд показателя и границы по базе (выходные дни в базу не входят)
 function limitsFor(k,P,ra){
+  const R=isAuto()?autoRange(k,P):{ra:ra||baseRange(),auto:false};ra=R.ra;
   const series=P.map(x=>valOf(k,x));
   const baseVals=series.map((v,i)=>({v,i})).filter(p=>p.v!=null&&!P[p.i].we&&p.i>=ra[0]&&p.i<=ra[1]).map(p=>p.v);
-  return {series,L:baseVals.length>=3?shewhart(baseVals,METRICS[k].clip0):null};
+  return {series,L:baseVals.length>=3?shewhart(baseVals,METRICS[k].clip0):null,R};
 }
 
 // === рекомендуемый план месяца ===
@@ -428,7 +472,7 @@ function rebuildPlan(g){
 // === правка плана товара: сразу в sales_plan, как editField в plan.html (те же поля и upsert) ===
 // κ — доля GMV CF в выручке PNL за точки базы (будни): маржинальность CF — от GMV, выручка PNL — заказы;
 // маржа = выручка × маржинальность × κ (при медианах ≈ медиане маржи)
-function kappaOf(P,ra){let g=0,r=0;P.forEach((x,i)=>{if(i<ra[0]||i>ra[1]||x.we||x.rev==null||x.revn==null)return;g+=x.revn;r+=x.rev;});return r>0?g/r:null;}
+function kappaOf(P,ra){if(isAuto())ra=autoRange('rev',P).ra;let g=0,r=0;P.forEach((x,i)=>{if(i<ra[0]||i>ra[1]||x.we||x.rev==null||x.revn==null)return;g+=x.revn;r+=x.rev;});return r>0?g/r:null;}
 const curMonth=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;};
 const planEditable=()=>PLAN_MK>=curMonth();   // прошлые месяцы — только просмотр
 const PLAN_FIELDS={plan_qty:'План, шт',price:'Цена продажи, ₽',margin_pct:'План маржинальность, %'};
@@ -522,7 +566,8 @@ async function renderPlan(fast){
   const qR=rR!=null&&pC>0?rR/pC:null,qP=has?plan.qty:null,pM=has?plan.mar:null;
   const rowD=(name,r,p,f)=>`<tr class="derived"><td>${name}</td><td class="num">${r!=null?f(r):'—'}</td><td class="muted">расчёт</td><td class="num">${p!=null?f(p):'—'}</td><td>${delta(p,r,f,false)}</td><td colspan="2" class="muted">= выручка ÷ цена плана${pC?' ('+fC(pC)+')':''}</td></tr>`;
   const fR=v=>fmtRub(v),fP=v=>fmtPct(v),fC=v=>v.toLocaleString('ru-RU',{maximumFractionDigits:0})+' ₽';
-  const baseTxt=`${STEP==='day'?'дни':'недели'} ${labelOf(P[ra[0]])} … ${labelOf(P[ra[1]])}`;
+  const baseTxt=isAuto()?`с последнего сдвига — выручка ${fromTxt(autoRange('rev',P))}, маржинальность ${fromTxt(autoRange('pct',P))}, маржа ${fromTxt(autoRange('mar',P))}`
+    :`${STEP==='day'?'дни':'недели'} ${labelOf(P[ra[0]])} … ${labelOf(P[ra[1]])}`;
   document.getElementById('planBody').innerHTML=`<div class="muted" style="font-size:.92em;margin-bottom:8px">${ENT==='all'?'ИП + ООО':BASES[ENT].name} · база границ: ${baseTxt} · эфф. дней в месяце ${eff.toLocaleString('ru-RU',{maximumFractionDigits:1})} (будни + 0,7 × выходные) · κ (GMV ÷ выручка PNL в базе) ${kap!=null?kap.toLocaleString('ru-RU',{maximumFractionDigits:3}):'—'}${has?'':' · <span class="warn">плана на '+monthName(PLAN_MK)+' нет</span>'}</div>
     <div class="tbl-wrap" style="max-height:none"><table class="plan-tbl"><tr><th>Показатель</th><th>Рекомендуемый</th><th>Коридор LCL – UCL</th><th>Действующий план</th><th>План − рекоменд.</th><th>Где план в коридоре</th><th><span style="color:${C_CL}">▲</span> рекоменд. · <span style="color:#E33D78">●</span> план</th></tr>
       ${row('Выручка (заказы, PNL)',cR,rR,pR,fR,false)}${row('Маржинальность (CF)',cP,rP,pP,fP,true)}${row('Маржа (CF), ₽ <span class="muted">= выручка × маржин. × κ; коридор — карта маржи</span>',cM,rM,pM,fR,false)}
@@ -568,8 +613,9 @@ function itemCalc(P,plan,k,t,ra,price){
   r.mar=r.rev!=null&&r.pct!=null&&kap!=null?r.rev*r.pct/100*kap:null;
   r.qty=r.rev!=null&&price>0?r.rev/price:null;
   const p=plan?{rev:plan.rev,mar:plan.mar,qty:plan.qty,pct:plan.rev>0?plan.mar/plan.rev*100:null,price:plan.qty>0?plan.rev/plan.qty:null}:null;
-  const base=P.slice(ra[0],ra[1]+1).reduce((s,x)=>s+(x.rev||0),0);
-  return {c,r,p,base};
+  const rr=rangeOf('rev',P).ra,base=P.slice(rr[0],rr[1]+1).reduce((s,x)=>s+(x.rev||0),0);
+  const from=isAuto()?{rev:fromTxt(autoRange('rev',P)),pct:fromTxt(autoRange('pct',P))}:null;
+  return {c,r,p,base,from};
 }
 // место плана в коридоре — коротко (полный текст — в подсказке)
 function placeTag(v,c){
@@ -635,6 +681,7 @@ function renderProducts(ents,plans,k,t,ra){
     const shown=raw?{plan_qty:fQ(raw.plan_qty),price:fC(raw.price),margin_pct:fP(raw.margin_pct)}[f]:'—';
     return `<td class="ed" title="${PLAN_FIELDS[f]} — нажмите, чтобы изменить (сохраняется сразу в план)" onclick="editPlan(this,'${it.b}','${esc(it.pid)}','${f}')">${shown}</td>`;};
   const tr=(it,cls,label)=>`<tr class="${cls}"${it.group?` onclick="togglePr('${it.gkey}')" style="cursor:pointer"`:''}><td>${label}${ent(it.b)}</td>`+
+    (isAuto()?`<td class="muted">${it.from?it.from.rev+' / '+it.from.pct:''}</td>`:'')+
     `<td class="num">${fR(it.r.rev)}</td><td>${fR(it.p&&it.p.rev)}</td><td>${placeTag(it.p&&it.p.rev,it.c.rev)}</td>`+
     `<td class="num">${fP(it.r.pct)}</td>${ed(it,'margin_pct',fP(it.p&&it.p.pct))}`+
     `<td class="num">${fR(it.r.mar)}</td><td>${fR(it.p&&it.p.mar)}</td><td>${placeTag(it.p&&it.p.mar,it.c.mar)}</td>`+
@@ -650,8 +697,8 @@ function renderProducts(ents,plans,k,t,ra){
   const S=f=>(src,key)=>items.reduce((s,it)=>s+((it[src]&&it[src][key])||0),0);
   const tot=S();
   const tRR=tot('r','rev'),tPR=tot('p','rev'),tRM=tot('r','mar'),tPM=tot('p','mar'),tRQ=tot('r','qty'),tPQ=tot('p','qty');
-  html+=`<tr class="pr-total"><td>Итого ${items.length} поз.</td><td class="num">${fR(tRR)}</td><td>${fR(tPR)}</td><td></td><td class="num">${fP(tRR>0?tRM/tRR*100:null)}</td><td>${fP(tPR>0?tPM/tPR*100:null)}</td><td class="num">${fR(tRM)}</td><td>${fR(tPM)}</td><td></td><td class="num">${fQ(tRQ)}</td><td>${fQ(tPQ)}</td><td>${fC(tPQ>0?tPR/tPQ:null)}</td></tr>`;
-  document.getElementById('prBody').innerHTML=items.length?`<table class="plan-tbl pr-tbl"><tr><th rowspan="2">Артикул</th><th colspan="3">Выручка (PNL)</th><th colspan="2">Маржинальность</th><th colspan="3">Маржа (CF) = выручка × маржин. × κ</th><th colspan="3">Заказы, шт = выручка ÷ цена плана</th></tr>
+  html+=`<tr class="pr-total"><td>Итого ${items.length} поз.</td>${isAuto()?'<td></td>':''}<td class="num">${fR(tRR)}</td><td>${fR(tPR)}</td><td></td><td class="num">${fP(tRR>0?tRM/tRR*100:null)}</td><td>${fP(tPR>0?tPM/tPR*100:null)}</td><td class="num">${fR(tRM)}</td><td>${fR(tPM)}</td><td></td><td class="num">${fQ(tRQ)}</td><td>${fQ(tPQ)}</td><td>${fC(tPQ>0?tPR/tPQ:null)}</td></tr>`;
+  document.getElementById('prBody').innerHTML=items.length?`<table class="plan-tbl pr-tbl"><tr><th rowspan="2">Артикул</th>${isAuto()?'<th rowspan="2" title="начало базы границ: выручка / маржинальность">База с</th>':''}<th colspan="3">Выручка (PNL)</th><th colspan="2">Маржинальность</th><th colspan="3">Маржа (CF) = выручка × маржин. × κ</th><th colspan="3">Заказы, шт = выручка ÷ цена плана</th></tr>
     <tr><th>рекоменд.</th><th>план</th><th>место</th><th>рекоменд.</th><th>план</th><th>рекоменд.</th><th>план</th><th>место</th><th>рекоменд.</th><th>план</th><th>цена плана</th></tr>${html}</table>`
     :'<div class="empty">Нет товаров по фильтру</div>';
 }
@@ -695,8 +742,8 @@ function syncBaseUI(rebuild){
   const B=BASE[STEP],list=STEP==='week'?WEEKS:DAYS,lab=STEP==='week'?weekLabel:dayLabel;
   const md=document.getElementById('baseMode'),bn=document.getElementById('baseN'),bf=document.getElementById('baseFrom'),bt=document.getElementById('baseTo');
   if(rebuild||!md.options.length){
-    md.innerHTML=STEP==='week'?'<option value="all">всем неделям</option><option value="last">последним N неделям</option><option value="range">неделям с … по …</option>'
-      :'<option value="all">всем дням</option><option value="last">последним N дням</option><option value="range">дням с … по …</option>';
+    md.innerHTML='<option value="shift">с последнего сдвига (авто)</option>'+(STEP==='week'?'<option value="all">всем неделям</option><option value="last">последним N неделям</option><option value="range">неделям с … по …</option>'
+      :'<option value="all">всем дням</option><option value="last">последним N дням</option><option value="range">дням с … по …</option>');
     const o=list.map((w,i)=>`<option value="${i}">${lab(w)}</option>`).join('');bf.innerHTML=o;bt.innerHTML=o;
     bn.title=STEP==='week'?'Сколько последних закрытых недель':'Сколько последних дней (выходные в расчёт не входят)';
   }
