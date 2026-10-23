@@ -169,7 +169,7 @@
                         <li>Сигналы (против границ выбранной базы): точка за ±3σ; 2 из 3 подряд за ±2σ с одной стороны; 7 подряд по одну сторону от CL; 6 подряд растут или падают.</li>
                         <li>Меньше 20 точек в базе — границы предварительные: с каждой новой точкой они уточняются.</li>
                         <li>Средняя цена (PNL) — Σ выручка ÷ Σ заказы, шт (<code>product_sales.qty</code>).</li>
-                        <li><b>Рекомендуемый план месяца</b> — по границам выбранного шага и базы: цель = медиана + ползунок × (UCL − медиана). Выручка за месяц = значение дня-будня × эфф. дни месяца (будни + 0,7 × выходные) или значение недели ÷ 6,4 × эфф. дни; маржинальность и цена — без пересчёта. Заказы = выручка ÷ цена, маржа = выручка × маржинальность.</li>
+                        <li><b>Рекомендуемый план месяца</b> — по границам выбранного шага и базы: цель = медиана + ползунок × (UCL − медиана). Выручка и маржа за месяц = значение дня-будня × эфф. дни месяца (будни + 0,7 × выходные) или значение недели ÷ 6,4 × эфф. дни; маржинальность и цена — без пересчёта. Маржа — по своей карте (факт CF), а не «выручка × маржинальность»: выручка PNL — это заказы, а маржинальность CF — от GMV начислений. Заказы = выручка ÷ цена.</li>
                         <li>Действующий план — <code>sales_plan</code> месяца, неархивные товары, как «Итого» в plan.html и на главной: выручка = Σ план, шт × цена; маржинальность = Σ(выручка × маржинальность) ÷ Σ выручка; цена = выручка ÷ Σ план, шт. «Где план в коридоре» — в сигмах от медианы и в % пути до UCL.</li>
                     </ul>
                 </details>
@@ -432,9 +432,10 @@ function scaleSVG(c,rec,plan){
 async function renderPlan(fast){
   const card=document.getElementById('planCard');const P=current();if(!P||!card)return;
   const months=monthOptions();if(!PLAN_MK)PLAN_MK=months[1];
-  const ents=ENT==='all'?['ip','ooo']:[ENT];
+  const ents=ENT==='all'?['ip','ooo']:[ENT],tok=ENT+STEP+PLAN_MK;
   let plan;
-  try{const ps=await Promise.all(ents.map(b=>loadPlan(b,PLAN_MK)));plan=ps.reduce((a,g)=>({rev:a.rev+g.rev,qty:a.qty+g.qty,mar:a.mar+g.mar,n:a.n+g.n}),{rev:0,qty:0,mar:0,n:0});}
+  try{const ps=await Promise.all(ents.map(b=>loadPlan(b,PLAN_MK)));
+    if(tok!==ENT+STEP+PLAN_MK)return;/* за время загрузки сменили юрлицо, шаг или месяц — отрисует свежий вызов */plan=ps.reduce((a,g)=>({rev:a.rev+g.rev,qty:a.qty+g.qty,mar:a.mar+g.mar,n:a.n+g.n}),{rev:0,qty:0,mar:0,n:0});}
   catch(e){card.innerHTML=`<h2>Рекомендуемый план месяца</h2><div class="err">План не загрузился: ${esc(e.message)}</div>`;delete card.dataset.ready;return;}
   // шапка (месяц, ползунок) строится один раз — перетаскивание ползунка не сбивается
   if(!card.dataset.ready){
@@ -446,21 +447,23 @@ async function renderPlan(fast){
   }
   document.getElementById('planMonth').value=PLAN_MK;document.getElementById('planTv').textContent=PLAN_T+'%';
   const ra=baseRange(),eff=effDaysOfMonth(PLAN_MK),k=STEP==='day'?eff:eff/WEEK_EFF,t=PLAN_T/100;
-  const lim=key=>{const {L}=limitsFor(key,P,ra);if(!L)return null;const f=key==='rev'?k:1;return {cl:L.cl*f,ucl:L.ucl*f,lcl:L.lcl*f,sigma:L.sigma*f,n:L.n};};
-  const cR=lim('rev'),cP=lim('pct'),cC=lim('price');
+  // суммы (выручка, маржа) — × коэффициент месяца; маржинальность и цена — без пересчёта
+  const lim=key=>{const {L}=limitsFor(key,P,ra);if(!L)return null;const f=key==='rev'||key==='mar'?k:1;return {cl:L.cl*f,ucl:L.ucl*f,lcl:L.lcl*f,sigma:L.sigma*f,n:L.n};};
+  const cR=lim('rev'),cM=lim('mar'),cP=lim('pct'),cC=lim('price');
   const rec=c=>c?c.cl+t*(c.ucl-c.cl):null;
-  const rR=rec(cR),rP=rec(cP),rC=rec(cC);
+  const rR=rec(cR),rM=rec(cM),rP=rec(cP),rC=rec(cC);
   const has=plan.n>0,pR=has?plan.rev:null,pP=has&&plan.rev>0?plan.mar/plan.rev*100:null,pC=has&&plan.qty>0?plan.rev/plan.qty:null;
   const delta=(p,r,f,isPct)=>p==null||r==null?'—':(isPct?`${p>=r?'+':''}${(p-r).toLocaleString('ru-RU',{maximumFractionDigits:1})} п.п.`:`${p>=r?'+':''}${f(p-r)} (${p>=r?'+':''}${((p/r-1)*100).toLocaleString('ru-RU',{maximumFractionDigits:1})}%)`);
   const row=(name,c,r,p,f,isPct)=>`<tr><td>${name}</td><td class="num">${r!=null?f(r):'—'}</td><td class="muted">${c?f(c.lcl)+' – '+f(c.ucl):'—'}</td><td class="num">${p!=null?f(p):'—'}</td><td>${delta(p,r,f,isPct)}</td><td>${p!=null?placeText(p,c):'<span class="muted">плана нет</span>'}</td><td>${c&&r!=null?scaleSVG(c,r,p):''}</td></tr>`;
-  const qR=rR!=null&&rC>0?rR/rC:null,qP=has?plan.qty:null,mR=rR!=null&&rP!=null?rR*rP/100:null,mP=has?plan.mar:null;
-  const rowD=(name,r,p,f)=>`<tr class="derived"><td>${name}</td><td class="num">${r!=null?f(r):'—'}</td><td class="muted">расчёт</td><td class="num">${p!=null?f(p):'—'}</td><td>${delta(p,r,f,false)}</td><td colspan="2" class="muted">${name.startsWith('Заказы')?'= выручка ÷ цена':'= выручка × маржинальность'}</td></tr>`;
+  // маржа — по своей карте (факт CF), не «выручка PNL × маржинальность CF»: у них разные базы (заказы и GMV начислений)
+  const qR=rR!=null&&rC>0?rR/rC:null,qP=has?plan.qty:null,pM=has?plan.mar:null;
+  const rowD=(name,r,p,f)=>`<tr class="derived"><td>${name}</td><td class="num">${r!=null?f(r):'—'}</td><td class="muted">расчёт</td><td class="num">${p!=null?f(p):'—'}</td><td>${delta(p,r,f,false)}</td><td colspan="2" class="muted">= выручка ÷ цена</td></tr>`;
   const fR=v=>fmtRub(v),fP=v=>fmtPct(v),fC=v=>v.toLocaleString('ru-RU',{maximumFractionDigits:0})+' ₽';
   const baseTxt=`${STEP==='day'?'дни':'недели'} ${labelOf(P[ra[0]])} … ${labelOf(P[ra[1]])}`;
   document.getElementById('planBody').innerHTML=`<div class="muted" style="font-size:.92em;margin-bottom:8px">${ENT==='all'?'ИП + ООО':BASES[ENT].name} · база границ: ${baseTxt} · эфф. дней в месяце ${eff.toLocaleString('ru-RU',{maximumFractionDigits:1})} (будни + 0,7 × выходные)${has?'':' · <span class="warn">плана на '+monthName(PLAN_MK)+' нет</span>'}</div>
     <div class="tbl-wrap" style="max-height:none"><table class="plan-tbl"><tr><th>Показатель</th><th>Рекомендуемый</th><th>Коридор LCL – UCL</th><th>Действующий план</th><th>План − рекоменд.</th><th>Где план в коридоре</th><th><span style="color:${C_CL}">▲</span> рекоменд. · <span style="color:#E33D78">●</span> план</th></tr>
-      ${row('Выручка (заказы, PNL)',cR,rR,pR,fR,false)}${row('Маржинальность (CF)',cP,rP,pP,fP,true)}${row('Средняя цена (PNL)',cC,rC,pC,fC,false)}
-      ${rowD('Заказы, шт',qR,qP,fmtQty)}${rowD('Маржа (CF), ₽',mR,mP,fR)}</table></div>`;
+      ${row('Выручка (заказы, PNL)',cR,rR,pR,fR,false)}${row('Маржа (CF), ₽',cM,rM,pM,fR,false)}${row('Маржинальность (CF)',cP,rP,pP,fP,true)}${row('Средняя цена (PNL)',cC,rC,pC,fC,false)}
+      ${rowD('Заказы, шт',qR,qP,fmtQty)}</table></div>`;
 }
 function bindTip(cb,m,P,series,L){
   const tip=cb.querySelector('.tooltip');
