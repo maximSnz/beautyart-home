@@ -447,8 +447,9 @@ function render(){
   renderPlan();
 }
 // ряд показателя и границы по базе (выходные дни в базу не входят)
-function limitsFor(k,P,ra){
-  const R=isAuto()?autoRange(k,P):{ra:ra||baseRange(),auto:false};ra=R.ra;
+// force — взять переданное окно ra и в авторежиме (общая база товара)
+function limitsFor(k,P,ra,force){
+  const R=isAuto()&&!force?autoRange(k,P):{ra:ra||baseRange(),auto:false};ra=R.ra;
   const series=P.map(x=>valOf(k,x));
   const baseVals=series.map((v,i)=>({v,i})).filter(p=>p.v!=null&&!P[p.i].we&&p.i>=ra[0]&&p.i<=ra[1]).map(p=>p.v);
   return {series,L:baseVals.length>=3?shewhart(baseVals,METRICS[k].clip0):null,R};
@@ -476,7 +477,7 @@ function rebuildPlan(g){
 // === правка плана товара: сразу в sales_plan, как editField в plan.html (те же поля и upsert) ===
 // κ — доля GMV CF в выручке PNL за точки базы (будни): маржинальность CF — от GMV, выручка PNL — заказы;
 // маржа = выручка × маржинальность × κ (при медианах ≈ медиане маржи)
-function kappaOf(P,ra){if(isAuto())ra=autoRange('rev',P).ra;let g=0,r=0;P.forEach((x,i)=>{if(i<ra[0]||i>ra[1]||x.we||x.rev==null||x.revn==null)return;g+=x.revn;r+=x.rev;});return r>0?g/r:null;}
+function kappaOf(P,ra,force){if(isAuto()&&!force)ra=autoRange('rev',P).ra;let g=0,r=0;P.forEach((x,i)=>{if(i<ra[0]||i>ra[1]||x.we||x.rev==null||x.revn==null)return;g+=x.revn;r+=x.rev;});return r>0?g/r:null;}
 const curMonth=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;};
 const planEditable=()=>PLAN_MK>=curMonth();   // прошлые месяцы — только просмотр
 const PLAN_FIELDS={plan_qty:'План, шт',price:'Цена продажи, ₽',margin_pct:'План маржинальность, %'};
@@ -621,15 +622,20 @@ const sumPoints=list=>list[0].map((x,i)=>{const s=list.map(p=>p[i]),nn=f=>s.ever
 // рекомендация и план одной позиции (товар или группа перчаток)
 // price — цена для перевода выручки в шт: цена плана товара (нет плана — цена товара)
 function itemCalc(P,plan,k,t,ra,price){
-  const lim=key=>{const {L}=limitsFor(key,P,ra);if(!L)return null;const f=key==='rev'||key==='mar'?k:1;return {cl:L.cl*f,ucl:L.ucl*f,lcl:L.lcl*f,sigma:L.sigma*f};};
+  // авторежим: одна общая база товара — более позднее из начал баз выручки и маржинальности (стабильны оба показателя)
+  let force=false,common=null;
+  if(isAuto()){const a=autoRange('rev',P),b=autoRange('pct',P),s0=Math.max(a.ra[0],b.ra[0]);ra=[s0,P.length-1];force=true;
+    const n=P.filter((x,i)=>i>=s0&&!x.we&&x.rev!=null).length;
+    common=a.from||b.from?{from:P[s0].key,short:a.short||b.short||n<SHIFT_MIN[STEP]}:null;}
+  const lim=key=>{const {L}=limitsFor(key,P,ra,force);if(!L)return null;const f=key==='rev'||key==='mar'?k:1;return {cl:L.cl*f,ucl:L.ucl*f,lcl:L.lcl*f,sigma:L.sigma*f};};
   const rec=(c,key)=>c?c.cl+t[key]*(c.ucl-c.cl):null;
   const c={rev:lim('rev'),mar:lim('mar'),pct:lim('pct')},r={rev:rec(c.rev,'rev'),pct:rec(c.pct,'pct')};
-  const kap=kappaOf(P,ra);
+  const kap=kappaOf(P,ra,force);
   r.mar=r.rev!=null&&r.pct!=null&&kap!=null?r.rev*r.pct/100*kap:null;
   r.qty=r.rev!=null&&price>0?r.rev/price:null;
   const p=plan?{rev:plan.rev,mar:plan.mar,qty:plan.qty,pct:plan.rev>0?plan.mar/plan.rev*100:null,price:plan.qty>0?plan.rev/plan.qty:null}:null;
-  const rr=rangeOf('rev',P).ra,base=P.slice(rr[0],rr[1]+1).reduce((s,x)=>s+(x.rev||0),0);
-  const from=isAuto()?{rev:fromTxt(autoRange('rev',P)),pct:fromTxt(autoRange('pct',P))}:null;
+  const rr=force?ra:rangeOf('rev',P).ra,base=P.slice(rr[0],rr[1]+1).reduce((s,x)=>s+(x.rev||0),0);
+  const from=isAuto()?(common?`с ${ddmm(common.from)}${common.short?' (мало данных)':''}`:'—'):null;
   return {c,r,p,base,from};
 }
 // место плана в коридоре — коротко (полный текст — в подсказке)
@@ -697,7 +703,7 @@ function renderProductsBody(ents,plans,k,t,ra){
     const shown=raw?{plan_qty:fQ(raw.plan_qty),price:fC(raw.price),margin_pct:fP(raw.margin_pct)}[f]:'—';
     return `<td class="ed" title="${PLAN_FIELDS[f]} — нажмите, чтобы изменить (сохраняется сразу в план)" onclick="editPlan(this,'${it.b}','${esc(it.pid)}','${f}')">${shown}</td>`;};
   const tr=(it,cls,label)=>`<tr class="${cls}"${it.group?` onclick="togglePr('${it.gkey}')" style="cursor:pointer"`:''}><td>${label}${ent(it.b)}</td>`+
-    (isAuto()?`<td class="muted">${it.from?it.from.rev+' / '+it.from.pct:''}</td>`:'')+
+    (isAuto()?`<td class="muted">${it.from||''}</td>`:'')+
     `<td class="num">${fR(it.r.rev)}</td><td>${fR(it.p&&it.p.rev)}</td><td>${placeTag(it.p&&it.p.rev,it.c.rev)}</td>`+
     `<td class="num">${fP(it.r.pct)}</td>${ed(it,'margin_pct',fP(it.p&&it.p.pct))}`+
     `<td class="num">${fR(it.r.mar)}</td><td>${fR(it.p&&it.p.mar)}</td><td>${placeTag(it.p&&it.p.mar,it.c.mar)}</td>`+
@@ -714,7 +720,7 @@ function renderProductsBody(ents,plans,k,t,ra){
   const tot=S();
   const tRR=tot('r','rev'),tPR=tot('p','rev'),tRM=tot('r','mar'),tPM=tot('p','mar'),tRQ=tot('r','qty'),tPQ=tot('p','qty');
   html+=`<tr class="pr-total"><td>Итого ${items.length} поз.</td>${isAuto()?'<td></td>':''}<td class="num">${fR(tRR)}</td><td>${fR(tPR)}</td><td></td><td class="num">${fP(tRR>0?tRM/tRR*100:null)}</td><td>${fP(tPR>0?tPM/tPR*100:null)}</td><td class="num">${fR(tRM)}</td><td>${fR(tPM)}</td><td></td><td class="num">${fQ(tRQ)}</td><td>${fQ(tPQ)}</td><td>${fC(tPQ>0?tPR/tPQ:null)}</td></tr>`;
-  document.getElementById('prBody').innerHTML=items.length?`<table class="plan-tbl pr-tbl"><tr><th rowspan="2">Артикул</th>${isAuto()?'<th rowspan="2" title="начало базы границ: выручка / маржинальность">База с</th>':''}<th colspan="3">Выручка (PNL)</th><th colspan="2">Маржинальность</th><th colspan="3">Маржа (CF) = выручка × маржин. × κ</th><th colspan="3">Заказы, шт = выручка ÷ цена плана</th></tr>
+  document.getElementById('prBody').innerHTML=items.length?`<table class="plan-tbl pr-tbl"><tr><th rowspan="2">Артикул</th>${isAuto()?'<th rowspan="2" title="общая база товара: более позднее из начал баз выручки и маржинальности">База с</th>':''}<th colspan="3">Выручка (PNL)</th><th colspan="2">Маржинальность</th><th colspan="3">Маржа (CF) = выручка × маржин. × κ</th><th colspan="3">Заказы, шт = выручка ÷ цена плана</th></tr>
     <tr><th>рекоменд.</th><th>план</th><th>место</th><th>рекоменд.</th><th>план</th><th>рекоменд.</th><th>план</th><th>место</th><th>рекоменд.</th><th>план</th><th>цена плана</th></tr>${html}</table>`
     :'<div class="empty">Нет товаров по фильтру</div>';
 }
