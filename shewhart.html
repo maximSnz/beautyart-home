@@ -167,7 +167,7 @@
                         <span class="ctl-label" id="baseAuto"></span>
                     </div>
                 </div>
-                <details class="rules" open>
+                <details class="rules" id="rulesBlock">
                     <summary>Правила подбора базы для плана</summary>
                     <ol>
                         <li><b>Последний стабильный период, а не самый длинный.</b> База — непрерывный отрезок без сигналов сдвига. Если на карте был сдвиг уровня, база начинается после него: иначе медиана смешает старый и новый процесс и не опишет ни один.</li>
@@ -228,10 +228,14 @@ const METRICS={
 const STEPS={week:{per:'за неделю',unitN:'нед.',title:'Недели',def:{mode:'all',n:4}},day:{per:'за день',unitN:'дн.',title:'Дни',def:{mode:'all',n:20}}};
 let AVAIL={ip:false,ooo:false},ENT='ip',MET='rev',STEP='week',DATA={},WEEKS=[],DAYS=[];
 let BASE={week:{...STEPS.week.def,from:0,to:0},day:{...STEPS.day.def,from:0,to:0}};
+// база блоков плана — отдельно от графика; по умолчанию «с последнего сдвига (авто)»
+let PBASE={week:{...STEPS.week.def,mode:'shift',from:0,to:0},day:{...STEPS.day.def,mode:'shift',from:0,to:0}};
+let CTX='chart';   // чью базу берут baseRange / isAuto: 'chart' — график, 'plan' — блоки плана
+const curB=()=>(CTX==='plan'?PBASE:BASE)[STEP];
 try{const s=JSON.parse(localStorage.getItem('ba_shewhart')||'{}');if(s.ent)ENT=s.ent;if(METRICS[s.met])MET=s.met;if(STEPS[s.step])STEP=s.step;
-  ['week','day'].forEach(k=>{if(s.bases&&s.bases[k])BASE[k]={...BASE[k],mode:s.bases[k].mode,n:s.bases[k].n};});}catch(e){}
+  ['week','day'].forEach(k=>{if(s.bases&&s.bases[k])BASE[k]={...BASE[k],mode:s.bases[k].mode,n:s.bases[k].n};if(s.pbases&&s.pbases[k])PBASE[k]={...PBASE[k],mode:s.pbases[k].mode,n:s.pbases[k].n};});}catch(e){}
 const q=new URLSearchParams(location.search).get('e');if(['ip','ooo','all'].includes(q))ENT=q;
-const save=()=>{try{localStorage.setItem('ba_shewhart',JSON.stringify({ent:ENT,met:MET,step:STEP,bases:{week:{mode:BASE.week.mode,n:BASE.week.n},day:{mode:BASE.day.mode,n:BASE.day.n}}}));}catch(e){}};
+const save=()=>{try{localStorage.setItem('ba_shewhart',JSON.stringify({ent:ENT,met:MET,step:STEP,bases:{week:{mode:BASE.week.mode,n:BASE.week.n},day:{mode:BASE.day.mode,n:BASE.day.n}},pbases:{week:{mode:PBASE.week.mode,n:PBASE.week.n},day:{mode:PBASE.day.mode,n:PBASE.day.n}}}));}catch(e){}};
 
 // === даты ===
 const localISO=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -340,7 +344,7 @@ function findSignals(pts,L){
 
 // === окно базы (индексы точек выбранного шага) ===
 function baseRange(){
-  const n=(STEP==='week'?WEEKS:DAYS).length,B=BASE[STEP];
+  const n=(STEP==='week'?WEEKS:DAYS).length,B=curB();
   if(B.mode==='last'){const k=Math.max(3,Math.min(n,B.n|0||3));return [n-k,n-1];}
   if(B.mode==='range'){const a=Math.max(0,Math.min(B.from,n-1)),b=Math.max(0,Math.min(B.to,n-1));return a<=b?[a,b]:[b,a];}
   return [0,n-1];
@@ -367,7 +371,7 @@ function autoRange(k,P){
   }
   return {ra:[idx[st],last],from:P[idx[st]].key,n:vals.length-st,shifts,short,auto:true};
 }
-const isAuto=()=>BASE[STEP].mode==='shift';
+const isAuto=()=>curB().mode==='shift';
 function rangeOf(k,P){return isAuto()?autoRange(k,P):{ra:baseRange(),auto:false};}
 const fromTxt=R=>R&&R.auto?(R.from?`с ${ddmm(R.from)}${R.short?' (мало данных)':''}`:'—'):'';
 
@@ -548,10 +552,20 @@ async function renderPlan(fast){
       <div class="ctl"><span class="ctl-label">Месяц</span><select id="planMonth" onchange="setPlanMonth(this.value)">${months.map(mk=>`<option value="${mk}">${monthName(mk)}</option>`).join('')}</select></div>
       </div>
       <div class="sliders"><span class="ctl-label">Цель — % пути от медианы до UCL:</span>${T_KEYS.map(([k,n])=>`<label class="ctl"><span class="ctl-label">${n}</span><input type="range" min="0" max="100" step="5" value="${PLAN_T[k]}" oninput="setPlanT('${k}',this.value)" style="width:120px;accent-color:#E33D78"><b id="planTv_${k}">${PLAN_T[k]}%</b></label>`).join('')}</div>
+      <div class="controls" style="margin-bottom:8px"><div class="ctl"><span class="ctl-label">База для плана</span>
+        <select id="pbaseMode" onchange="setBase('plan')"></select>
+        <input type="number" id="pbaseN" min="3" value="20" class="hide" onchange="setBase('plan')">
+        <select id="pbaseFrom" class="hide" onchange="setBase('plan')" title="Начало базы"></select>
+        <select id="pbaseTo" class="hide" onchange="setBase('plan')" title="Конец базы"></select>
+        <span class="ctl-label">— для этого блока и плана по товарам (у графика — своя, «Границы по» вверху)</span></div></div>
       <div id="planBody"></div>`;
+    const rb=document.getElementById('rulesBlock');if(rb)card.insertBefore(rb,document.getElementById('planBody'));
     card.dataset.ready='1';
+    syncBaseUI(true,'plan');
   }
   document.getElementById('planMonth').value=PLAN_MK;
+  const prevCtx=CTX;CTX='plan';
+  try{
   const ra=baseRange(),eff=effDaysOfMonth(PLAN_MK),k=STEP==='day'?eff:eff/WEEK_EFF,t={};T_KEYS.forEach(([x])=>t[x]=PLAN_T[x]/100);
   // суммы (выручка, маржа) — × коэффициент месяца; маржинальность — без пересчёта
   const lim=key=>{const {L}=limitsFor(key,P,ra);if(!L)return null;const f=key==='rev'||key==='mar'?k:1;return {cl:L.cl*f,ucl:L.ucl*f,lcl:L.lcl*f,sigma:L.sigma*f,n:L.n};};
@@ -573,6 +587,7 @@ async function renderPlan(fast){
       ${row('Выручка (заказы, PNL)',cR,rR,pR,fR,false)}${row('Маржинальность (CF)',cP,rP,pP,fP,true)}${row('Маржа (CF), ₽ <span class="muted">= выручка × маржин. × κ; коридор — карта маржи</span>',cM,rM,pM,fR,false)}
       ${rowD('Заказы, шт',qR,qP,fmtQty)}</table></div>`;
   renderProducts(ents,ps,k,t,ra);
+  }finally{CTX=prevCtx;}
 }
 
 // === рекомендуемый план по товарам ===
@@ -627,7 +642,8 @@ function placeTag(v,c){
   if(v>=c.lcl)return `<span class="pl-low" title="${full}">&lt;мед</span>`;
   return `<span class="pl-bad" title="${full}">&lt;LCL</span>`;
 }
-function renderProducts(ents,plans,k,t,ra){
+function renderProducts(...a){const prev=CTX;CTX='plan';try{renderProductsBody(...a);}finally{CTX=prev;}}
+function renderProductsBody(ents,plans,k,t,ra){
   PR_ARGS=[ents,plans,k,t,ra];
   const card=document.getElementById('prodCard');if(!card)return;
   if(!card.dataset.ready){
@@ -638,7 +654,7 @@ function renderProducts(ents,plans,k,t,ra){
         <option value="marGap">разрыв маржи: план − рекоменд. ↓</option><option value="revGap">разрыв выручки: план − рекоменд. ↓</option>
         <option value="planRev">план выручки ↓</option><option value="recRev">рекоменд. выручка ↓</option><option value="offer">артикул</option></select></div></div>
       <div class="muted" style="font-size:.92em;margin-bottom:6px" id="prHint"></div>
-      <div class="muted" style="font-size:.92em;margin-bottom:6px">Те же шаг, база границ, месяц и ползунки, что выше. Место плана: <span class="pl-ok">N%</span> — пути от медианы до UCL, <span class="pl-bad">&gt;UCL</span> — выше верхней границы, <span class="pl-low">&lt;мед</span> — ниже медианы (процесс даёт сам), <span class="pl-bad">&lt;LCL</span> — ниже нижней. Сумма товаров ≠ общему блоку: медиана суммы не равна сумме медиан.</div>
+      <div class="muted" style="font-size:.92em;margin-bottom:6px">Те же шаг, «База для плана», месяц и ползунки, что выше. Место плана: <span class="pl-ok">N%</span> — пути от медианы до UCL, <span class="pl-bad">&gt;UCL</span> — выше верхней границы, <span class="pl-low">&lt;мед</span> — ниже медианы (процесс даёт сам), <span class="pl-bad">&lt;LCL</span> — ниже нижней. Сумма товаров ≠ общему блоку: медиана суммы не равна сумме медиан.</div>
       <div class="tbl-wrap" id="prBody" style="max-height:640px"></div>`;
     card.dataset.ready='1';
   }
@@ -737,10 +753,11 @@ async function setEnt(e){
   render();
 }
 function setMetric(k){if(!METRICS[k])return;MET=k;save();render();}
-function setStep(k){if(!STEPS[k]||k===STEP)return;STEP=k;save();syncBaseUI(true);render();}
-function syncBaseUI(rebuild){
-  const B=BASE[STEP],list=STEP==='week'?WEEKS:DAYS,lab=STEP==='week'?weekLabel:dayLabel;
-  const md=document.getElementById('baseMode'),bn=document.getElementById('baseN'),bf=document.getElementById('baseFrom'),bt=document.getElementById('baseTo');
+function setStep(k){if(!STEPS[k]||k===STEP)return;STEP=k;save();syncBaseUI(true);syncBaseUI(true,'plan');render();}
+function syncBaseUI(rebuild,ctx){
+  const pre=ctx==='plan'?'p':'',B=(ctx==='plan'?PBASE:BASE)[STEP],list=STEP==='week'?WEEKS:DAYS,lab=STEP==='week'?weekLabel:dayLabel;
+  const md=document.getElementById(pre+'baseMode'),bn=document.getElementById(pre+'baseN'),bf=document.getElementById(pre+'baseFrom'),bt=document.getElementById(pre+'baseTo');
+  if(!md)return;
   if(rebuild||!md.options.length){
     md.innerHTML='<option value="shift">с последнего сдвига (авто)</option>'+(STEP==='week'?'<option value="all">всем неделям</option><option value="last">последним N неделям</option><option value="range">неделям с … по …</option>'
       :'<option value="all">всем дням</option><option value="last">последним N дням</option><option value="range">дням с … по …</option>');
@@ -751,12 +768,12 @@ function syncBaseUI(rebuild){
   bn.classList.toggle('hide',B.mode!=='last');bf.classList.toggle('hide',B.mode!=='range');bt.classList.toggle('hide',B.mode!=='range');
   bf.value=Math.min(B.from,list.length-1);bt.value=Math.min(B.to,list.length-1);
 }
-function setBase(){
-  const B=BASE[STEP],n=(STEP==='week'?WEEKS:DAYS).length;
-  B.mode=document.getElementById('baseMode').value;
-  B.n=Math.max(3,Math.min(n,parseInt(document.getElementById('baseN').value,10)||3));
-  if(B.mode==='range'){B.from=+document.getElementById('baseFrom').value;B.to=+document.getElementById('baseTo').value;}
-  save();syncBaseUI();render();
+function setBase(ctx){
+  const pre=ctx==='plan'?'p':'',B=(ctx==='plan'?PBASE:BASE)[STEP],n=(STEP==='week'?WEEKS:DAYS).length,el=id=>document.getElementById(pre+id);
+  B.mode=el('baseMode').value;
+  B.n=Math.max(3,Math.min(n,parseInt(el('baseN').value,10)||3));
+  if(B.mode==='range'){B.from=+el('baseFrom').value;B.to=+el('baseTo').value;}
+  save();syncBaseUI(false,ctx);if(ctx==='plan')renderPlan(true);else render();
 }
 
 // === вход (auth.js — общий для всех страниц); после входа — обе базы ===
@@ -769,7 +786,7 @@ async function go(){
   WEEKS=closedMondays();DAYS=pastDays();
   if(!DAYS.length){document.getElementById('chart').innerHTML='<div class="empty">Данных с '+ddmm(START)+' ещё нет.</div>';return;}
   if(!WEEKS.length)STEP='day';
-  BASE.week.from=0;BASE.week.to=Math.max(0,WEEKS.length-1);BASE.day.from=0;BASE.day.to=DAYS.length-1;
+  [BASE,PBASE].forEach(X=>{X.week.from=0;X.week.to=Math.max(0,WEEKS.length-1);X.day.from=0;X.day.to=DAYS.length-1;});
   syncBaseUI(true);
   if(ENT==='all'&&!AVAIL.ooo)ENT='ip';
   if(ENT==='ooo'&&!AVAIL.ooo)ENT='ip';
