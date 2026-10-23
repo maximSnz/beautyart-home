@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beauty Art - Карты Шухарта</title>
+    <link href="https://fonts.googleapis.com/css2?family=Forum&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Forum', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #78A6C7 0%, #E33D78 50%, #7D3673 100%);
+            background-attachment: fixed; min-height: 100vh; padding: 16px; color: #fff;
+        }
+        .container { max-width: 1700px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+        .glass { background: rgba(255,255,255,.15); backdrop-filter: blur(20px) saturate(1.4); -webkit-backdrop-filter: blur(20px) saturate(1.4);
+            border: 1px solid rgba(255,255,255,.3); border-radius: 16px; box-shadow: 0 8px 32px rgba(28,13,46,.2); }
+
+        /* === ШАПКА — как в index.html === */
+        .header { display: flex; align-items: center; gap: 20px; padding: 14px 26px; background: rgba(255,255,255,.15);
+            backdrop-filter: blur(20px) saturate(1.4); -webkit-backdrop-filter: blur(20px) saturate(1.4);
+            border-radius: 16px; border: 1px solid rgba(255,255,255,.3); box-shadow: 0 8px 32px rgba(28,13,46,.2); position: relative; z-index: 200; }
+        .logo-link { display: inline-block; flex: 0 0 auto; }
+        .logo { width: 52px; height: auto; filter: drop-shadow(0 4px 8px rgba(0,0,0,.2)); transition: transform .3s ease; display: block; }
+        .logo-link:hover .logo { transform: scale(1.1); }
+        .company-name { font-family: 'Forum', serif; font-size: 1.8em; font-weight: 400; color: #fff; text-shadow: 0 2px 8px rgba(28,13,46,.4); letter-spacing: 2px; }
+
+        /* === ПАНЕЛЬ === */
+        .controls { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; padding: 14px 20px; }
+        .controls h1 { font-weight: 400; font-size: 1.5em; text-shadow: 0 2px 8px rgba(28,13,46,.35); margin-right: auto; }
+        .tabs { display: inline-flex; background: rgba(28,13,46,.25); border-radius: 10px; padding: 3px; gap: 2px; }
+        .tab { font-family: inherit; font-size: 1em; color: #fff; background: transparent; border: none; border-radius: 8px; padding: 6px 14px; cursor: pointer; }
+        .tab:hover { background: rgba(255,255,255,.15); }
+        .tab.on { background: rgba(255,255,255,.32); }
+        .tab:disabled { opacity: .4; cursor: not-allowed; }
+        .ctl { display: inline-flex; align-items: center; gap: 6px; }
+        .ctl-label { font-size: .9em; color: rgba(255,255,255,.75); }
+        select, input[type=number] { font-family: inherit; font-size: 1em; color: #fff; background: rgba(28,13,46,.35); border: 1px solid rgba(255,255,255,.35);
+            border-radius: 8px; padding: 5px 8px; color-scheme: dark; }
+        input[type=number] { width: 64px; }
+        .note { padding: 10px 20px; font-size: .95em; color: rgba(255,255,255,.88); line-height: 1.45; }
+        .note b { color: #fff; font-weight: 400; text-decoration: underline; text-underline-offset: 3px; }
+        .warn { color: #fde047; }
+
+        /* === КАРТЫ === */
+        .card { padding: 16px 20px; }
+        .card-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 8px; }
+        .card-head h2 { font-weight: 400; font-size: 1.3em; text-shadow: 0 1px 4px rgba(28,13,46,.35); }
+        .badge { font-size: .88em; border-radius: 999px; padding: 3px 12px; border: 1px solid; }
+        .badge.ok { color: #4ade80; border-color: rgba(74,222,128,.55); background: rgba(74,222,128,.1); }
+        .badge.alert { color: #fecaca; border-color: rgba(248,113,113,.7); background: rgba(248,113,113,.18); }
+        .stats { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+        .stat { background: rgba(28,13,46,.22); border: 1px solid rgba(255,255,255,.18); border-radius: 8px; padding: 3px 10px; font-size: .9em; white-space: nowrap; }
+        .stat span { color: rgba(255,255,255,.65); margin-right: 4px; }
+        .chart-box { position: relative; background: rgba(28,13,46,.28); border-radius: 12px; padding: 6px 4px; }
+        .chart-box svg { width: 100%; height: auto; display: block; }
+        .tooltip { position: absolute; pointer-events: none; background: rgba(28,13,46,.92); border: 1px solid rgba(255,255,255,.3); border-radius: 8px;
+            padding: 7px 10px; font-size: .9em; line-height: 1.4; white-space: nowrap; display: none; z-index: 5; }
+        .signals { list-style: none; margin-top: 6px; font-size: .95em; }
+        .signals li { padding: 4px 10px; margin-top: 4px; border-left: 3px solid #f87171; background: rgba(248,113,113,.12); border-radius: 0 6px 6px 0; }
+        .signals li.none { border-left-color: #4ade80; background: rgba(74,222,128,.08); }
+        .empty { padding: 30px; text-align: center; color: rgba(255,255,255,.8); }
+
+        /* === ТАБЛИЦА НЕДЕЛЬ === */
+        .tbl-wrap { overflow-x: auto; }
+        table { border-collapse: collapse; width: 100%; font-size: .95em; }
+        th, td { padding: 6px 10px; text-align: right; border-bottom: 1px solid rgba(255,255,255,.14); white-space: nowrap; }
+        th { font-weight: 400; color: rgba(255,255,255,.7); }
+        th:first-child, td:first-child { text-align: left; }
+        tr.in-base td { background: rgba(255,255,255,.07); }
+        .method { font-size: .92em; color: rgba(255,255,255,.85); line-height: 1.5; }
+        .method li { margin-left: 18px; }
+
+        .hide { display: none !important; }
+        /* вход — как в plan.html */
+        .login-box{max-width:400px;margin:60px auto;background:#fff;border-radius:16px;padding:40px;box-shadow:0 10px 40px rgba(28,13,46,.3);border:2px solid rgba(84,66,115,.2);text-align:center;box-sizing:border-box}
+        .login-logo{width:80px;height:auto;margin-bottom:15px}
+        .login-title{font-family:'Forum',serif;font-size:1.8em;color:#1C0D2E;margin-bottom:10px}
+        .login-subtitle{color:#666;font-size:.95em;margin-bottom:25px;font-family:'Forum',serif}
+        .password-input{width:100%;padding:14px 16px;border:2px solid rgba(84,66,115,.2);border-radius:10px;font-size:1em;font-family:'Forum',serif;margin-bottom:15px;box-sizing:border-box;color:#1C0D2E}
+        .password-input:focus{outline:none;border-color:#E33D78}
+        .login-btn{width:100%;padding:14px;background:linear-gradient(135deg,#78A6C7,#E33D78);color:#fff;border:none;border-radius:10px;font-size:1.05em;font-family:'Forum',serif;cursor:pointer;transition:all .3s}
+        .login-btn:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(227,61,120,.4)}
+        .error-message{display:none;color:#E33D78;font-size:.9em;margin-top:15px;font-family:'Forum',serif}
+        @media (max-width: 700px) { body { padding: 10px; } .company-name { font-size: 1.5em; } .stats { margin-left: 0; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="https://maximsnz.github.io/beautyart-home/index.html" class="logo-link" title="На главную">
+                <img src="https://i.ibb.co/ZzbPQmQt/IMG-8031.png" alt="Beauty Art Logo" class="logo">
+            </a>
+            <div class="company-name">Beauty Art</div>
+        </div>
+
+        <div class="login-box hide" id="login">
+            <img src="https://i.ibb.co/ZzbPQmQt/IMG-8031.png" alt="Beauty Art Logo" class="login-logo">
+            <div class="login-title">Закрытый раздел</div>
+            <div class="login-subtitle">Введите почту и пароль для доступа</div>
+            <input type="email" id="email" class="password-input" placeholder="Почта" autocomplete="username" onkeypress="if(event.key==='Enter')go()">
+            <input type="password" id="pwd" class="password-input" placeholder="Пароль" autocomplete="current-password" onkeypress="if(event.key==='Enter')go()">
+            <button class="login-btn" onclick="go()">Войти</button>
+            <div class="error-message" id="errorMessage"></div>
+        </div>
+
+        <div class="hide" id="app" style="display:flex;flex-direction:column;gap:16px">
+            <div class="glass controls">
+                <h1>Карты Шухарта · Ozon по неделям</h1>
+                <div class="tabs" title="Юрлицо">
+                    <button class="tab" id="ent_ip" onclick="setEnt('ip')">ИП</button>
+                    <button class="tab" id="ent_ooo" onclick="setEnt('ooo')">ООО</button>
+                    <button class="tab" id="ent_all" onclick="setEnt('all')">Вместе</button>
+                </div>
+                <div class="ctl">
+                    <span class="ctl-label">Границы по</span>
+                    <select id="baseMode" onchange="setBase()">
+                        <option value="all">всем неделям</option>
+                        <option value="last">последним N неделям</option>
+                        <option value="range">неделям с … по …</option>
+                    </select>
+                    <input type="number" id="baseN" min="3" value="4" class="hide" onchange="setBase()" title="Сколько последних закрытых недель">
+                    <select id="baseFrom" class="hide" onchange="setBase()" title="Первая неделя базы"></select>
+                    <select id="baseTo" class="hide" onchange="setBase()" title="Последняя неделя базы"></select>
+                </div>
+            </div>
+            <div class="glass note" id="dataNote">Загрузка…</div>
+            <div id="cards" style="display:flex;flex-direction:column;gap:16px"></div>
+            <div class="glass card">
+                <div class="card-head"><h2>Недели</h2><span class="ctl-label">подсвечены недели базы границ</span></div>
+                <div class="tbl-wrap" id="weekTable"></div>
+            </div>
+            <div class="glass card method">
+                <div class="card-head"><h2>Как считается</h2></div>
+                <ul>
+                    <li>Точка — закрытая календарная неделя (пн–вс) с 31.08.2026; текущая неделя не показывается.</li>
+                    <li>Выручка (PNL) — Σ <code>product_sales.revenue</code> за неделю, все товары; маржа (CF) — Σ <code>sales_plan_weeks.mar</code> по товарам (расчёт <code>syncPnl</code>, как в plan.html); маржинальность — Σмаржа ÷ ΣGMV (<code>revn</code>) × 100.</li>
+                    <li>Средняя линия CL — медиана недель базы; скользящий размах MRᵢ = |Xᵢ − Xᵢ₋₁|, σ = средний MR ÷ 1,128; границы UCL / LCL = CL ± 3σ (у выручки нижняя — не ниже 0). Пунктир ±2σ — для правила «2 из 3».</li>
+                    <li>Сигналы (по всем неделям, против границ выбранной базы): точка за ±3σ; 2 из 3 подряд за ±2σ с одной стороны; 7 подряд по одну сторону от CL; 6 подряд растут или падают.</li>
+                    <li>Меньше ~20 точек в базе — границы предварительные: с каждой новой неделей они уточняются.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+<script src="auth.js?v=20261021"></script>
+<script>
+// === базы и доступ: один вход — сразу в ИП и ООО (auth.js); «Вместе» — сумма двух баз ===
+const BASES={
+  ip:{name:'ИП',url:'https://jvoofakrkhzoblhhuyvr.supabase.co',anon:'sb_publishable_IA4ReUU9xTL7hb_sbsHaFA_LPATJazE'},
+  ooo:{name:'ООО',url:'https://jaruwkpugxybwcsalhgr.supabase.co',anon:'sb_publishable_09rFaH3adGXnEO3-cybX9A_eK_mCnW0'}
+};
+const HDS={ip:{apikey:BASES.ip.anon,Authorization:'Bearer '+BASES.ip.anon},ooo:{apikey:BASES.ooo.anon,Authorization:'Bearer '+BASES.ooo.anon}};
+const SUPABASE_URL=BASES.ip.url;
+const START='2026-08-31';   // начало работы в инструменте — первая неделя карт
+const D2=1.128;
+const C_UP='#4ade80',C_DOWN='#f87171';
+const METRICS=[
+  {key:'rev',name:'Выручка (PNL)',unit:'rub',color:'#5eead4',clip0:true},
+  {key:'mar',name:'Маржа (CF)',unit:'rub',color:'#ffffff',clip0:false},
+  {key:'pct',name:'Маржинальность (CF)',unit:'pct',color:'#fde047',clip0:false}
+];
+let AVAIL={ip:false,ooo:false},ENT='ip',DATA={},WEEKS=[];
+let BASE={mode:'all',n:4,from:0,to:0};
+try{const s=JSON.parse(localStorage.getItem('ba_shewhart')||'{}');if(s.ent)ENT=s.ent;if(s.base)BASE={...BASE,...s.base};}catch(e){}
+const q=new URLSearchParams(location.search).get('e');if(['ip','ooo','all'].includes(q))ENT=q;
+const save=()=>{try{localStorage.setItem('ba_shewhart',JSON.stringify({ent:ENT,base:{mode:BASE.mode,n:BASE.n}}));}catch(e){}};
+
+// === даты ===
+const localISO=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const parseISO=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d);};
+const addDays=(d,n)=>{const r=new Date(d);r.setDate(r.getDate()+n);return r;};
+const ddmm=s=>s.slice(8,10)+'.'+s.slice(5,7);
+const weekLabel=w=>ddmm(w)+'–'+ddmm(localISO(addDays(parseISO(w),6)));
+// закрытые недели: воскресенье — раньше сегодняшнего дня
+function closedMondays(){const today=new Date();today.setHours(0,0,0,0);const out=[];let d=parseISO(START);while(addDays(d,6)<today){out.push(localISO(d));d=addDays(d,7);}return out;}
+
+// === формат ===
+const fmtMln=v=>(v/1e6).toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2})+' млн';
+const fmtRub=v=>Math.round(v).toLocaleString('ru-RU')+' ₽';
+const fmtPct=v=>v.toLocaleString('ru-RU',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';
+const fmtV=(m,v)=>m.unit==='pct'?fmtPct(v):fmtMln(v);
+const fmtExact=(m,v)=>m.unit==='pct'?v.toLocaleString('ru-RU',{maximumFractionDigits:2})+'%':fmtRub(v);
+const esc=s=>String(s).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+
+// === загрузка: постранично, сортировка по уникальному id ===
+async function fetchPages(b,q){let out=[],off=0;while(true){const r=await fetch(BASES[b].url+'/rest/v1/'+q+`${q.includes('order=')?'':'&order=id'}&limit=1000&offset=${off}`,{headers:HDS[b]});if(!r.ok)throw new Error(`${BASES[b].name}: HTTP ${r.status} ${q.split('?')[0]}`);const j=await r.json();out=out.concat(j);if(j.length<1000)break;off+=1000;}return out;}
+async function lastDate(b,table,col){const r=await fetch(BASES[b].url+`/rest/v1/${table}?select=${col}&order=${col}.desc&limit=1`,{headers:HDS[b]});if(!r.ok)return null;const j=await r.json();return j[0]?j[0][col]:null;}
+async function loadBase(b){
+  if(DATA[b])return DATA[b];
+  const lastMon=WEEKS[WEEKS.length-1];
+  // выручка PNL — по неделям параллельно (у артикула за день много строк — по складам)
+  const revW=await Promise.all(WEEKS.map(async w=>{
+    const rows=await fetchPages(b,`product_sales?sale_date=gte.${w}&sale_date=lte.${localISO(addDays(parseISO(w),6))}&select=sale_date,revenue`);
+    return {rev:rows.reduce((s,x)=>s+Number(x.revenue||0),0),days:new Set(rows.map(x=>x.sale_date)).size};
+  }));
+  // CF — недельные факты по товарам (ключ — понедельник; итог недели = сумма по товарам)
+  const cf={};
+  (await fetchPages(b,`sales_plan_weeks?week=gte.${START}&week=lte.${lastMon}&metric=in.(mar,revn)&fact=not.is.null&select=week,metric,fact,cost_provisional`)).forEach(r=>{
+    const g=cf[r.week]=cf[r.week]||{mar:0,revn:0,prov:false};
+    g[r.metric]+=Number(r.fact||0);if(r.cost_provisional)g.prov=true;
+  });
+  const [lastSale,lastAd]=await Promise.all([lastDate(b,'product_sales','sale_date'),lastDate(b,'ozon_ad_spend','spend_date')]);
+  DATA[b]={weeks:WEEKS.map((w,i)=>({w,rev:revW[i].days?revW[i].rev:null,days:revW[i].days,mar:cf[w]?cf[w].mar:null,revn:cf[w]?cf[w].revn:null,prov:!!(cf[w]&&cf[w].prov)})),lastSale,lastAd};
+  return DATA[b];
+}
+// «Вместе»: суммы двух баз; у юрлица нет данных за неделю (ООО — с 01.10.2026) — берём только второе, с пометкой only
+function combine(a,o){
+  const sum=(x,y)=>x==null?y:y==null?x:x+y;
+  return {weeks:a.weeks.map((x,i)=>{const y=o.weeks[i];
+    const only=x.rev==null&&x.mar==null?'ООО':y.rev==null&&y.mar==null?'ИП':'';
+    return {w:x.w,rev:sum(x.rev,y.rev),days:x.rev==null?y.days:y.rev==null?x.days:Math.min(x.days,y.days),mar:sum(x.mar,y.mar),revn:sum(x.revn,y.revn),prov:(x.mar!=null&&x.prov)||(y.mar!=null&&y.prov),only};}),
+    lastSale:[a.lastSale,o.lastSale].filter(Boolean).sort()[0]||null,lastAd:[a.lastAd,o.lastAd].filter(Boolean).sort()[0]||null};
+}
+const valOf=(m,x)=>m.key==='rev'?x.rev:m.key==='mar'?x.mar:(x.revn>0&&x.mar!=null?x.mar/x.revn*100:null);
+
+// === математика Шухарта (как в прототипе shewhart.html) ===
+const median=a=>{const s=[...a].sort((x,y)=>x-y),m=s.length>>1;return s.length%2?s[m]:(s[m-1]+s[m])/2;};
+function shewhart(vals,clip0){
+  const mrs=vals.slice(1).map((v,i)=>Math.abs(v-vals[i]));
+  const cl=median(vals),avgMR=mrs.reduce((s,v)=>s+v,0)/mrs.length,sigma=avgMR/D2;
+  const lcl=cl-3*sigma;
+  return {cl,avgMR,sigma,ucl:cl+3*sigma,lcl:clip0?Math.max(0,lcl):lcl,n:vals.length};
+}
+// сигналы по всем неделям против границ базы; pts — [{i,v}] без пропусков данных
+function findSignals(pts,L){
+  const out=[],mark=new Set();
+  const add=(rule,ids,text)=>{ids.forEach(i=>mark.add(i));out.push({rule,ids,text});};
+  pts.forEach(p=>{if(p.v>L.ucl)add(1,[p.i],'выше UCL');else if(p.v<L.lcl)add(1,[p.i],'ниже LCL');});
+  // 2 из 3 подряд за ±2σ с одной стороны; пересекающиеся тройки — один сигнал
+  let g2=null;
+  for(let k=2;k<pts.length;k++){
+    const t=pts.slice(k-2,k+1);
+    [1,-1].forEach(sd=>{
+      const far=t.filter(p=>sd*(p.v-L.cl)>2*L.sigma).map(p=>p.i);if(far.length<2)return;
+      if(g2&&g2.sd===sd&&far.some(i=>g2.ids.includes(i))){far.forEach(i=>{if(!g2.ids.includes(i))g2.ids.push(i);mark.add(i);});}
+      else{add(2,far,'2 из 3 подряд '+(sd>0?'выше +2σ':'ниже −2σ'));g2=out[out.length-1];g2.sd=sd;}
+    });
+  }
+  // серии: [s..e] — индексы в pts
+  const runs=(key,from)=>{const r=[];let s=from;for(let k=from+1;k<=pts.length;k++){if(k<pts.length&&key(k)!==0&&key(k)===key(s))continue;r.push([s,k-1]);s=k;}return r;};
+  // 7 подряд по одну сторону от CL (точка на линии серию прерывает)
+  const side=k=>Math.sign(pts[k].v-L.cl);
+  runs(side,0).forEach(([s,e])=>{if(side(s)!==0&&e-s+1>=7)add(3,pts.slice(s,e+1).map(p=>p.i),`${e-s+1} подряд ${side(s)>0?'выше':'ниже'} CL`);});
+  // 6 подряд растут / падают: 5+ шагов одного знака
+  if(pts.length>=6){const dir=k=>Math.sign(pts[k].v-pts[k-1].v);
+    runs(dir,1).forEach(([s,e])=>{if(dir(s)!==0&&e-s+2>=6)add(4,pts.slice(s-1,e+1).map(p=>p.i),`${e-s+2} подряд ${dir(s)>0?'растут':'падают'}`);});}
+  return {list:out,mark};
+}
+
+// === окно базы ===
+function baseRange(){
+  const n=WEEKS.length;
+  if(BASE.mode==='last'){const k=Math.max(3,Math.min(n,BASE.n|0||3));return [n-k,n-1];}
+  if(BASE.mode==='range'){const a=Math.max(0,Math.min(BASE.from,n-1)),b=Math.max(0,Math.min(BASE.to,n-1));return a<=b?[a,b]:[b,a];}
+  return [0,n-1];
+}
+
+// === график (SVG) ===
+function chartSVG(m,series,L,sig,ra){
+  const W=1000,H=300,pl=78,pr=96,pt=18,pb=40,n=series.length;
+  const vals=series.filter(v=>v!=null);
+  let lo=Math.min(...vals,L?L.lcl:Infinity,L?L.cl-2*L.sigma:Infinity),hi=Math.max(...vals,L?L.ucl:-Infinity);
+  if(!Number.isFinite(lo)||!Number.isFinite(hi)){lo=0;hi=1;}
+  if(hi===lo){hi+=1;lo-=1;}
+  const padY=(hi-lo)*.1;lo-=padY;hi+=padY;if(m.clip0&&lo<0&&Math.min(...vals)>=0)lo=0;
+  const step=n>1?(W-pl-pr)/(n-1):0;
+  const X=i=>n>1?pl+i*step:(pl+W-pr)/2,Y=v=>pt+(hi-v)/(hi-lo)*(H-pt-pb);
+  let s=`<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" font-family="Forum">`;
+  // база границ
+  const bx0=Math.max(pl-8,X(ra[0])-step/2),bx1=Math.min(W-pr+8,X(ra[1])+step/2);
+  s+=`<rect x="${bx0}" y="${pt}" width="${Math.max(16,bx1-bx0)}" height="${H-pt-pb}" fill="rgba(255,255,255,0.08)" rx="6"/>`;
+  s+=`<text x="${(bx0+bx1)/2}" y="${pt+12}" text-anchor="middle" font-size="11" fill="rgba(255,255,255,0.55)">база границ</text>`;
+  // сетка
+  for(let k=0;k<=4;k++){const v=lo+(hi-lo)*k/4,y=Y(v);s+=`<line x1="${pl}" x2="${W-pr}" y1="${y}" y2="${y}" stroke="rgba(255,255,255,0.12)"/><text x="${pl-8}" y="${y+4}" text-anchor="end" font-size="12" fill="rgba(255,255,255,0.7)">${m.unit==='pct'?fmtPct(v):(v/1e6).toLocaleString('ru-RU',{maximumFractionDigits:2})}</text>`;}
+  if(m.unit!=='pct')s+=`<text x="${pl-8}" y="${pt-5}" text-anchor="end" font-size="11" fill="rgba(255,255,255,0.55)">млн ₽</text>`;
+  if(lo<0&&hi>0)s+=`<line x1="${pl}" x2="${W-pr}" y1="${Y(0)}" y2="${Y(0)}" stroke="rgba(255,255,255,0.45)"/>`;
+  // линии карты
+  if(L){
+    const hl=(v,col,dash,w,lab)=>{if(v<lo||v>hi)return;const y=Y(v);s+=`<line x1="${pl}" x2="${W-pr}" y1="${y}" y2="${y}" stroke="${col}" stroke-width="${w}" stroke-dasharray="${dash}"/>`;if(lab)s+=`<text x="${W-pr+6}" y="${y+4}" font-size="12" fill="${col}">${lab}</text>`;};
+    hl(L.cl+2*L.sigma,'rgba(255,255,255,0.3)','2 5',1,'');hl(L.cl-2*L.sigma,'rgba(255,255,255,0.3)','2 5',1,'');
+    hl(L.ucl,C_DOWN,'6 5',2,'UCL '+fmtV(m,L.ucl).replace(' млн',''));
+    hl(L.lcl,C_DOWN,'6 5',2,'LCL '+fmtV(m,L.lcl).replace(' млн',''));
+    hl(L.cl,C_UP,'10 6',2,'CL '+fmtV(m,L.cl).replace(' млн',''));
+  }
+  // ряд: разрывы на неделях без данных
+  let path='',pen=false;series.forEach((v,i)=>{if(v==null){pen=false;return;}path+=(pen?'L':'M')+X(i)+' '+Y(v)+' ';pen=true;});
+  s+=`<path d="${path}" fill="none" stroke="${m.color}" stroke-width="2.5" stroke-linejoin="round"/>`;
+  series.forEach((v,i)=>{if(v==null)return;const hot=sig.mark.has(i);
+    s+=`<circle cx="${X(i)}" cy="${Y(v)}" r="${hot?7:5}" fill="${hot?C_DOWN:m.color}" stroke="${hot?'#fff':'rgba(28,13,46,0.6)'}" stroke-width="2" data-i="${i}" style="cursor:pointer"/>`;});
+  // подписи недель (при тесноте — через одну)
+  const every=Math.ceil(n/14);
+  WEEKS.forEach((w,i)=>{if(i%every&&i!==n-1)return;s+=`<text x="${X(i)}" y="${H-pb+20}" text-anchor="middle" font-size="12" fill="rgba(255,255,255,0.75)">${ddmm(w)}</text>`;});
+  return s+'</svg>';
+}
+
+// === отрисовка ===
+function current(){
+  if(ENT==='all')return DATA.ip&&DATA.ooo?combine(DATA.ip,DATA.ooo):null;
+  return DATA[ENT]||null;
+}
+function render(){
+  const D=current(),ra=baseRange();
+  ['ip','ooo','all'].forEach(e=>{const b=document.getElementById('ent_'+e);b.classList.toggle('on',e===ENT);b.disabled=e==='all'?!(AVAIL.ip&&AVAIL.ooo):!AVAIL[e];});
+  if(!D)return;
+  // примечание о свежести данных
+  const lastSun=localISO(addDays(parseISO(WEEKS[WEEKS.length-1]),6));
+  const partRev=D.weeks.filter(x=>x.rev!=null&&x.days<7).map(x=>weekLabel(x.w));
+  const adsShort=D.lastAd&&D.lastAd<lastSun;
+  document.getElementById('dataNote').innerHTML=
+    `${ENT==='all'?'ИП + ООО':BASES[ENT].name}: ${WEEKS.length} закрытых недель (${weekLabel(WEEKS[0])} … ${weekLabel(WEEKS[WEEKS.length-1])}). `+
+    `Заказы загружены по <b>${D.lastSale?ddmm(D.lastSale):'—'}</b>, реклама — по <b>${D.lastAd?ddmm(D.lastAd):'—'}</b>.`+
+    (adsShort?` <span class="warn">Реклама загружена не за всю последнюю неделю — её маржа завышена.</span>`:'')+
+    (partRev.length?` <span class="warn">Неполные недели по заказам (меньше 7 дней с данными): ${partRev.join(', ')}.</span>`:'')+
+    (ra[1]-ra[0]+1<20?` Границы <b>предварительные</b>: в базе ${ra[1]-ra[0]+1} нед. (нужно ~20).`:'');
+  // карты
+  const box=document.getElementById('cards');box.innerHTML='';
+  METRICS.forEach(m=>{
+    const series=D.weeks.map(x=>valOf(m,x));
+    const baseVals=series.slice(ra[0],ra[1]+1).filter(v=>v!=null);
+    const L=baseVals.length>=3?shewhart(baseVals,m.clip0):null;
+    const pts=series.map((v,i)=>({i,v})).filter(p=>p.v!=null);
+    const sig=L?findSignals(pts,L):{list:[],mark:new Set()};
+    const card=document.createElement('div');card.className='glass card';
+    const stats=L?[['CL',fmtV(m,L.cl)],['MR̄',fmtV(m,L.avgMR)],['σ',fmtV(m,L.sigma)],['UCL',fmtV(m,L.ucl)],['LCL',fmtV(m,L.lcl)],['точек в базе',L.n]].map(([a,b])=>`<div class="stat"><span>${a}</span>${b}</div>`).join(''):'';
+    card.innerHTML=`<div class="card-head"><h2>${m.name}</h2>`+
+      (L?`<span class="badge ${sig.list.length?'alert':'ok'}">${sig.list.length?'Сигналов: '+sig.list.length:'Сигналов нет — обычный разброс'}</span>`:'')+
+      `<div class="stats">${stats}</div></div>`+
+      (pts.length?`<div class="chart-box">${chartSVG(m,series,L,sig,ra)}<div class="tooltip"></div></div>`:`<div class="empty">Нет данных за эти недели</div>`)+
+      (L?`<ul class="signals">${sig.list.length?sig.list.map(s=>`<li>${s.ids.map(i=>weekLabel(WEEKS[i])).join(', ')}: ${esc(s.text)}</li>`).join(''):'<li class="none">Все точки внутри границ, серий нет — реагировать на колебания не нужно.</li>'}</ul>`:(pts.length?'<ul class="signals"><li>В базе меньше 3 недель с данными — границы не считаются.</li></ul>':''));
+    box.appendChild(card);
+    const cb=card.querySelector('.chart-box');
+    if(cb)bindTip(cb,m,series,L,D);
+  });
+  renderTable(D,ra);
+}
+function bindTip(cb,m,series,L,D){
+  const tip=cb.querySelector('.tooltip');
+  cb.addEventListener('mousemove',e=>{
+    const c=e.target.closest('circle[data-i]');if(!c){tip.style.display='none';return;}
+    const i=+c.dataset.i,v=series[i],x=D.weeks[i];
+    let h=`<b>${weekLabel(x.w)}</b>${x.only?' (только '+x.only+')':''}<br>${m.name}: ${fmtExact(m,v)}`;
+    if(L)h+=`<br>к CL: ${v>=L.cl?'+':''}${m.unit==='pct'?(v-L.cl).toLocaleString('ru-RU',{maximumFractionDigits:1})+' п.п.':fmtRub(v-L.cl)}`;
+    if(m.key!=='rev'&&x.prov)h+='<br>* себестоимость части товаров — предварительная';
+    if(m.key==='rev'&&x.days<7)h+=`<br>дней с заказами: ${x.days} из 7`;
+    tip.innerHTML=h;tip.style.display='block';
+    const r=cb.getBoundingClientRect();let lx=e.clientX-r.left+14;if(lx+tip.offsetWidth>r.width)lx=e.clientX-r.left-tip.offsetWidth-14;
+    tip.style.left=lx+'px';tip.style.top=Math.max(0,e.clientY-r.top-tip.offsetHeight-10)+'px';
+  });
+  cb.addEventListener('mouseleave',()=>{tip.style.display='none';});
+}
+function renderTable(D,ra){
+  const rows=D.weeks.map((x,i)=>{const p=valOf(METRICS[2],x);
+    return `<tr class="${i>=ra[0]&&i<=ra[1]?'in-base':''}"><td>${weekLabel(x.w)}${x.only?' <span class="ctl-label">(только '+x.only+')</span>':''}</td><td>${x.rev!=null?fmtRub(x.rev):'—'}${x.rev!=null&&x.days<7?' <span class="warn" title="дней с заказами">('+x.days+' дн)</span>':''}</td><td>${x.mar!=null?fmtRub(x.mar):'—'}${x.mar!=null&&x.prov?' *':''}</td><td>${x.revn!=null?fmtRub(x.revn):'—'}</td><td>${p!=null?fmtPct(p):'—'}</td></tr>`;}).reverse().join('');
+  document.getElementById('weekTable').innerHTML=`<table><tr><th>Неделя</th><th>Выручка (PNL)</th><th>Маржа (CF)</th><th>GMV (CF)</th><th>Маржинальность</th></tr>${rows}</table>`+
+    (D.weeks.some(x=>x.prov)?'<div class="ctl-label" style="margin-top:6px">* у части товаров себестоимость предварительная (cost_provisional)</div>':'');
+}
+
+// === управление ===
+async function setEnt(e){
+  ENT=e;save();
+  try{
+    if(e==='all'){await Promise.all([loadBase('ip'),loadBase('ooo')]);}else await loadBase(e);
+  }catch(err){document.getElementById('dataNote').innerHTML=`<span class="warn">Ошибка загрузки: ${esc(err.message)}</span>`;document.getElementById('cards').innerHTML='';console.error(err);return;}
+  render();
+}
+function syncBaseUI(){
+  const md=document.getElementById('baseMode'),bn=document.getElementById('baseN'),bf=document.getElementById('baseFrom'),bt=document.getElementById('baseTo');
+  md.value=BASE.mode;bn.value=BASE.n;bn.max=WEEKS.length;
+  bn.classList.toggle('hide',BASE.mode!=='last');bf.classList.toggle('hide',BASE.mode!=='range');bt.classList.toggle('hide',BASE.mode!=='range');
+  if(!bf.options.length){const o=WEEKS.map((w,i)=>`<option value="${i}">${weekLabel(w)}</option>`).join('');bf.innerHTML=o;bt.innerHTML=o;}
+  bf.value=Math.min(BASE.from,WEEKS.length-1);bt.value=Math.min(BASE.to,WEEKS.length-1);
+}
+function setBase(){
+  BASE.mode=document.getElementById('baseMode').value;
+  BASE.n=Math.max(3,Math.min(WEEKS.length,parseInt(document.getElementById('baseN').value,10)||3));
+  if(BASE.mode==='range'){BASE.from=+document.getElementById('baseFrom').value;BASE.to=+document.getElementById('baseTo').value;}
+  save();syncBaseUI();render();
+}
+
+// === вход (auth.js — общий для всех страниц); после входа — обе базы ===
+async function go(){
+  if(!await BA_AUTH.login(BASES.ip.url,HDS.ip)){document.getElementById('login').classList.remove('hide');document.getElementById('pwd').value='';return;}
+  AVAIL.ip=true;
+  try{AVAIL.ooo=await BA_AUTH.login(BASES.ooo.url,HDS.ooo);}catch(e){AVAIL.ooo=false;}
+  document.getElementById('login').classList.add('hide');
+  document.getElementById('app').classList.remove('hide');
+  WEEKS=closedMondays();
+  if(!WEEKS.length){document.getElementById('dataNote').textContent='Закрытых недель с '+ddmm(START)+' ещё нет.';return;}
+  BASE.from=0;BASE.to=WEEKS.length-1;
+  syncBaseUI();
+  if(ENT==='all'&&!AVAIL.ooo)ENT='ip';
+  if(ENT==='ooo'&&!AVAIL.ooo)ENT='ip';
+  setEnt(ENT);
+}
+if(BA_AUTH.has(SUPABASE_URL))go();else document.getElementById('login').classList.remove('hide');
+</script>
+</body>
+</html>
