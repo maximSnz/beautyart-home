@@ -104,7 +104,8 @@
         .pr-tbl td, .pr-tbl th { padding: 3px 5px; }
         .pl-ok { color: #16a34a; } .pl-low { color: #b45309; } .pl-bad { color: #dc2626; }
         .pr-tbl td { white-space: nowrap; }
-        .pr-tbl td.ed { cursor: pointer; color: #544273; border-bottom: 1px dashed #E33D78; }
+        .pr-tbl td.ed { cursor: pointer; color: #544273; }
+        .pr-tbl .bs { border-left: 2px solid rgba(84,66,115,.18); }
         .pr-tbl td.ed:hover { background: rgba(227,61,120,.08); }
         .pr-tbl td.ed::after { content: ' ✎'; opacity: .35; font-size: .8em; }
         .ed-mark { color: #E33D78; }
@@ -870,11 +871,11 @@ function renderProductsBody(ents,plans,k,ra,all){
   const tg=(it,txt,t)=>`<td class="num tgt" title="${esc(t||it.segTxt)}">${txt}</td>`;
   const tr=(it,cls,label)=>`<tr class="${cls}"${it.group?` onclick="togglePr('${it.gkey}')" style="cursor:pointer"`:''}><td>${label}${ent(it.b)}</td>`+
     (isAuto()?`<td class="muted" title="${esc(it.from||'')}">${it.from?esc(it.from.replace('с ','').replace(' (мало данных)','*')):''}</td>`:'')+
-    `<td class="num">${fR(it.r.rev)}</td>${tg(it,fR(it.r.revT),it.segTxtR)}<td>${fR(it.p&&it.p.rev)}</td><td>${placeTag(it.p&&it.p.rev,it.c.rev)}</td>`+
-    `<td class="num">${fP(it.r.pct)}</td>${tg(it,fP(it.r.pctT))}${ed(it,'margin_pct',fP(it.p&&it.p.pct))}<td>${placeTag(it.p&&it.p.pct,it.c.pct)}</td>`+
-    `<td class="num">${fR(it.r.mar)}</td>${tg(it,fR(it.r.marT),it.segTxtR+'; '+it.segTxt)}<td>${fR(it.p&&it.p.mar)}</td><td>${placeTag(it.p&&it.p.mar,it.c.mar)}</td>`+
-    `<td class="num">${fQ(it.r.qty)}</td>${tg(it,fQ(it.r.qtyT),it.qtyTxt)}${ed(it,'plan_qty',fQ(it.p&&it.p.qty))}<td>${placeTag(it.p&&it.p.qty,it.c.qty)}</td>`+
-    `<td class="num" title="фактическая средняя цена дней базы (Σ выручки ÷ Σ шт)">${fC(it.r.price)}</td>${tg(it,fC(it.r.priceT),it.qtyTxt)}${ed(it,'price',fC(it.p&&it.p.price))}<td>${placeTag(it.p&&it.p.price,it.c.price)}</td></tr>`;
+    `<td class="num bs">${fR(it.r.rev)}</td>${tg(it,fR(it.r.revT),it.segTxtR)}<td>${fR(it.p&&it.p.rev)}</td><td>${placeTag(it.p&&it.p.rev,it.c.rev)}</td>`+
+    `<td class="num bs">${fP(it.r.pct)}</td>${tg(it,fP(it.r.pctT))}${ed(it,'margin_pct',fP(it.p&&it.p.pct))}<td>${placeTag(it.p&&it.p.pct,it.c.pct)}</td>`+
+    `<td class="num bs">${fR(it.r.mar)}</td>${tg(it,fR(it.r.marT),it.segTxtR+'; '+it.segTxt)}<td>${fR(it.p&&it.p.mar)}</td><td>${placeTag(it.p&&it.p.mar,it.c.mar)}</td>`+
+    `<td class="num bs">${fQ(it.r.qty)}</td>${tg(it,fQ(it.r.qtyT),it.qtyTxt)}${ed(it,'plan_qty',fQ(it.p&&it.p.qty))}<td>${placeTag(it.p&&it.p.qty,it.c.qty)}</td>`+
+    `<td class="num bs" title="фактическая средняя цена дней базы (Σ выручки ÷ Σ шт)">${fC(it.r.price)}</td>${tg(it,fC(it.r.priceT),it.qtyTxt)}${ed(it,'price',fC(it.p&&it.p.price))}<td>${placeTag(it.p&&it.p.price,it.c.price)}</td></tr>`;
   let html='';
   items.forEach(it=>{
     if(!it.group){html+=tr(it,'',esc(it.offer));return;}
@@ -887,9 +888,9 @@ function renderProductsBody(ents,plans,k,ra,all){
   const tRR=tot('r','rev'),tTRv=tot('r','revT'),tPR=tot('p','rev'),tRM=tot('r','mar'),tTM=tot('r','marT'),tPM=tot('p','mar'),tRQ=tot('r','qty'),tTQ=tot('r','qtyT'),tPQ=tot('p','qty');
   // итоговая маржинальность — от GMV (Σ маржи ÷ Σ выручка × κ), как Σmar ÷ Σrevn; план — от плановой выручки (так задан план)
   const gM=items.reduce((s,it)=>s+(it.r.mar!=null?it.r.gmv||0:0),0),gT=items.reduce((s,it)=>s+(it.r.marT!=null?it.r.gmvT||0:0),0);
-  html+=`<tr class="pr-total"><td>Итого ${items.length} поз.</td>${isAuto()?'<td></td>':''}<td class="num">${fR(tRR)}</td><td class="num tgt">${fR(tTRv)}</td><td>${fR(tPR)}</td><td></td><td class="num">${fP(gM>0?tRM/gM*100:null)}</td><td class="num tgt">${fP(gT>0?tTM/gT*100:null)}</td><td>${fP(tPR>0?tot('p','marRaw')/tPR*100:null)}</td><td></td><td class="num">${fR(tRM)}</td><td class="num tgt">${fR(tTM)}</td><td>${fR(tPM)}</td><td></td><td class="num">${fQ(tRQ)}</td><td class="num tgt">${fQ(tTQ)}</td><td>${fQ(tPQ)}</td><td></td><td class="num">${fC(tRQ>0?items.reduce((s,it)=>s+(it.r.qty?it.r.rev:0),0)/tRQ:null)}</td><td class="num tgt">${fC(tTQ>0?items.reduce((s,it)=>s+(it.r.qtyT?it.r.revT:0),0)/tTQ:null)}</td><td>${fC(tPQ>0?tPR/tPQ:null)}</td><td></td></tr>`;
-  document.getElementById('prBody').innerHTML=items.length?`<table class="plan-tbl pr-tbl"><tr><th rowspan="2">Артикул</th>${isAuto()?'<th rowspan="2" title="начало общей базы товара (* — мало данных)">База</th>':''}<th colspan="4">Выручка, тыс ₽</th><th colspan="4">Маржинальность</th><th colspan="4">Маржа, тыс ₽</th><th colspan="4">Заказы, шт</th><th colspan="4">Цена, ₽</th></tr>
-    <tr>${'<th>мед.</th><th>цель</th><th>план</th><th title="где план в коридоре: N% пути от медианы до UCL, >UCL, <мед, <LCL">откл.</th>'.repeat(5)}</tr>${html}</table>`
+  html+=`<tr class="pr-total"><td>Итого ${items.length} поз.</td>${isAuto()?'<td></td>':''}<td class="num bs">${fR(tRR)}</td><td class="num tgt">${fR(tTRv)}</td><td>${fR(tPR)}</td><td></td><td class="num bs">${fP(gM>0?tRM/gM*100:null)}</td><td class="num tgt">${fP(gT>0?tTM/gT*100:null)}</td><td>${fP(tPR>0?tot('p','marRaw')/tPR*100:null)}</td><td></td><td class="num bs">${fR(tRM)}</td><td class="num tgt">${fR(tTM)}</td><td>${fR(tPM)}</td><td></td><td class="num bs">${fQ(tRQ)}</td><td class="num tgt">${fQ(tTQ)}</td><td>${fQ(tPQ)}</td><td></td><td class="num bs">${fC(tRQ>0?items.reduce((s,it)=>s+(it.r.qty?it.r.rev:0),0)/tRQ:null)}</td><td class="num tgt">${fC(tTQ>0?items.reduce((s,it)=>s+(it.r.qtyT?it.r.revT:0),0)/tTQ:null)}</td><td>${fC(tPQ>0?tPR/tPQ:null)}</td><td></td></tr>`;
+  document.getElementById('prBody').innerHTML=items.length?`<table class="plan-tbl pr-tbl"><tr><th rowspan="2">Артикул</th>${isAuto()?'<th rowspan="2" title="начало общей базы товара (* — мало данных)">База</th>':''}<th colspan="4" class="bs">Выручка, тыс ₽</th><th colspan="4" class="bs">Маржинальность</th><th colspan="4" class="bs">Маржа, тыс ₽</th><th colspan="4" class="bs">Заказы, шт</th><th colspan="4" class="bs">Цена, ₽</th></tr>
+    <tr>${'<th class="bs">мед.</th><th>цель</th><th>план</th><th title="где план в коридоре: N% пути от медианы до UCL, >UCL, <мед, <LCL">откл.</th>'.repeat(5)}</tr>${html}</table>`
     :'<div class="empty">Нет товаров по фильтру</div>';
 }
 function togglePr(k){PR_OPEN.has(k)?PR_OPEN.delete(k):PR_OPEN.add(k);if(PR_ARGS)renderProducts(...PR_ARGS);}
