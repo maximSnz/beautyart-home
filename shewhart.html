@@ -534,16 +534,18 @@ function bestSeg(k,P){const all=segmentsOf(k,P),s=all.filter(x=>x.n>=TARGET_MIN[
 // «Цель по»: лучший период по маржинальности ('pct') или по выручке ('rev'); второй показатель — за те же дни
 // ползунок цели (решение владельца 26.10.2026): 0% — лучший период по выручке, 100% — по маржинальности; между ними выручка,
 // маржинальность и κ цели — линейно между двумя точками (допущение о линейном размене)
-// по умолчанию — положение с наибольшей маржой юрлица (Σ маржи цели товаров) для текущих юрлица, шага, месяца и базы;
-// ручное положение держится, пока этот контекст не сменится (решение владельца 26.10.2026)
-let PLAN_MK=null,TGT_W=100,TGT_KEY=null;
+// у каждого товара своё оптимальное положение w (0 — A, 100 — B) — где его маржа цели наибольшая; ползунок — общий СДВИГ
+// от оптимума (TGT_S, −100…+100, 0 — все товары в оптимуме), положение товара = оптимум + сдвиг в пределах 0…100
+// (решение владельца 26.10.2026); сдвиг сбрасывается в 0 при смене юрлица, шага, месяца или базы
+let PLAN_MK=null,TGT_S=0,TGT_KEY=null;
 const tgtKey=()=>ENT+'|'+STEP+'|'+PLAN_MK+'|'+JSON.stringify(PBASE[STEP]);
-function setTgtW(v){TGT_W=Math.max(0,Math.min(100,+v||0));TGT_KEY=tgtKey();const el=document.getElementById('planTgt');if(el)el.value=TGT_W;renderPlan(true);}
-function stepTgtW(d){setTgtW(TGT_W+d);}
-// маржа цели позиции при положении w — из двух точек (A — лучшая выручка, B — лучшая маржинальность)
-function marAt(it,w){const mix=(a,b)=>a==null?b:b==null?a:a+(b-a)*w/100,A=it.A,B=it.B;const rv=mix(A.rev,B.rev),pc=mix(A.pct,B.pct),kp=mix(A.kap,B.kap);return rv!=null&&pc!=null&&kp!=null?rv*pc/100*kp:0;}
-function bestW(items){let bw=100,bm=-Infinity;for(let w=100;w>=0;w-=5){   // при равной марже — правее (к маржинальности)
-  const m=items.reduce((s,it)=>s+marAt(it,w),0);if(m>bm+1e-6){bm=m;bw=w;}}return bw;}
+function setTgtS(v){TGT_S=Math.max(-100,Math.min(100,+v||0));TGT_KEY=tgtKey();const el=document.getElementById('planTgt');if(el)el.value=TGT_S;renderPlan(true);}
+function stepTgtS(d){setTgtS(TGT_S+d);}
+// маржа цели при положении w — из двух точек (A — лучшая выручка, B — лучшая маржинальность)
+function marAtPts(A,B,w){const mix=(a,b)=>a==null?b:b==null?a:a+(b-a)*w/100;const rv=mix(A.rev,B.rev),pc=mix(A.pct,B.pct),kp=mix(A.kap,B.kap);return rv!=null&&pc!=null&&kp!=null?rv*pc/100*kp:-Infinity;}
+function bestWOf(A,B){let bw=100,bm=-Infinity;for(let w=100;w>=0;w-=5){const m=marAtPts(A,B,w);if(m>bm+1e-6){bm=m;bw=w;}}return bw;}   // при равенстве — правее
+// точка надёжна, если маржинальность периода посчитана минимум по PT_MIN_CF дням с маржой CF
+const PT_MIN_CF=5;
 function monthOptions(){const d=new Date();d.setDate(1);const out=[];for(let k=-1;k<=2;k++){const x=new Date(d.getFullYear(),d.getMonth()+k,1);out.push(`${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}`);}return out;}
 const MONTHS_RU=['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
 const monthName=mk=>{const [y,m]=mk.split('-').map(Number);return MONTHS_RU[m-1]+' '+y;};
@@ -583,7 +585,7 @@ async function renderPlan(fast){
   if(!card.dataset.ready){
     card.innerHTML=`<div class="chart-head"><h2>Рекомендуемый план месяца</h2>
       <div class="ctl"><span class="ctl-label">Месяц</span><select id="planMonth" onchange="setPlanMonth(this.value)">${months.map(mk=>`<option value="${mk}">${monthName(mk)}</option>`).join('')}</select></div>
-      <div class="ctl" title="Цель между лучшим стабильным периодом товара по выручке (слева) и по маржинальности (справа), между ними — линейно; по умолчанию — положение с наибольшей маржой юрлица"><span class="ctl-label">Цель: выручка</span><button type="button" class="stepbtn" onclick="stepTgtW(-5)" title="К выручке на 5%">−</button><input type="range" id="planTgt" min="0" max="100" step="5" value="${TGT_W}" oninput="setTgtW(this.value)" style="width:150px;accent-color:#7c3aed"><button type="button" class="stepbtn" onclick="stepTgtW(5)" title="К маржинальности на 5%">+</button><span class="ctl-label">маржинальность</span></div>
+      <div class="ctl" title="У каждого товара цель — между его лучшим стабильным периодом по выручке и по маржинальности; по умолчанию (середина) каждый товар в положении с наибольшей своей маржой, ползунок сдвигает все товары от их оптимума к выручке или к маржинальности"><span class="ctl-label">Цель: выручка</span><button type="button" class="stepbtn" onclick="stepTgtS(-5)" title="Всем товарам — на 5 шагов к выручке от их оптимума">−</button><input type="range" id="planTgt" min="-100" max="100" step="5" value="${TGT_S}" oninput="setTgtS(this.value)" style="width:150px;accent-color:#7c3aed"><button type="button" class="stepbtn" onclick="stepTgtS(5)" title="Всем товарам — на 5 шагов к маржинальности от их оптимума">+</button><span class="ctl-label">маржинальность</span><button type="button" class="stepbtn" style="width:auto;padding:0 8px;font-size:.9em" onclick="setTgtS(0)" title="Каждый товар — в положение с наибольшей своей маржой">к оптимуму</button></div>
       <div class="ctl" title="База границ для этого блока и плана по товарам (у графика — своя, «Границы по» вверху)"><span class="ctl-label">База</span>
         <select id="pbaseMode" onchange="setBase('plan')"></select>
         <input type="number" id="pbaseN" min="3" value="20" class="hide" onchange="setBase('plan')">
@@ -595,7 +597,7 @@ async function renderPlan(fast){
     card.dataset.ready='1';
     syncBaseUI(true,'plan');
   }
-  document.getElementById('planMonth').value=PLAN_MK;document.getElementById('planTgt').value=TGT_W;
+  document.getElementById('planMonth').value=PLAN_MK;document.getElementById('planTgt').value=TGT_S;
   const prevCtx=CTX;CTX='plan';
   try{
   const ra=baseRange(),eff=effDaysOfMonth(PLAN_MK),k=STEP==='day'?eff:eff/WEEK_EFF;
@@ -607,7 +609,8 @@ async function renderPlan(fast){
   // цель юрлица — сумма целей товаров: выручка = Σ, маржа = Σ, маржинальность = Σ маржи цели ÷ Σ GMV цели (выручка × κ, как Σmar ÷ Σrevn)
   let items=buildItems(ents,ps,k,ra);
   // новый контекст (юрлицо, шаг, месяц, база) — ползунок на наибольшую маржу юрлица
-  if(TGT_KEY!==tgtKey()){const w=bestW(items);TGT_KEY=tgtKey();if(w!==TGT_W){TGT_W=w;items=buildItems(ents,ps,k,ra);}document.getElementById('planTgt').value=TGT_W;}
+  // новый контекст (юрлицо, шаг, месяц, база) — сдвиг в 0: каждый товар в своём оптимуме
+  if(TGT_KEY!==tgtKey()){TGT_KEY=tgtKey();if(TGT_S!==0){TGT_S=0;items=buildItems(ents,ps,k,ra);}document.getElementById('planTgt').value=TGT_S;}
   const sumR=f=>items.reduce((a,it)=>a+(it.r[f]||0),0);
   const tR=sumR('revT'),tM=sumR('marT'),tG=items.reduce((a,it)=>a+(it.r.marT!=null?it.r.gmvT||0:0),0);
   const tP=tG>0?tM/tG*100:null;
@@ -623,7 +626,7 @@ async function renderPlan(fast){
   const fR=v=>fmtRub(v),fP=v=>fmtPct(v),fC=v=>v.toLocaleString('ru-RU',{maximumFractionDigits:0})+' ₽';
   const baseTxt=isAuto()?`с последнего сдвига — выручка ${fromTxt(autoRange('rev',P))}, маржинальность ${fromTxt(autoRange('pct',P))}, маржа ${fromTxt(autoRange('mar',P))}`
     :`${STEP==='day'?'дни':'недели'} ${labelOf(P[ra[0]])} … ${labelOf(P[ra[1]])}`;
-  document.getElementById('planBody').innerHTML=`<div class="muted" style="font-size:.92em;margin-bottom:8px">${ENT==='all'?'ИП + ООО':BASES[ENT].name} · база границ: ${baseTxt} · эфф. дней в месяце ${eff.toLocaleString('ru-RU',{maximumFractionDigits:1})} (будни + 0,7 × выходные) · κ (GMV ÷ выручка PNL в базе) ${kap!=null?kap.toLocaleString('ru-RU',{maximumFractionDigits:3}):'—'}${has?'':' · <span class="warn">плана на '+monthName(PLAN_MK)+' нет</span>'}<br><b>Медиана</b> — уровень текущего стабильного периода (что процесс даёт сам); <b>цель</b> — сумма целей товаров: у каждого товара — две точки: лучший стабильный период по выручке и по маржинальности (выручка, маржинальность и κ — за дни периода); цель — между ними по ползунку «Цель» (слева — выручка, справа — маржинальность, между — линейно; по умолчанию — положение с наибольшей маржой юрлица); маржа цели = выручка цели × маржинальность цели × κ; маржинальность юрлица = Σ маржи ÷ Σ GMV.</div>
+  document.getElementById('planBody').innerHTML=`<div class="muted" style="font-size:.92em;margin-bottom:8px">${ENT==='all'?'ИП + ООО':BASES[ENT].name} · база границ: ${baseTxt} · эфф. дней в месяце ${eff.toLocaleString('ru-RU',{maximumFractionDigits:1})} (будни + 0,7 × выходные) · κ (GMV ÷ выручка PNL в базе) ${kap!=null?kap.toLocaleString('ru-RU',{maximumFractionDigits:3}):'—'}${has?'':' · <span class="warn">плана на '+monthName(PLAN_MK)+' нет</span>'}<br><b>Медиана</b> — уровень текущего стабильного периода (что процесс даёт сам); <b>цель</b> — сумма целей товаров: у каждого товара — две точки: лучший стабильный период по выручке и по маржинальности (выручка, маржинальность и κ — за дни периода); цель — между ними (линейно); по умолчанию каждый товар в положении с наибольшей своей маржой (если текущий уровень лучше всех точек между ними — в медианах), ползунок «Цель» сдвигает все товары от их оптимума к выручке или к маржинальности; точка с маржинальностью меньше чем по ${PT_MIN_CF} дням с маржой CF не учитывается; маржа цели = выручка цели × маржинальность цели × κ; маржинальность юрлица = Σ маржи ÷ Σ GMV.</div>
     <div class="tbl-wrap" style="max-height:none"><table class="plan-tbl"><tr><th>Показатель</th><th>Медиана</th><th>Цель</th><th>Коридор LCL – UCL</th><th>Действующий план</th><th>План − цель (нет цели — медиана)</th><th>Отклонение: где план в коридоре</th><th><span style="color:${C_CL}">▲</span> медиана · <span style="color:${C_TGT}">◆</span> цель · <span style="color:#E33D78">●</span> план</th></tr>
       ${row('Выручка (заказы, PNL)',cR,rR,tR>0?tR:null,pR,fR,false)}${row('Маржинальность (CF)',cP,rP,tP,pP,fP,true)}${row('Маржа (CF), ₽ <span class="muted">= выручка × маржин. × κ; коридор — карта маржи</span>',cM,rM,tM>0?tM:null,pM,fR,false)}
       ${row('Заказы, шт <span class="muted">= Σ товаров: выручка ÷ факт. средняя цена дней</span>',cQ,qR,qT,qP,fmtQty,false)}${row('Средняя цена (PNL) <span class="muted">= выручка ÷ шт; коридор — карта цены</span>',cC,rC,tC,pC,fC,false)}</table></div>`;
@@ -673,7 +676,7 @@ function itemCalc(P,plan,k,ra,price){
   r.mar=r.rev!=null&&r.pct!=null&&kap!=null?r.rev*r.pct/100*kap:null;
   // две точки цели — лучший стабильный период по выручке (A) и по маржинальности (B): выручка, маржинальность и κ — медианы и доля
   // GMV за те же будние дни (выручка × коэффициент месяца); лучший период = текущий — точка = медианы базы. Цель — между A и B
-  // по ползунку TGT_W (0 — A, 100 — B); маржа цели = выручка × маржин. × κ; GMV = выручка × κ — знаменатель Σmar ÷ ΣGMV
+  // по положению товара (0 — A, 100 — B; оптимум товара + сдвиг ползунка); маржа цели = выручка × маржин. × κ; GMV = выручка × κ — знаменатель Σmar ÷ ΣGMV
   r.kap=kap;
   // средняя фактическая цена PNL дней окна = Σ выручки ÷ Σ шт (будни, взвешенно — как график «Средняя цена»); заказы = выручка ÷ она
   const avgPrice=(i0,i1)=>{let rv=0,q=0;for(let i=i0;i<=i1;i++){const x=P[i];if(x.we||x.rev==null)continue;rv+=x.rev;q+=x.qty||0;}return q>0?rv/q:null;};
@@ -685,11 +688,20 @@ function itemCalc(P,plan,k,ra,price){
     const rv=win.map(x=>x.rev).filter(v=>v!=null),pv=win.map(x=>valOf('pct',x)).filter(v=>v!=null);
     const rev=rv.length?median(rv)*k:null,pr=avgPrice(i0,i1);
     return {seg,rev,pct:pv.length?median(pv):null,kap:kappaOf(P,[i0,i1],true),qty:rev!=null&&pr>0?rev/pr:null,price:pr,
-      pN:pv.length<win.length?pv.length:null};};   // pN — маржи CF нет за часть дней (в ИП cf_daily — с 07.09)
-  // по ползунку по прямой между A и B идут выручка, маржинальность, κ и заказы, шт; цена цели = выручка ÷ шт (получается сама)
-  const A=pt('rev'),B=pt('pct'),w=TGT_W/100,mix=(a,b)=>a==null?b:b==null?a:a+(b-a)*w;
-  r.revT=mix(A.rev,B.rev);r.pctT=mix(A.pct,B.pct);const kapT=mix(A.kap,B.kap);
-  r.qtyT=mix(A.qty,B.qty);r.priceT=r.revT!=null&&r.qtyT>0?r.revT/r.qtyT:null;
+      pN:pv.length<win.length?pv.length:null,nCF:pv.length};};   // pN — маржи CF нет за часть дней (в ИП cf_daily — с 07.09)
+  // точка с маржинальностью меньше чем по PT_MIN_CF дням с маржой CF — недостоверна: вместо неё медианы базы (bad — причина)
+  const med={rev:r.rev,pct:r.pct,kap,pN:null,qty:r.qty,price:pr0};
+  const ok=x=>!x.seg||x.seg.last||x.nCF>=PT_MIN_CF?x:{...med,seg:x.seg,bad:x};
+  // по положению по прямой между A и B идут выручка, маржинальность, κ и заказы, шт; цена цели = выручка ÷ шт (получается сама)
+  const A=ok(pt('rev')),B=ok(pt('pct'));
+  // текущий уровень (медианы) лучше всего отрезка A–B по марже — оптимум = медианы, сдвиг ведёт от медиан к A (−) или к B (+)
+  let wOpt=bestWOf(A,B),wPos=Math.max(0,Math.min(100,wOpt+TGT_S)),X=A,Y=B,w=wPos/100;
+  const medBest=r.mar!=null&&r.mar>marAtPts(A,B,wOpt)+1;
+  if(medBest){X=med;Y=TGT_S<0?A:B;w=Math.abs(TGT_S)/100;}
+  const mix=(a,b)=>a==null?b:b==null?a:a+(b-a)*w,mixP=f=>mix(X[f],Y[f]);
+  r.wOpt=medBest?null:wOpt;r.wPos=medBest?null:wPos;r.medBest=medBest;
+  r.revT=mixP('rev');r.pctT=mixP('pct');const kapT=mixP('kap');
+  r.qtyT=mixP('qty');r.priceT=r.revT!=null&&r.qtyT>0?r.revT/r.qtyT:null;
   r.kapT=kapT;
   r.marT=r.revT!=null&&r.pctT!=null&&kapT!=null?r.revT*r.pctT/100*kapT:null;
   r.gmv=r.rev!=null&&kap!=null?r.rev*kap:null;r.gmvT=r.revT!=null&&kapT!=null?r.revT*kapT:null;
@@ -697,9 +709,11 @@ function itemCalc(P,plan,k,ra,price){
   const rr=force?ra:rangeOf('rev',P).ra,base=P.slice(rr[0],rr[1]+1).reduce((s,x)=>s+(x.rev||0),0);
   const from=isAuto()?(common?`с ${ddmm(common.from)}${common.short?' (мало данных)':''}`:'—'):null;
   const un=STEP==='day'?'будн. дн.':'нед.',per=STEP==='day'?'день':'неделю';
-  const ptTxt=(x,by)=>`${by}: `+(!x.seg?`нет стабильных отрезков от ${TARGET_MIN[STEP]} точек — медианы`:x.seg.last?'текущий период — лучший, медианы'
+  const ptTxt=(x,by)=>`${by}: `+(x.bad?`${ddmm(x.seg.from)}–${ddmm(x.seg.to)} — маржинальность только по ${x.bad.nCF} дн. с маржой CF (нужно от ${PT_MIN_CF}), точка не учитывается — медианы`
+    :!x.seg?`нет стабильных отрезков от ${TARGET_MIN[STEP]} точек — медианы`:x.seg.last?'текущий период — лучший, медианы'
     :`${ddmm(x.seg.from)}–${ddmm(x.seg.to)} (${x.seg.n} ${un})`)+` — выручка ${x.rev!=null&&k?fmtV(METRICS.rev,x.rev/k):'—'} за ${per}, маржинальность ${x.pct!=null?fmtPct(x.pct):'—'}${x.pN!=null?` (по ${x.pN} дн. с маржой CF)`:''}, средняя цена ${x.price!=null?fmtRub(x.price):'—'}, κ ${x.kap!=null?x.kap.toLocaleString('ru-RU',{maximumFractionDigits:3}):'—'}`;
-  const segTxt=`цель между лучшей выручкой и лучшей маржинальностью (положение ползунка ${TGT_W} из 100). ${ptTxt(A,'Лучшая выручка')}. ${ptTxt(B,'Лучшая маржинальность')}`;
+  const segTxt=(medBest?`текущий уровень (медианы) лучше по марже любой точки между лучшей выручкой и лучшей маржинальностью — оптимум = медианы${TGT_S?`, со сдвигом ${TGT_S>0?'+':''}${TGT_S}% от медиан к лучшей ${TGT_S<0?'выручке':'маржинальности'}`:''}`
+    :`цель между лучшей выручкой (0) и лучшей маржинальностью (100): оптимум товара ${wOpt}${TGT_S?`, со сдвигом ${TGT_S>0?'+':''}${TGT_S} — ${wPos}`:''}`)+`. ${ptTxt(A,'Лучшая выручка')}. ${ptTxt(B,'Лучшая маржинальность')}`;
   const qtyTxt=`заказы = выручка ÷ фактическая средняя цена дней (Σ выручки ÷ Σ шт). Медиана: цена базы ${pr0!=null?fmtRub(pr0):'—'}. Цель: шт по прямой между точками, цена цели ≈ ${r.priceT!=null?fmtRub(r.priceT):'—'}. `+segTxt;
   return {c,r,p,base,from,segTxt,segTxtR:segTxt,qtyTxt,seg:B.seg,A,B};
 }
