@@ -746,7 +746,16 @@ function buildItems(ents,plans,k,ra){
       const P=sumPoints(mem.map(m=>m.P)),pls=mem.filter(m=>m.plan).map(m=>m.plan);
       const pl=pls.length?{rev:pls.reduce((s,x)=>s+x.rev,0),qty:pls.reduce((s,x)=>s+x.qty,0),mar:pls.reduce((s,x)=>s+x.mar,0)}:null;
       const price=pl&&pl.qty>0?pl.rev/pl.qty:mem.reduce((s,m)=>s+m.price,0)/mem.length;
-      items.push({b,group:true,gkey:b+':'+f,offer:f,members:mem,P,plan:pl,price,...itemCalc(P,pl,k,ra,price)});
+      const g={b,group:true,gkey:b+':'+f,offer:f,members:mem,P,plan:pl,price,...itemCalc(P,pl,k,ra,price)};
+      // цель группы = сумма целей размеров (решение владельца 26.10.2026): выручка, маржа, шт, GMV — суммы; маржинальность =
+      // Σ маржи ÷ Σ GMV, цена = Σ выручки ÷ Σ шт, κ = Σ GMV ÷ Σ выручки; медиана и коридор — по суммарному ряду группы
+      const sm=f=>{let v=0,any=false;mem.forEach(m=>{if(m.r[f]!=null){v+=m.r[f];any=true;}});return any?v:null;};
+      g.r.revT=sm('revT');g.r.marT=sm('marT');g.r.qtyT=sm('qtyT');g.r.gmvT=sm('gmvT');
+      g.r.pctT=g.r.gmvT>0&&g.r.marT!=null?g.r.marT/g.r.gmvT*100:null;g.r.priceT=g.r.qtyT>0&&g.r.revT!=null?g.r.revT/g.r.qtyT:null;
+      g.r.kapT=g.r.revT>0&&g.r.gmvT!=null?g.r.gmvT/g.r.revT:null;
+      g.segTxt=g.segTxtR=`цель группы — сумма целей размеров (${mem.length} шт); у каждого размера своя цель — в подсказке его строки`;
+      g.qtyTxt=g.segTxt+`; цена цели = Σ выручки ÷ Σ шт`;
+      items.push(g);
     });
   });
   return items;
