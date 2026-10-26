@@ -84,6 +84,8 @@
         details.rules ol { margin: 8px 0 6px 20px; }
         details.rules li { margin-bottom: 4px; }
         details.rules b { color: #1C0D2E; font-weight: 400; text-decoration: underline; text-decoration-color: rgba(227,61,120,.5); text-underline-offset: 3px; }
+        .stepbtn { font-family: 'Forum'; font-size: 1.1em; line-height: 1; width: 28px; height: 28px; border: 2px solid rgba(84,66,115,.2); border-radius: 8px; background: #fff; color: #7c3aed; cursor: pointer; }
+        .stepbtn:hover { border-color: #7c3aed; background: rgba(124,58,237,.06); }
         .sliders { display: flex; gap: 8px 22px; flex-wrap: wrap; align-items: center; margin: 4px 0 10px; }
         .tgt { color: #7c3aed; }
         .pl-ok { color: #16a34a; } .pl-low { color: #b45309; } .pl-bad { color: #dc2626; }
@@ -531,10 +533,16 @@ function bestSeg(k,P){const all=segmentsOf(k,P),s=all.filter(x=>x.n>=TARGET_MIN[
 // «Цель по»: лучший период по маржинальности ('pct') или по выручке ('rev'); второй показатель — за те же дни
 // ползунок цели (решение владельца 26.10.2026): 0% — лучший период по выручке, 100% — по маржинальности; между ними выручка,
 // маржинальность и κ цели — линейно между двумя точками (допущение о линейном размене)
-let PLAN_MK=null,TGT_W=100;
-try{const s=JSON.parse(localStorage.getItem('ba_shewhart_plan')||'{}');if(Number.isFinite(s.w))TGT_W=s.w;else if(s.by==='rev')TGT_W=0;}catch(e){}
-function setTgtW(v){TGT_W=Math.max(0,Math.min(100,+v||0));const el=document.getElementById('planTgtV');if(el)el.textContent=TGT_W+'%';
-  try{localStorage.setItem('ba_shewhart_plan',JSON.stringify({w:TGT_W}));}catch(e){}renderPlan(true);}
+// по умолчанию — положение с наибольшей маржой юрлица (Σ маржи цели товаров) для текущих юрлица, шага, месяца и базы;
+// ручное положение держится, пока этот контекст не сменится (решение владельца 26.10.2026)
+let PLAN_MK=null,TGT_W=100,TGT_KEY=null;
+const tgtKey=()=>ENT+'|'+STEP+'|'+PLAN_MK+'|'+JSON.stringify(PBASE[STEP]);
+function setTgtW(v){TGT_W=Math.max(0,Math.min(100,+v||0));TGT_KEY=tgtKey();const el=document.getElementById('planTgt');if(el)el.value=TGT_W;renderPlan(true);}
+function stepTgtW(d){setTgtW(TGT_W+d);}
+// маржа цели позиции при положении w — из двух точек (A — лучшая выручка, B — лучшая маржинальность)
+function marAt(it,w){const mix=(a,b)=>a==null?b:b==null?a:a+(b-a)*w/100,A=it.A,B=it.B;const rv=mix(A.rev,B.rev),pc=mix(A.pct,B.pct),kp=mix(A.kap,B.kap);return rv!=null&&pc!=null&&kp!=null?rv*pc/100*kp:0;}
+function bestW(items){let bw=100,bm=-Infinity;for(let w=100;w>=0;w-=5){   // при равной марже — правее (к маржинальности)
+  const m=items.reduce((s,it)=>s+marAt(it,w),0);if(m>bm+1e-6){bm=m;bw=w;}}return bw;}
 function monthOptions(){const d=new Date();d.setDate(1);const out=[];for(let k=-1;k<=2;k++){const x=new Date(d.getFullYear(),d.getMonth()+k,1);out.push(`${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}`);}return out;}
 const MONTHS_RU=['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
 const monthName=mk=>{const [y,m]=mk.split('-').map(Number);return MONTHS_RU[m-1]+' '+y;};
@@ -574,20 +582,19 @@ async function renderPlan(fast){
   if(!card.dataset.ready){
     card.innerHTML=`<div class="chart-head"><h2>Рекомендуемый план месяца</h2>
       <div class="ctl"><span class="ctl-label">Месяц</span><select id="planMonth" onchange="setPlanMonth(this.value)">${months.map(mk=>`<option value="${mk}">${monthName(mk)}</option>`).join('')}</select></div>
-      <div class="ctl" title="0% — цель = лучший стабильный период товара по выручке, 100% — по маржинальности; между ними — линейно"><span class="ctl-label">Цель: лучшая выручка</span><input type="range" id="planTgt" min="0" max="100" step="5" value="${TGT_W}" oninput="setTgtW(this.value)" style="width:170px;accent-color:#7c3aed"><span class="ctl-label">лучшая маржинальность</span><b id="planTgtV">${TGT_W}%</b></div>
-      </div>
-      <div class="controls" style="margin-bottom:8px"><div class="ctl"><span class="ctl-label">База для плана</span>
+      <div class="ctl" title="Цель между лучшим стабильным периодом товара по выручке (слева) и по маржинальности (справа), между ними — линейно; по умолчанию — положение с наибольшей маржой юрлица"><span class="ctl-label">Цель: выручка</span><button type="button" class="stepbtn" onclick="stepTgtW(-5)" title="К выручке на 5%">−</button><input type="range" id="planTgt" min="0" max="100" step="5" value="${TGT_W}" oninput="setTgtW(this.value)" style="width:150px;accent-color:#7c3aed"><button type="button" class="stepbtn" onclick="stepTgtW(5)" title="К маржинальности на 5%">+</button><span class="ctl-label">маржинальность</span></div>
+      <div class="ctl" title="База границ для этого блока и плана по товарам (у графика — своя, «Границы по» вверху)"><span class="ctl-label">База</span>
         <select id="pbaseMode" onchange="setBase('plan')"></select>
         <input type="number" id="pbaseN" min="3" value="20" class="hide" onchange="setBase('plan')">
         <select id="pbaseFrom" class="hide" onchange="setBase('plan')" title="Начало базы"></select>
-        <select id="pbaseTo" class="hide" onchange="setBase('plan')" title="Конец базы"></select>
-        <span class="ctl-label">— для этого блока и плана по товарам (у графика — своя, «Границы по» вверху)</span></div></div>
+        <select id="pbaseTo" class="hide" onchange="setBase('plan')" title="Конец базы"></select></div>
+      </div>
       <div id="planBody"></div>`;
     const rb=document.getElementById('rulesBlock');if(rb)card.insertBefore(rb,document.getElementById('planBody'));
     card.dataset.ready='1';
     syncBaseUI(true,'plan');
   }
-  document.getElementById('planMonth').value=PLAN_MK;document.getElementById('planTgt').value=TGT_W;document.getElementById('planTgtV').textContent=TGT_W+'%';
+  document.getElementById('planMonth').value=PLAN_MK;document.getElementById('planTgt').value=TGT_W;
   const prevCtx=CTX;CTX='plan';
   try{
   const ra=baseRange(),eff=effDaysOfMonth(PLAN_MK),k=STEP==='day'?eff:eff/WEEK_EFF;
@@ -597,7 +604,9 @@ async function renderPlan(fast){
   const kap=kappaOf(P,ra);
   const rR=cR?cR.cl:null,rP=cP?cP.cl:null,rM=rR!=null&&rP!=null&&kap!=null?rR*rP/100*kap:null;
   // цель юрлица — сумма целей товаров: выручка = Σ, маржа = Σ, маржинальность = Σ маржи цели ÷ Σ GMV цели (выручка × κ, как Σmar ÷ Σrevn)
-  const items=buildItems(ents,ps,k,ra);
+  let items=buildItems(ents,ps,k,ra);
+  // новый контекст (юрлицо, шаг, месяц, база) — ползунок на наибольшую маржу юрлица
+  if(TGT_KEY!==tgtKey()){const w=bestW(items);TGT_KEY=tgtKey();if(w!==TGT_W){TGT_W=w;items=buildItems(ents,ps,k,ra);}document.getElementById('planTgt').value=TGT_W;}
   const sumR=f=>items.reduce((a,it)=>a+(it.r[f]||0),0);
   const tR=sumR('revT'),tM=sumR('marT'),tG=items.reduce((a,it)=>a+(it.r.marT!=null?it.r.gmvT||0:0),0);
   const tP=tG>0?tM/tG*100:null;
@@ -610,7 +619,7 @@ async function renderPlan(fast){
   const fR=v=>fmtRub(v),fP=v=>fmtPct(v),fC=v=>v.toLocaleString('ru-RU',{maximumFractionDigits:0})+' ₽';
   const baseTxt=isAuto()?`с последнего сдвига — выручка ${fromTxt(autoRange('rev',P))}, маржинальность ${fromTxt(autoRange('pct',P))}, маржа ${fromTxt(autoRange('mar',P))}`
     :`${STEP==='day'?'дни':'недели'} ${labelOf(P[ra[0]])} … ${labelOf(P[ra[1]])}`;
-  document.getElementById('planBody').innerHTML=`<div class="muted" style="font-size:.92em;margin-bottom:8px">${ENT==='all'?'ИП + ООО':BASES[ENT].name} · база границ: ${baseTxt} · эфф. дней в месяце ${eff.toLocaleString('ru-RU',{maximumFractionDigits:1})} (будни + 0,7 × выходные) · κ (GMV ÷ выручка PNL в базе) ${kap!=null?kap.toLocaleString('ru-RU',{maximumFractionDigits:3}):'—'}${has?'':' · <span class="warn">плана на '+monthName(PLAN_MK)+' нет</span>'}<br><b>Медиана</b> — уровень текущего стабильного периода (что процесс даёт сам); <b>цель</b> — сумма целей товаров: у каждого товара — две точки: лучший стабильный период по выручке и по маржинальности (выручка, маржинальность и κ — за дни периода); цель — между ними по ползунку (сейчас ${TGT_W}%: 0% — лучшая выручка, 100% — лучшая маржинальность, между — линейно); маржа цели = выручка цели × маржинальность цели × κ; маржинальность юрлица = Σ маржи ÷ Σ GMV.</div>
+  document.getElementById('planBody').innerHTML=`<div class="muted" style="font-size:.92em;margin-bottom:8px">${ENT==='all'?'ИП + ООО':BASES[ENT].name} · база границ: ${baseTxt} · эфф. дней в месяце ${eff.toLocaleString('ru-RU',{maximumFractionDigits:1})} (будни + 0,7 × выходные) · κ (GMV ÷ выручка PNL в базе) ${kap!=null?kap.toLocaleString('ru-RU',{maximumFractionDigits:3}):'—'}${has?'':' · <span class="warn">плана на '+monthName(PLAN_MK)+' нет</span>'}<br><b>Медиана</b> — уровень текущего стабильного периода (что процесс даёт сам); <b>цель</b> — сумма целей товаров: у каждого товара — две точки: лучший стабильный период по выручке и по маржинальности (выручка, маржинальность и κ — за дни периода); цель — между ними по ползунку «Цель» (слева — выручка, справа — маржинальность, между — линейно; по умолчанию — положение с наибольшей маржой юрлица); маржа цели = выручка цели × маржинальность цели × κ; маржинальность юрлица = Σ маржи ÷ Σ GMV.</div>
     <div class="tbl-wrap" style="max-height:none"><table class="plan-tbl"><tr><th>Показатель</th><th>Медиана</th><th>Цель</th><th>Коридор LCL – UCL</th><th>Действующий план</th><th>План − цель (нет цели — медиана)</th><th>Где план в коридоре</th><th><span style="color:${C_CL}">▲</span> медиана · <span style="color:${C_TGT}">◆</span> цель · <span style="color:#E33D78">●</span> план</th></tr>
       ${row('Выручка (заказы, PNL)',cR,rR,tR>0?tR:null,pR,fR,false)}${row('Маржинальность (CF)',cP,rP,tP,pP,fP,true)}${row('Маржа (CF), ₽ <span class="muted">= выручка × маржин. × κ; коридор — карта маржи</span>',cM,rM,tM>0?tM:null,pM,fR,false)}
       ${rowD('Заказы, шт',qR,qP,fmtQty)}</table></div>`;
@@ -680,8 +689,8 @@ function itemCalc(P,plan,k,ra,price){
   const un=STEP==='day'?'будн. дн.':'нед.',per=STEP==='day'?'день':'неделю';
   const ptTxt=(x,by)=>`${by}: `+(!x.seg?`нет стабильных отрезков от ${TARGET_MIN[STEP]} точек — медианы`:x.seg.last?'текущий период — лучший, медианы'
     :`${ddmm(x.seg.from)}–${ddmm(x.seg.to)} (${x.seg.n} ${un})`)+` — выручка ${x.rev!=null&&k?fmtV(METRICS.rev,x.rev/k):'—'} за ${per}, маржинальность ${x.pct!=null?fmtPct(x.pct):'—'}${x.pN!=null?` (по ${x.pN} дн. с маржой CF)`:''}, κ ${x.kap!=null?x.kap.toLocaleString('ru-RU',{maximumFractionDigits:3}):'—'}`;
-  const segTxt=`цель на ${TGT_W}% от лучшей выручки к лучшей маржинальности. ${ptTxt(A,'Лучшая выручка')}. ${ptTxt(B,'Лучшая маржинальность')}`;
-  return {c,r,p,base,from,segTxt,segTxtR:segTxt,seg:B.seg};
+  const segTxt=`цель между лучшей выручкой и лучшей маржинальностью (положение ползунка ${TGT_W} из 100). ${ptTxt(A,'Лучшая выручка')}. ${ptTxt(B,'Лучшая маржинальность')}`;
+  return {c,r,p,base,from,segTxt,segTxtR:segTxt,seg:B.seg,A,B};
 }
 // место плана в коридоре — коротко (полный текст — в подсказке)
 function placeTag(v,c){
