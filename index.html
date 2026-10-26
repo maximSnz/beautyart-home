@@ -494,6 +494,21 @@ function generateDemoMonth(mk,weeksCount){
   return {planRub,planRev,planPct,factRub,factPct,ordersDaily,real:false};
 }
 
+// κ = GMV (CF, Σ sales_plan_weeks.revn) ÷ выручка PNL (Σ product_sales.revenue) за 4 последние закрытые календарные недели
+// не позже endD (решение 26.10.2026, как на картах Шухарта): план, шт — заказы, а маржинальность CF — от выкупов (GMV),
+// поэтому план маржи CF = план выручки × маржинальность × κ. Нет данных — null (план маржи без поправки, с пометкой)
+async function loadKappa(endD){
+  let sun=new Date(endD);sun.setHours(0,0,0,0);while(sun.getDay()!==0)sun=addDays(sun,-1);
+  const mons=[0,1,2,3].map(i=>addDays(sun,-6-7*i)).reverse(),keys=mons.map(keyOfMonday);
+  const gmv={},rev={};
+  (await fetchPages(`sales_plan_weeks?week=in.(${keys.map(k=>`"${k}"`).join(',')})&metric=eq.revn&fact=not.is.null&select=week,fact`)).forEach(r=>{gmv[r.week]=(gmv[r.week]||0)+Number(r.fact||0);});
+  (await fetchPages(`product_sales?sale_date=gte.${keys[0]}&sale_date=lte.${keyOfMonday(sun)}&select=sale_date,revenue`)).forEach(x=>{const [yy,mm,dd]=x.sale_date.split('-').map(Number);const k=keyOfMonday(addDays(new Date(yy,mm-1,dd),-((new Date(yy,mm-1,dd).getDay()+6)%7)));rev[k]=(rev[k]||0)+Number(x.revenue||0);});
+  const ok=keys.filter(k=>gmv[k]>0&&rev[k]>0);
+  if(!ok.length)return null;
+  const G=ok.reduce((t,k)=>t+gmv[k],0),R=ok.reduce((t,k)=>t+rev[k],0);
+  return {k:G/R,from:ok[0],to:keyOfMonday(addDays(new Date(ok[ok.length-1]+'T00:00:00'),6)),n:ok.length};
+}
+
 // === реальные данные юрлица: план месяца + CF-факты недель (СУММА по товарам) + PNL-дни ===
 async function loadRealMonth(mk){
   if(REAL_CACHE[mk])return REAL_CACHE[mk];
@@ -513,7 +528,11 @@ async function loadRealMonth(mk){
     const q=Number(r.plan_qty||0),pr=Number(r.price||0),pc=Number(r.margin_pct||0);
     planRev+=q*pr;planRub+=q*pr*pc/100;
   });
+  // маржинальность плана — от плановой выручки (так задан план); план маржи CF — с поправкой κ (раздел 5.1 CLAUDE.md)
   const planPct=planRev>0?planRub/planRev*100:0;
+  const yD=new Date();yD.setHours(0,0,0,0);const mEnd=new Date(y,m,0);
+  // κ грузится параллельно с остальными данными месяца (продажи за 4 недели — самый долгий запрос)
+  const kappaP=loadKappa(mEnd<yD?mEnd:addDays(yD,-1)).catch(e=>{console.warn('κ:',e.message);return null;});
   const inList='('+weekKeys.map(w=>`"${w}"`).join(',')+')';
   // CF-факты недель: СУММА по товарам, ключ — понедельник недели
   const cfWeeks={};
@@ -539,7 +558,8 @@ async function loadRealMonth(mk){
     (await fetchPages(`cf_daily?day=gte.${mFrom}&day=lte.${mTo}&select=day,mar,revn&order=product_id,day`)).forEach(r=>{const g=map.get(r.day)||{mar:0,revn:0};g.mar+=Number(r.mar||0);g.revn+=Number(r.revn||0);map.set(r.day,g);});
     if(map.size)cfDaily=[...map.entries()].sort((a,b)=>a[0]<b[0]?-1:1).map(([d,g])=>{const [yy,mm,dd]=d.split('-').map(Number);return {t:new Date(yy,mm-1,dd).getTime(),mar:g.mar,revn:g.revn};});
   }catch(e){console.warn('cf_daily:',e.message);}
-  const out={planRub:Math.round(planRub),planRev:Math.round(planRev),planPct,cfWeeks,ordersDaily,cfDaily,real:true};
+  const kappa=await kappaP;if(kappa)planRub*=kappa.k;
+  const out={planRub:Math.round(planRub),planRev:Math.round(planRev),planPct,kappa,cfWeeks,ordersDaily,cfDaily,real:true};
   REAL_CACHE[mk]=out;
   return out;
 }
@@ -647,6 +667,8 @@ function drawChart(boxId,tooltipId,cfg){
   // «месяц»: прогноз закрытия (раздел 5.4) в ₽ за месяц против пунктира плана месяца; подписи и красная пульсация —
   // только у недельных точек (концы закрытых недель: вс / последний день месяца)
   const DM=cfg.dim||30;
+  // план маржи CF = план выручки × маржинальность × κ (GMV ÷ выручка PNL); в подсказке — κ и его период
+  const kNote=cfg.kappa?` (× κ ${cfg.kappa.k.toLocaleString('ru-RU',{minimumFractionDigits:3,maximumFractionDigits:3})} — GMV ÷ выручка PNL, ${fmtShort(new Date(cfg.kappa.from+'T00:00:00'))}–${fmtShort(new Date(cfg.kappa.to+'T00:00:00'))})`:(cfg.kappa===null?' (без поправки κ: нет данных GMV)':'');
   const monthSeries=(ser,band,max,color,planMonth,min=0)=>{
     let o='';
     if(planMonth>0){const py=yBand(band,planMonth,max,min);o+=`<line x1="${padL}" y1="${py}" x2="${plotRight}" y2="${py}" stroke="${color}" stroke-width="1.8" stroke-dasharray="8 6" opacity="0.9"/>`;}
@@ -664,18 +686,20 @@ function drawChart(boxId,tooltipId,cfg){
     });
     return o;
   };
-  // «сутки»: факт дня (сиреневый) против пунктира плана дня (план месяца ÷ дней месяца)
-  const daySeries=(ser,band,max,min,color,planDay,label,planMonth)=>{
+  // «сутки»: факт дня (сиреневый) против пунктира плана дня — «ступенька»: будний = план месяца ÷ эфф. дни, выходной × 0,7
+  const half=dataW/(spanEndMs-spanStartMs)*43200000;
+  const planOn=(t,planDay)=>planDay*(isWeekendD(new Date(t))?0.7:1);
+  const daySeries=(ser,band,max,min,color,planDay,label,planMonth,planNote='')=>{
     let o='';
-    if(planDay>0){const py=yBand(band,planDay,max,min);o+=`<line x1="${padL}" y1="${py}" x2="${plotRight}" y2="${py}" stroke="${color}" stroke-width="1.8" stroke-dasharray="6 6" opacity="0.9"/>`;}
+    if(planDay>0){let d='';for(let t=weeks[0].start.getTime();t<=weeks[n-1].end.getTime();t=addDays(new Date(t),1).getTime()){const py=yBand(band,planOn(t,planDay),max,min).toFixed(1);d+=`${d?'L':'M'} ${(xDay(t)-half).toFixed(1)} ${py} L ${(xDay(t)+half).toFixed(1)} ${py} `;}o+=`<path d="${d}" fill="none" stroke="${color}" stroke-width="1.8" stroke-dasharray="6 6" opacity="0.9"/>`;}
     if(min<0){const zy=yBand(band,0,max,min);o+=`<line x1="${padL}" y1="${zy}" x2="${plotRight}" y2="${zy}" stroke="${BASELINE}" stroke-width="1" opacity="0.5"/>`;}
     if(ser.length>1)o+=`<path d="${ser.map((p,k)=>`${k?'L':'M'} ${xDay(p.t).toFixed(1)} ${yBand(band,p.v,max,min).toFixed(1)}`).join(' ')}" fill="none" stroke="${C_FACT}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>`;
     ser.forEach(p=>{
-      const dv=p.v-planDay;
-      let tip=`${label} за день: ${fmtRub(Math.round(p.v))}${planDay>0?' • к плану дня'+tipDev(dv,v=>fmtRubShort(v),dv/planDay*100):''}`;
+      const pd=planOn(p.t,planDay),dv=p.v-pd;
+      let tip=`${label} за день: ${fmtRub(Math.round(p.v))}${pd>0?` • план дня ${fmtRubShort(pd)}${tipDev(dv,v=>fmtRubShort(v),dv/pd*100)}`:''}`;
       if(p.pcs!=null)tip+=` • Заказы: ${fmt0(p.pcs)} шт`;
       tip+=` • Накопительно: ${fmtRub(Math.round(p.cum))}`;
-      if(planMonth>0)tip+=` • План месяца: ${fmtRub(Math.round(planMonth))}`;
+      if(planMonth>0)tip+=` • План месяца: ${fmtRub(Math.round(planMonth))}${planNote}`;
       o+=`<circle class="chart-point" cx="${xDay(p.t).toFixed(1)}" cy="${yBand(band,p.v,max,min).toFixed(1)}" r="2.8" fill="${C_FACT}" stroke="rgba(28,13,46,0.85)" stroke-width="1" data-label="${label}, ${fmtShort(new Date(p.t))} (${wd(p.t)})" data-value="${tip}"/>`;
     });
     return o;
@@ -702,7 +726,7 @@ function drawChart(boxId,tooltipId,cfg){
   svg+=weekAvg(revDay,0,scaleA.max,0,'Выручка, среднее за неделю');
   svg+=daySeries(revDay,0,scaleA.max,0,C_FACT,planRevDay,'Выручка',planRev);
   svg+=monthSeries(revDay,0,scaleAm.max,C_PCS,planRev,scaleAm.min);
-  if(marDay.length)svg+=weekAvg(marDay,1,scaleB.max,scaleBmin,'Маржа, среднее за неделю')+daySeries(marDay,1,scaleB.max,scaleBmin,C_FACT,planMarDay,'Маржа',plan)+monthSeries(marDay,1,scaleBm.max,C_MARGIN,plan,scaleBm.min);
+  if(marDay.length)svg+=weekAvg(marDay,1,scaleB.max,scaleBmin,'Маржа, среднее за неделю')+daySeries(marDay,1,scaleB.max,scaleBmin,C_FACT,planMarDay,'Маржа',plan,kNote)+monthSeries(marDay,1,scaleBm.max,C_MARGIN,plan,scaleBm.min);
   else svg+=`<text x="${(padL+plotRight)/2}" y="${qTop(1)+bandH/2}" text-anchor="middle" font-size="11" fill="${TXT_SUB}" font-family="Forum">${cfg.hasCfDaily===false?'Дневной маржи CF за месяц нет — появится после загрузки начислений в «Плане продаж»':''}</text>`;
   if(pctPlan>0){const ppY=yBand(2,pctPlan,scaleC.max,scaleCmin);svg+=`<line x1="${padL}" y1="${ppY}" x2="${plotRight}" y2="${ppY}" stroke="${C_PCT}" stroke-width="1.8" stroke-dasharray="6 6"/>`;}
   const wp=weekPct.map((v,i)=>[i,v]).filter(a=>Number.isFinite(a[1]));
@@ -837,14 +861,15 @@ async function renderMonth(mk){
      const E=effRange(mFirst,new Date(o.t));
      if(E>0)revFcDaily.push({t:o.t,v:Math.round(cr/E*T)});
    });}
-  // суточные ряды (с 20.10.2026): выручка PNL и маржа CF за день; план дня = план месяца ÷ дней месяца;
+  // суточные ряды (с 20.10.2026): выручка PNL и маржа CF за день; план дня (с 26.10.2026) = план месяца ÷ эфф. дни месяца
+  // в будний день, × 0,7 в выходной — как прогноз (раздел 5.4) и карты Шухарта; planRevDay/planMarDay — значение будня;
   // в подсказке — накопленный факт, план месяца и прогноз закрытия на этот день (та же формула: факт ÷ эфф. дни × эфф. дни месяца)
   const DM=new Date(y,m,0).getDate();
-  const planRevDay=(data.planRev||0)/DM,planMarDay=(data.planRub||0)/DM;
+  const planRevDay=T>0?(data.planRev||0)/T:0,planMarDay=T>0?(data.planRub||0)/T:0;
   const revDay=[],marDay=[];
   {let cr=0;(data.ordersDaily||[]).filter(o=>o.t>=mStartMs&&o.t<=Math.min(mEndMs,D.getTime())).forEach(o=>{cr+=o.rub;const E=effRange(mFirst,new Date(o.t));revDay.push({t:o.t,v:o.rub,pcs:o.pcs,cum:cr,fc:E>0?Math.round(cr/E*T):null});});}
   {let cm=0;(data.cfDaily||[]).filter(o=>o.t>=mStartMs&&o.t<=Math.min(mEndMs,D.getTime())).forEach(o=>{cm+=o.mar;const E=effRange(mFirst,new Date(o.t));marDay.push({t:o.t,v:o.mar,cum:cm,fc:E>0?Math.round(cm/E*T):null});});}
-  drawChart('chartBoxRub','tooltipRub',{dim:DM,revDay,marDay,planRevDay,planMarDay,hasCfDaily:!!data.cfDaily,weeks,weekLabels,plan:data.planRub,pctPlan:data.planPct,planRev:data.planRev||0,lineValues:fc,factValues:cum,factWeekly,pctValues:pctVals,ordersDaily,revForecast:fcRev,revFact:cumRev,revWeekly:weekRev,revFactDaily,revFcDaily,asOf:D,weekPct,revPace,marPace});
+  drawChart('chartBoxRub','tooltipRub',{dim:DM,kappa:data.kappa,revDay,marDay,planRevDay,planMarDay,hasCfDaily:!!data.cfDaily,weeks,weekLabels,plan:data.planRub,pctPlan:data.planPct,planRev:data.planRev||0,lineValues:fc,factValues:cum,factWeekly,pctValues:pctVals,ordersDaily,revForecast:fcRev,revFact:cumRev,revWeekly:weekRev,revFactDaily,revFcDaily,asOf:D,weekPct,revPace,marPace});
 }
 
 // === вкладка «Поиск отклонений» (до 20.10.2026 — «Ключевые отклонения») ===
