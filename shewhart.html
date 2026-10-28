@@ -194,7 +194,7 @@
                     <h4>1. Какие данные</h4>
                     <ul>
                         <li>Выручка и заказы — PNL (<code>product_sales</code>), маржа — CF (<code>cf_daily</code> по дням, <code>sales_plan_weeks</code> по неделям). Маржинальность = Σ маржи ÷ Σ GMV.</li>
-                        <li>План на день — будни; выходные в медиану, границы и цели не входят.</li>
+                        <li>План считается только по дням (будни; выходные в медиану, границы и цели не входят); селектор «Неделя» меняет только график.</li>
                         <li>Месяц = значение дня-будня × эфф. дни месяца (будни + 0,7 × выходные); для шага «Неделя» — значение недели ÷ 6,4 × эфф. дни.</li>
                     </ul>
                     <h4>2. База (откуда берём уровень и коридор)</h4>
@@ -218,7 +218,7 @@
                         <li>Две точки: <b>A</b> — лучший стабильный период по выручке, <b>B</b> — по маржинальности (отрезок от 5 будних дней / 3 недель с наибольшей медианой). У точки — медиана выручки, взвешенная маржинальность и шт за её дни. Точка с маржой CF меньше чем по 5 дням не учитывается — вместо неё медианы.</li>
                         <li>Кандидаты цели — 21 положение по прямой A→B (линейный размен — допущение) и медианы. <b>Допустимые</b> — где выручка и маржинальность внутри коридоров базы. Цена — рычаг менеджера, шт и маржа — производные: их коридоры показываются, но цель не ограничивают.</li>
                         <li>Режим: <b>Target Max</b> — наибольшая маржа среди допустимых, <b>Real</b> — маржа, ближайшая к средней по допустимым, <b>Stress Min</b> — наименьшая. Допустимых нет — ближайшее к коридору положение (пометка в подсказке).</li>
-                        <li><b>Ползунок</b> — общий сдвиг всех товаров от положения режима к A (выручка) или к B (маржинальность); сбрасывается при смене режима, месяца, базы, юрлица и шага.</li>
+                        <li><b>Ползунок</b> — доля пути от положения режима к краю допустимого отрезка прямой A→B у каждого товара: −100 — край со стороны выручки, +100 — со стороны маржинальности. Цель не выходит из коридоров; если на прямой допустимых положений нет, ползунок товар не двигает. Сбрасывается при смене режима, месяца, базы и юрлица.</li>
                         <li>Цель группы перчаток и юрлица — сумма целей товаров; маржинальность итогов = Σ маржи ÷ Σ GMV (выручка × κ).</li>
                     </ul>
                     <h4>5. План и отклонение</h4>
@@ -281,7 +281,9 @@ let BASE={week:{...STEPS.week.def,from:0,to:0},day:{...STEPS.day.def,from:0,to:0
 // база блоков плана — отдельно от графика; по умолчанию «с последнего сдвига (авто)»
 let PBASE={week:{...STEPS.week.def,mode:'shift',from:0,to:0},day:{...STEPS.day.def,mode:'shift',from:0,to:0}};
 let CTX='chart';   // чью базу берут baseRange / isAuto: 'chart' — график, 'plan' — блоки плана
-const curB=()=>(CTX==='plan'?PBASE:BASE)[STEP];
+// план считается только по дням (решение владельца 29.10.2026): в контексте плана шаг — всегда 'day', селектор шага влияет только на график
+const SP=()=>CTX==='plan'?'day':STEP;
+const curB=()=>(CTX==='plan'?PBASE:BASE)[SP()];
 try{const s=JSON.parse(localStorage.getItem('ba_shewhart')||'{}');if(s.ent)ENT=s.ent;if(METRICS[s.met])MET=s.met;if(STEPS[s.step])STEP=s.step;
   ['week','day'].forEach(k=>{if(s.bases&&s.bases[k])BASE[k]={...BASE[k],mode:s.bases[k].mode,n:s.bases[k].n};if(s.pbases&&s.pbases[k])PBASE[k]={...PBASE[k],mode:s.pbases[k].mode,n:s.pbases[k].n};});}catch(e){}
 const q=new URLSearchParams(location.search).get('e');if(['ip','ooo','all'].includes(q))ENT=q;
@@ -297,7 +299,7 @@ const weekLabel=w=>ddmm(w)+'–'+ddmm(weekEnd(w));
 const WD=['вс','пн','вт','ср','чт','пт','сб'];
 const dayLabel=d=>ddmm(d)+' '+WD[parseISO(d).getDay()];
 const isWeekend=d=>{const g=parseISO(d).getDay();return g===0||g===6;};
-const labelOf=x=>STEP==='week'?weekLabel(x.key):dayLabel(x.key);
+const labelOf=x=>SP()==='week'?weekLabel(x.key):dayLabel(x.key);
 // закрытые недели — воскресенье раньше сегодня; дни — по вчера
 function closedMondays(){const today=new Date();today.setHours(0,0,0,0);const out=[];let d=parseISO(START);while(addDays(d,6)<today){out.push(localISO(d));d=addDays(d,7);}return out;}
 function pastDays(){const today=new Date();today.setHours(0,0,0,0);const out=[];let d=parseISO(START);while(d<today){out.push(localISO(d));d=addDays(d,1);}return out;}
@@ -308,7 +310,7 @@ const fmtTys=v=>Math.round(v/1e3).toLocaleString('ru-RU')+' тыс';
 const fmtRub=v=>Math.round(v).toLocaleString('ru-RU')+' ₽';
 const fmtPct=v=>v.toLocaleString('ru-RU',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';
 // дневные суммы — в тыс ₽, недельные — в млн ₽
-const fmtV=(m,v)=>m.unit==='pct'?fmtPct(v):m.unit==='price'?fmtRub(v):STEP==='day'?fmtTys(v):fmtMln(v);
+const fmtV=(m,v)=>m.unit==='pct'?fmtPct(v):m.unit==='price'?fmtRub(v):SP()==='day'?fmtTys(v):fmtMln(v);
 const fmtAxis=(m,v)=>m.unit==='pct'?fmtPct(v):m.unit==='price'?Math.round(v).toLocaleString('ru-RU'):STEP==='day'?Math.round(v/1e3).toLocaleString('ru-RU'):(v/1e6).toLocaleString('ru-RU',{maximumFractionDigits:2});
 const fmtExact=(m,v)=>m.unit==='pct'?v.toLocaleString('ru-RU',{maximumFractionDigits:2})+'%':m.unit==='price'?v.toLocaleString('ru-RU',{maximumFractionDigits:2})+' ₽':fmtRub(v);
 const fmtQty=v=>Math.round(v).toLocaleString('ru-RU')+' шт';
@@ -397,7 +399,7 @@ function findSignals(pts,L){
 
 // === окно базы (индексы точек выбранного шага) ===
 function baseRange(){
-  const n=(STEP==='week'?WEEKS:DAYS).length,B=curB();
+  const n=(SP()==='week'?WEEKS:DAYS).length,B=curB();
   if(B.mode==='last'){const k=Math.max(3,Math.min(n,B.n|0||3));return [n-k,n-1];}
   if(B.mode==='range'){const a=Math.max(0,Math.min(B.from,n-1)),b=Math.max(0,Math.min(B.to,n-1));return a<=b?[a,b]:[b,a];}
   return [0,n-1];
@@ -410,7 +412,7 @@ function baseRange(){
 const SHIFT_MIN={day:10,week:5};
 function autoRange(k,P){
   const idx=[];P.forEach((x,i)=>{const v=valOf(k,x);if(v!=null&&!x.we)idx.push(i);});
-  const vals=idx.map(i=>valOf(k,P[i])),MIN=SHIFT_MIN[STEP],last=P.length-1;
+  const vals=idx.map(i=>valOf(k,P[i])),MIN=SHIFT_MIN[SP()],last=P.length-1;
   if(vals.length<3)return {ra:[0,last],from:null,n:vals.length,shifts:0,short:false,auto:true};
   let st=0,shifts=0,short=false;
   for(let it=0;it<10;it++){
@@ -469,8 +471,8 @@ function chartSVG(m,P,series,L,sig,ra){
 }
 
 // === отрисовка ===
-function current(){
-  const pick=b=>DATA[b]&&DATA[b][STEP];
+function current(st){
+  const pick=b=>DATA[b]&&DATA[b][st||STEP];
   if(ENT==='all')return pick('ip')&&pick('ooo')?combine(pick('ip'),pick('ooo')):null;
   return pick(ENT)||null;
 }
@@ -607,7 +609,7 @@ function segmentsOf(k,P){
   return segs;
 }
 // лучший отрезок; last — это текущий (последний) отрезок истории
-function bestSeg(k,P){const all=segmentsOf(k,P),s=all.filter(x=>x.n>=TARGET_MIN[STEP]);if(!s.length)return null;const b=s.reduce((a,c)=>c.med>a.med?c:a);return {...b,last:b.to===all[all.length-1].to};}
+function bestSeg(k,P){const all=segmentsOf(k,P),s=all.filter(x=>x.n>=TARGET_MIN[SP()]);if(!s.length)return null;const b=s.reduce((a,c)=>c.med>a.med?c:a);return {...b,last:b.to===all[all.length-1].to};}
 // «Цель по»: лучший период по маржинальности ('pct') или по выручке ('rev'); второй показатель — за те же дни
 // ползунок цели (решение владельца 26.10.2026): 0% — лучший период по выручке, 100% — по маржинальности; между ними выручка,
 // маржинальность и κ цели — линейно между двумя точками (допущение о линейном размене)
@@ -616,7 +618,7 @@ function bestSeg(k,P){const all=segmentsOf(k,P),s=all.filter(x=>x.n>=TARGET_MIN[
 // сдвиг сбрасывается в 0 при смене юрлица, шага, месяца, базы или режима
 let PLAN_MK=null,TGT_S=0,TGT_KEY=null,TGT_MODE='max';
 const TGT_MODES={max:'Target Max',real:'Real',min:'Stress Min'};
-const tgtKey=()=>ENT+'|'+STEP+'|'+PLAN_MK+'|'+JSON.stringify(PBASE[STEP]);
+const tgtKey=()=>ENT+'|'+PLAN_MK+'|'+JSON.stringify(PBASE.day);
 function setTgtS(v){TGT_S=Math.max(-100,Math.min(100,+v||0));TGT_KEY=tgtKey();const el=document.getElementById('planTgt');if(el)el.value=TGT_S;renderPlan(true);}
 function stepTgtS(d){setTgtS(TGT_S+d);}
 function setMode(m){if(!TGT_MODES[m])return;TGT_MODE=m;TGT_S=0;const el=document.getElementById('planTgt');if(el)el.value=0;renderPlan(true);}
@@ -650,12 +652,12 @@ function scaleSVG(c,rec,plan,tgt){
   return s+'</svg>';
 }
 async function renderPlan(fast){
-  const card=document.getElementById('planCard');const P=current();if(!P||!card)return;
+  const card=document.getElementById('planCard');const P=current('day');if(!P||!card)return;
   const months=monthOptions();if(!PLAN_MK)PLAN_MK=months[1];
-  const ents=ENT==='all'?['ip','ooo']:[ENT],tok=ENT+STEP+PLAN_MK;
+  const ents=ENT==='all'?['ip','ooo']:[ENT],tok=ENT+PLAN_MK;
   let plan,ps;
   try{ps=await Promise.all(ents.map(b=>loadPlan(b,PLAN_MK)));
-    if(tok!==ENT+STEP+PLAN_MK)return;/* за время загрузки сменили юрлицо, шаг или месяц — отрисует свежий вызов */plan=ps.reduce((a,g)=>({rev:a.rev+g.rev,qty:a.qty+g.qty,mar:a.mar+g.mar,n:a.n+g.n}),{rev:0,qty:0,mar:0,n:0});}
+    if(tok!==ENT+PLAN_MK)return;/* за время загрузки сменили юрлицо или месяц — отрисует свежий вызов */plan=ps.reduce((a,g)=>({rev:a.rev+g.rev,qty:a.qty+g.qty,mar:a.mar+g.mar,n:a.n+g.n}),{rev:0,qty:0,mar:0,n:0});}
   catch(e){card.innerHTML=`<h2>Рекомендуемый план месяца</h2><div class="err">План не загрузился: ${esc(e.message)}</div>`;delete card.dataset.ready;return;}
   // шапка (месяц, база) строится один раз
   if(!card.dataset.ready){
@@ -685,7 +687,7 @@ async function renderPlan(fast){
   document.getElementById('prMgr').value=PR.mgr;Object.keys(TGT_MODES).forEach(m=>document.getElementById('mode_'+m).classList.toggle('on',m===TGT_MODE));
   const prevCtx=CTX;CTX='plan';
   try{
-  const ra=baseRange(),eff=effDaysOfMonth(PLAN_MK),k=STEP==='day'?eff:eff/WEEK_EFF;
+  const ra=baseRange(),eff=effDaysOfMonth(PLAN_MK),k=eff;
   // медиана — уровень стабильного периода (что процесс даёт сам); суммы (выручка, маржа) — × коэффициент месяца
   const lim=key=>{const {L,R}=limitsFor(key,P,ra);if(!L)return null;const f=key==='rev'||key==='mar'||key==='qty'?k:1;
     // маржинальность: центр — взвешенная за дни базы, ширина ±3σ — по дневному ряду
@@ -718,7 +720,7 @@ async function renderPlan(fast){
   if(byMgr){cRx=cMx=cPx=cQx=cCx=null;rRx=sumR('rev')||null;rMx=sumR('mar')||null;const gm=items.reduce((a,it)=>a+(it.r.mar!=null?it.r.gmv||0:0),0);rPx=gm>0?rMx/gm*100:null;}
   const fR=v=>fmtRub(v),fP=v=>fmtPct(v),fC=v=>v.toLocaleString('ru-RU',{maximumFractionDigits:0})+' ₽';
   const baseTxt=isAuto()?`с последнего сдвига — выручка ${fromTxt(autoRange('rev',P))}, маржинальность ${fromTxt(autoRange('pct',P))}, маржа ${fromTxt(autoRange('mar',P))}`
-    :`${STEP==='day'?'дни':'недели'} ${labelOf(P[ra[0]])} … ${labelOf(P[ra[1]])}`;
+    :`дни ${labelOf(P[ra[0]])} … ${labelOf(P[ra[1]])}`;
   document.getElementById('planBody').innerHTML=`<div class="muted plan-info">${ENT==='all'?'ИП + ООО':BASES[ENT].name}${byMgr?' · '+(PR.mgr==='m1'?'Илья':'Ольга')+' — суммы его товаров, коридор юрлица не показывается':''} · база: ${baseTxt} · эфф. дней ${eff.toLocaleString('ru-RU',{maximumFractionDigits:1})} · κ ${kap.toLocaleString('ru-RU',{minimumFractionDigits:3,maximumFractionDigits:3})}${KE.n?` (${ddmm(KE.from)}–${ddmm(KE.to)})`:' (нет данных — 1)'} · цель: ${TGT_MODES[TGT_MODE]}${TGT_S?`, сдвиг ${TGT_S>0?'+':''}${TGT_S}`:''}${has?'':' · <span class="warn">плана на '+monthName(PLAN_MK)+' нет</span>'}</div>
     <div class="tbl-wrap" style="max-height:none"><table class="plan-tbl"><tr><th>Показатель</th><th>Медиана</th><th>Цель</th><th>Коридор LCL – UCL</th><th>Действующий план</th><th>План − цель (нет цели — медиана)</th><th>Отклонение: где план в коридоре</th><th><span style="color:${C_CL}">▲</span> медиана · <span style="color:${C_TGT}">◆</span> цель · <span style="color:#E33D78">●</span> план</th></tr>
       ${row('Выручка (заказы, PNL)',cRx,rRx,tR>0?tR:null,pR,fR,false)}${row('Маржинальность (CF)',cPx,rPx,tP,pP,fP,true)}${row('Маржа (CF), ₽',cMx,rMx,tM>0?tM:null,pM,fR,false)}
@@ -746,9 +748,9 @@ function setPr(k,v){PR[k]=v;try{localStorage.setItem('ba_shewhart_prod',JSON.str
 // ряд товара по точкам юрлица: нет строки за день/неделю, а у юрлица данные есть — 0 (товар не продавался), иначе нет данных
 function prodPoints(D,pid){
   const pd=D.pd.get(pid),pw=D.pw.get(pid);
-  return D[STEP].map(x=>{
+  return D[SP()].map(x=>{
     let rev=0,qty=0,mar=0,revn=0,prov=false;
-    if(STEP==='day'){const g=pd&&pd.get(x.key);if(g){rev=g.rev;qty=g.qty;mar=g.mar;revn=g.revn;prov=g.prov;}}
+    if(SP()==='day'){const g=pd&&pd.get(x.key);if(g){rev=g.rev;qty=g.qty;mar=g.mar;revn=g.revn;prov=g.prov;}}
     else{if(pd)for(let i=0;i<7;i++){const g=pd.get(localISO(addDays(parseISO(x.key),i)));if(g){rev+=g.rev;qty+=g.qty;}}const h=pw&&pw.get(x.key);if(h){mar=h.mar;revn=h.revn;prov=h.prov;}}
     return {key:x.key,we:x.we,rev:x.rev==null?null:rev,qty,mar:x.mar==null?null:mar,revn:x.mar==null?null:revn,prov};
   });
@@ -762,7 +764,7 @@ function itemCalc(P,plan,k,ra,price){
   let force=false,common=null;
   if(isAuto()){const a=autoRange('rev',P),b=autoRange('pct',P),s0=Math.max(a.ra[0],b.ra[0]);ra=[s0,P.length-1];force=true;
     const n=P.filter((x,i)=>i>=s0&&!x.we&&x.rev!=null).length;
-    common=a.from||b.from?{from:P[s0].key,short:a.short||b.short||n<SHIFT_MIN[STEP]}:null;}
+    common=a.from||b.from?{from:P[s0].key,short:a.short||b.short||n<SHIFT_MIN[SP()]}:null;}
   const lim=key=>{const {L,R}=limitsFor(key,P,ra,force);if(!L)return null;const f=key==='rev'||key==='mar'||key==='qty'?k:1;
     // маржинальность: центр — взвешенная (Σ маржи ÷ Σ GMV) за дни базы, ширина ±3σ — по дневному ряду
     if(key==='pct'){const w=wPctOf(P,R.ra[0],R.ra[1]);if(w!=null)return {cl:w,ucl:w+3*L.sigma,lcl:w-3*L.sigma,sigma:L.sigma};}
@@ -809,7 +811,15 @@ function itemCalc(P,plan,k,ra,price){
     else if(TGT_MODE==='real'){const avg=mars.reduce((q,v)=>q+v,0)/mars.length;anc=feas.reduce((a,x)=>Math.abs(x.mar-avg)<Math.abs(a.mar-avg)?x:a);}
     else anc=feas.reduce((a,x)=>x.mar>a.mar?x:a);
     r.marRange=[Math.min(...mars),Math.max(...mars)];}
-  const tg=!anc||anc.med?(TGT_S?mixW(med,TGT_S<0?A:B,Math.abs(TGT_S)/100):med):mixW(A,B,Math.max(0,Math.min(100,anc.w+TGT_S))/100);
+  // ползунок (решение владельца 29.10.2026): доля пути от положения режима к краю допустимого отрезка прямой A→B — −100 край со стороны
+  // выручки (wL), +100 со стороны маржинальности (wR); цель не выходит из коридоров (коридор выпуклый — путь от допустимой точки к допустимой
+  // внутри него); режим выбрал медианы — путь от медиан к точке края; на прямой допустимых нет — ползунок не двигает
+  const lineF=feas.filter(x=>!x.med),wL=lineF.length?Math.min(...lineF.map(x=>x.w)):null,wR=lineF.length?Math.max(...lineF.map(x=>x.w)):null;
+  const f=Math.abs(TGT_S)/100,wE=TGT_S<0?wL:wR;let tg,wT=null;
+  if(!anc)tg=med;
+  else if(anc.med)tg=TGT_S&&wE!=null?mixW(med,mixW(A,B,wE/100),f):med;
+  else{wT=TGT_S&&wE!=null?anc.w+(wE-anc.w)*f:anc.w;tg=mixW(A,B,wT/100);}
+  r.wT=wT;r.wEdge=[wL,wR];
   r.anc=anc;r.inCor=inCor;r.nFeas=inCor?feas.length:0;r.nCand=valid.length;
   r.revT=tg.rev;r.pctT=tg.pct;const kapT=kap;
   r.qtyT=tg.qty;r.priceT=r.revT!=null&&r.qtyT>0?r.revT/r.qtyT:null;
@@ -820,11 +830,11 @@ function itemCalc(P,plan,k,ra,price){
   const p=plan?{rev:plan.rev,mar:plan.mar*kap,marRaw:plan.mar,qty:plan.qty,pct:plan.rev>0?plan.mar/plan.rev*100:null,price:plan.qty>0?plan.rev/plan.qty:null}:null;
   const rr=force?ra:rangeOf('rev',P).ra,base=P.slice(rr[0],rr[1]+1).reduce((s,x)=>s+(x.rev||0),0);
   const from=isAuto()?(common?`с ${ddmm(common.from)}${common.short?' (мало данных)':''}`:'—'):null;
-  const un=STEP==='day'?'будн. дн.':'нед.',per=STEP==='day'?'день':'неделю';
+  const un=SP()==='day'?'будн. дн.':'нед.',per=SP()==='day'?'день':'неделю';
   const ptTxt=(x,by)=>`${by}: `+(x.bad?`${ddmm(x.seg.from)}–${ddmm(x.seg.to)} — маржинальность только по ${x.bad.nCF} дн. с маржой CF (нужно от ${PT_MIN_CF}), точка не учитывается — медианы`
-    :!x.seg?`нет стабильных отрезков от ${TARGET_MIN[STEP]} точек — медианы`:x.seg.last?'текущий период — лучший, медианы'
+    :!x.seg?`нет стабильных отрезков от ${TARGET_MIN[SP()]} точек — медианы`:x.seg.last?'текущий период — лучший, медианы'
     :`${ddmm(x.seg.from)}–${ddmm(x.seg.to)} (${x.seg.n} ${un})`)+` — выручка ${x.rev!=null&&k?fmtV(METRICS.rev,x.rev/k):'—'} за ${per}, маржинальность ${x.pct!=null?fmtPct(x.pct):'—'}${x.pN!=null?` (по ${x.pN} дн. с маржой CF)`:''}, средняя цена ${x.price!=null?fmtRub(x.price):'—'}, κ ${x.kap!=null?x.kap.toLocaleString('ru-RU',{maximumFractionDigits:3}):'—'}`;
-  const ancTxt=!anc||anc.med?'медианы':`положение ${anc.w} из 100 (0 — лучшая выручка, 100 — лучшая маржинальность)`;
+  const ancTxt=(!anc||anc.med?'медианы':`положение ${anc.w} из 100 (0 — лучшая выручка, 100 — лучшая маржинальность)`)+(wL!=null?`, допустимый отрезок ${wL}–${wR}`:'')+(TGT_S&&wT!=null?`, с ползунком — ${Math.round(wT)}`:'');
   const segTxt=`${TGT_MODES[TGT_MODE]}: ${ancTxt}${TGT_S?`, сдвиг ${TGT_S>0?'+':''}${TGT_S}`:''}. `+(inCor?`Выручка и маржинальность в коридоре — ${r.nFeas} из ${r.nCand} положений, маржа среди них ${fmtRub(r.marRange[0])} – ${fmtRub(r.marRange[1])}.`
     :'Ни одно положение не держит выручку и маржинальность в коридоре — взято ближайшее к коридору.')+` ${ptTxt(A,'Лучшая выручка')}. ${ptTxt(B,'Лучшая маржинальность')}`;
   const qtyTxt=`заказы = выручка ÷ фактическая средняя цена дней (Σ выручки ÷ Σ шт). Медиана: цена базы ${pr0!=null?fmtRub(pr0):'—'}. Цель: шт по прямой между точками, цена цели ≈ ${r.priceT!=null?fmtRub(r.priceT):'—'}. `+segTxt;
@@ -962,23 +972,23 @@ async function setEnt(e){
   render();
 }
 function setMetric(k){if(!METRICS[k])return;MET=k;save();render();}
-function setStep(k){if(!STEPS[k]||k===STEP)return;STEP=k;save();syncBaseUI(true);syncBaseUI(true,'plan');render();}
+function setStep(k){if(!STEPS[k]||k===STEP)return;STEP=k;save();syncBaseUI(true);render();}
 function syncBaseUI(rebuild,ctx){
-  const pre=ctx==='plan'?'p':'',B=(ctx==='plan'?PBASE:BASE)[STEP],list=STEP==='week'?WEEKS:DAYS,lab=STEP==='week'?weekLabel:dayLabel;
+  const st=ctx==='plan'?'day':STEP,pre=ctx==='plan'?'p':'',B=(ctx==='plan'?PBASE:BASE)[st],list=st==='week'?WEEKS:DAYS,lab=st==='week'?weekLabel:dayLabel;
   const md=document.getElementById(pre+'baseMode'),bn=document.getElementById(pre+'baseN'),bf=document.getElementById(pre+'baseFrom'),bt=document.getElementById(pre+'baseTo');
   if(!md)return;
   if(rebuild||!md.options.length){
-    md.innerHTML='<option value="shift">с последнего сдвига (авто)</option>'+(STEP==='week'?'<option value="all">всем неделям</option><option value="last">последним N неделям</option><option value="range">неделям с … по …</option>'
+    md.innerHTML='<option value="shift">с последнего сдвига (авто)</option>'+(st==='week'?'<option value="all">всем неделям</option><option value="last">последним N неделям</option><option value="range">неделям с … по …</option>'
       :'<option value="all">всем дням</option><option value="last">последним N дням</option><option value="range">дням с … по …</option>');
     const o=list.map((w,i)=>`<option value="${i}">${lab(w)}</option>`).join('');bf.innerHTML=o;bt.innerHTML=o;
-    bn.title=STEP==='week'?'Сколько последних закрытых недель':'Сколько последних дней (выходные в расчёт не входят)';
+    bn.title=st==='week'?'Сколько последних закрытых недель':'Сколько последних дней (выходные в расчёт не входят)';
   }
   md.value=B.mode;bn.value=B.n;bn.max=list.length;
   bn.classList.toggle('hide',B.mode!=='last');bf.classList.toggle('hide',B.mode!=='range');bt.classList.toggle('hide',B.mode!=='range');
   bf.value=Math.min(B.from,list.length-1);bt.value=Math.min(B.to,list.length-1);
 }
 function setBase(ctx){
-  const pre=ctx==='plan'?'p':'',B=(ctx==='plan'?PBASE:BASE)[STEP],n=(STEP==='week'?WEEKS:DAYS).length,el=id=>document.getElementById(pre+id);
+  const st=ctx==='plan'?'day':STEP,pre=ctx==='plan'?'p':'',B=(ctx==='plan'?PBASE:BASE)[st],n=(st==='week'?WEEKS:DAYS).length,el=id=>document.getElementById(pre+id);
   B.mode=el('baseMode').value;
   B.n=Math.max(3,Math.min(n,parseInt(el('baseN').value,10)||3));
   if(B.mode==='range'){B.from=+el('baseFrom').value;B.to=+el('baseTo').value;}
