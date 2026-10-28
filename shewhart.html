@@ -115,6 +115,8 @@
         .pr-tbl th { position: sticky; top: 0; background: #fff; text-align: center; }
         .pr-tbl tr:nth-child(2) th { top: 27px; }
         .pr-tbl tr.pr-group td { background: rgba(120,166,199,.1); }
+        .pr-tbl tr.tg-low td { background: rgba(227,61,120,.10); }
+        .pr-tbl tr.tg-neg td { background: rgba(227,61,120,.38); }
         .pr-tbl tr.pr-member td:first-child { padding-left: 24px; color: #544273; }
         .pr-tbl tr.pr-total td { font-weight: 700; border-top: 2px solid rgba(84,66,115,.25); position: sticky; bottom: 0; background: #fff; }
         .muted { color: #94a3b8; }
@@ -899,7 +901,9 @@ function renderProductsBody(ents,plans,k,ra,all){
     const shown=raw?{plan_qty:fQ(raw.plan_qty),price:fC(raw.price),margin_pct:fP(raw.margin_pct)}[f]:'—';
     return `<td class="ed" title="${PLAN_FIELDS[f]} — нажмите, чтобы изменить (сохраняется сразу в план)" onclick="editPlan(this,'${it.b}','${esc(it.pid)}','${f}')">${shown}</td>`;};
   const tg=(it,txt,t)=>`<td class="num tgt" title="${esc(t||it.segTxt)}">${txt}</td>`;
-  const tr=(it,cls,label)=>`<tr class="${cls}"${it.group?` onclick="togglePr('${it.gkey}')" style="cursor:pointer"`:''}><td>${label}${ent(it.b)}</td>`+
+  // подсветка по маржинальности цели: < 0 — ярко-розовая, 0…5% — бледно-розовая (решение владельца 29.10.2026)
+  const tgCls=it=>{const v=it.r.pctT;return v==null?'':v<0?' tg-neg':v<5?' tg-low':'';};
+  const tr=(it,cls,label)=>`<tr class="${cls}${tgCls(it)}"${it.group?` onclick="togglePr('${it.gkey}')" style="cursor:pointer"`:''}><td>${label}${ent(it.b)}</td>`+
     (isAuto()?`<td class="muted" title="${esc(it.from||'')}">${it.from?esc(it.from.replace('с ','').replace(' (мало данных)','*')):''}</td>`:'')+
     `<td class="num bs">${fR(it.r.rev)}</td>${tg(it,fR(it.r.revT),it.segTxtR)}<td>${fR(it.p&&it.p.rev)}</td><td>${placeTag(it.p&&it.p.rev,it.c.rev)}</td>`+
     `<td class="num bs">${fP(it.r.pct)}</td>${tg(it,fP(it.r.pctT))}${ed(it,'margin_pct',fP(it.p&&it.p.pct))}<td>${placeTag(it.p&&it.p.pct,it.c.pct)}</td>`+
