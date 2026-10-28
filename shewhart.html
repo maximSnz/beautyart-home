@@ -92,6 +92,8 @@
         .modes { gap: 0; }
         .modebtn { font-family: 'Forum'; font-size: 1em; padding: 4px 10px; border: 2px solid rgba(84,66,115,.2); background: #fff; color: #544273; cursor: pointer; margin-left: -2px; }
         .modebtn:first-child { border-radius: 8px 0 0 8px; margin-left: 0; } .modebtn:last-child { border-radius: 0 8px 8px 0; }
+        .xlsbtn { font-family: 'Forum'; font-size: 1em; padding: 4px 12px; border: 2px solid rgba(84,66,115,.2); border-radius: 8px; background: #fff; color: #16a34a; cursor: pointer; }
+        .xlsbtn:hover { border-color: #16a34a; background: rgba(22,163,74,.06); }
         .modebtn.on { background: #7c3aed; border-color: #7c3aed; color: #fff; position: relative; }
         .search-full { width: 100%; box-sizing: border-box; font-family: 'Forum'; font-size: 1em; padding: 6px 12px; border: 2px solid rgba(84,66,115,.2); border-radius: 8px; margin-bottom: 8px; }
         .plan-info { font-size: .9em; margin: 8px 0; }
@@ -251,6 +253,7 @@
         </div>
     </div>
 
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="auth.js?v=20261021"></script>
 <script>
 // === базы и доступ: один вход — сразу в ИП и ООО (auth.js); «Вместе» — сумма двух баз ===
@@ -508,8 +511,8 @@ const PLAN_CACHE={};
 // действующий план — как «Итого» в plan.html и на главной: только неархивные товары; выручка = Σ plan_qty × price
 async function loadPlan(b,mk){
   const key=b+mk;if(PLAN_CACHE[key])return PLAN_CACHE[key];
-  const [prods,rows]=await Promise.all([fetchPages(b,'products?select=product_id,archived,price&order=product_id'),fetchPages(b,`sales_plan?month=eq.${mk}&select=product_id,plan_qty,price,margin_pct&order=product_id`)]);
-  const g={arch:new Set(prods.filter(p=>p.archived).map(p=>p.product_id)),priceOf:new Map(prods.map(p=>[p.product_id,Number(p.price||0)])),raw:new Map()};
+  const [prods,rows]=await Promise.all([fetchPages(b,'products?select=product_id,offer_id,name,archived,price&order=product_id'),fetchPages(b,`sales_plan?month=eq.${mk}&select=product_id,plan_qty,price,margin_pct&order=product_id`)]);
+  const g={arch:new Set(prods.filter(p=>p.archived).map(p=>p.product_id)),prod:new Map(prods.map(p=>[p.product_id,{offer:p.offer_id||'',name:p.name||''}])),priceOf:new Map(prods.map(p=>[p.product_id,Number(p.price||0)])),raw:new Map()};
   rows.forEach(r=>g.raw.set(r.product_id,{plan_qty:Number(r.plan_qty||0),price:Number(r.price||0),margin_pct:Number(r.margin_pct||0)}));
   return PLAN_CACHE[key]=rebuildPlan(g);
 }
@@ -518,6 +521,23 @@ function rebuildPlan(g){
   g.rev=0;g.qty=0;g.mar=0;g.n=0;g.byPid=new Map();
   g.raw.forEach((r,pid)=>{if(g.arch.has(pid))return;const q=r.plan_qty,p=r.price,pc=r.margin_pct;if(!q)return;g.rev+=q*p;g.qty+=q;g.mar+=q*p*pc/100;g.n++;g.byPid.set(pid,{rev:q*p,qty:q,mar:q*p*pc/100});});
   return g;
+}
+// === выгрузка действующего плана месяца в Excel: товары с планом, как «Итого» (неархивные, шт > 0), фильтр менеджера;
+// маржа = шт × цена × маржинальность × κ юрлица (как plan.html), маржинальность — без κ ===
+async function exportPlan(){
+  if(typeof XLSX==='undefined'){alert('Библиотека Excel не загрузилась — проверьте интернет и обновите страницу.');return;}
+  const ents=ENT==='all'?['ip','ooo']:[ENT],r2=v=>Math.round(v*100)/100,rows=[];let tq=0,tr=0,tm=0,tpc=0;
+  for(const b of ents){const g=await loadPlan(b,PLAN_MK),kap=entKappa([b],PLAN_MK).k;
+    g.raw.forEach((r,pid)=>{if(g.arch.has(pid)||!r.plan_qty)return;const pr=g.prod.get(pid)||{offer:String(pid),name:''};
+      if(PR.mgr!=='all'&&matrixOf(b,pr.offer)!==PR.mgr)return;
+      const rev=r.plan_qty*r.price,mar=rev*r.margin_pct/100*kap;tq+=r.plan_qty;tr+=rev;tm+=mar;tpc+=rev*r.margin_pct/100;
+      rows.push({...(ents.length>1?{'Юрлицо':BASES[b].name}:{}),'Артикул':pr.offer,'Наименование':pr.name,'Заказы, шт':r.plan_qty,'Маржинальность, %':r2(r.margin_pct),'Цена, ₽':r2(r.price),'Выручка, ₽':r2(rev),'Маржа, ₽':r2(mar)});});}
+  if(!rows.length){alert(`Плана на ${monthName(PLAN_MK)} нет.`);return;}
+  rows.sort((a,b)=>(a['Юрлицо']||'').localeCompare(b['Юрлицо']||'')||a['Артикул'].localeCompare(b['Артикул']));
+  rows.push({...(ents.length>1?{'Юрлицо':''}:{}),'Артикул':'Итого','Наименование':`${rows.length} поз.`,'Заказы, шт':tq,'Маржинальность, %':tr>0?r2(tpc/tr*100):null,'Цена, ₽':tq>0?r2(tr/tq):null,'Выручка, ₽':r2(tr),'Маржа, ₽':r2(tm)});
+  const ws=XLSX.utils.json_to_sheet(rows);ws['!cols']=[...(ents.length>1?[{wch:7}]:[]),{wch:28},{wch:60},{wch:11},{wch:17},{wch:10},{wch:14},{wch:13}];
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'План '+PLAN_MK);
+  const who=PR.mgr==='all'?'':(PR.mgr==='m1'?'_Илья':'_Ольга');XLSX.writeFile(wb,`plan_${ENT}_${PLAN_MK}${who}.xlsx`);
 }
 // === правка плана товара: сразу в sales_plan, как editField в plan.html (те же поля и upsert) ===
 // κ — доля GMV CF в выручке PNL за точки базы (будни): маржинальность CF — от GMV, выручка PNL — заказы;
@@ -648,6 +668,7 @@ async function renderPlan(fast){
         <div class="ctl"><span class="ctl-label">Сортировка</span><select id="prSort" onchange="setPr('sort',this.value)">
           <option value="marGap">план − цель маржи ↓</option><option value="tgtGap">потенциал: цель − медиана ↓</option><option value="revGap">план − медиана выручки ↓</option>
           <option value="planRev">план выручки ↓</option><option value="offer">артикул</option></select></div>
+        <div class="ctl" style="margin-left:auto"><button type="button" class="xlsbtn" onclick="exportPlan()" title="Действующий план месяца по товарам (с учётом менеджера) — в Excel">⬇ Excel</button></div>
       </div>
       <input type="text" id="prQ" class="search-full" placeholder="Поиск по артикулу…" oninput="setPr('q',this.value)">
       <div id="planBody"></div>`;
