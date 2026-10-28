@@ -443,6 +443,37 @@
         </div>
     </div>
 
+<script>
+// меню (28.10.2026): плавное раскрытие/сворачивание всех блоков <details>; у крупных блоков (menu-section) открыт только один —
+// раскрытие сворачивает другой открытый. Анимация — высота блока (Web Animations), при prefers-reduced-motion — без анимации
+(function(){
+  const DUR=matchMedia('(prefers-reduced-motion: reduce)').matches?0:260;
+  const closedH=d=>{const s=d.querySelector(':scope>summary');return s?s.offsetHeight:0;};
+  function animate(d,open){
+    if(d._anim){d._anim.cancel();d._anim=null;}
+    const from=d.offsetHeight;
+    if(open)d.open=true;
+    const to=open?(d.style.height='',d.offsetHeight):closedH(d);
+    if(!DUR||from===to){if(!open)d.open=false;d.style.overflow='';return;}
+    d.style.overflow='hidden';
+    // fill:'forwards' держит конечную высоту, пока блок не закрыт — без мелькания раскрытого блока в последнем кадре
+    const a=d.animate([{height:from+'px'},{height:to+'px'}],{duration:DUR,easing:'cubic-bezier(.4,0,.2,1)',fill:'forwards'});
+    d._anim=a;
+    a.onfinish=()=>{if(!open)d.open=false;d.style.overflow='';d._anim=null;a.cancel();};
+    a.oncancel=()=>{if(d._anim!==a)return;d.style.overflow='';};
+  }
+  document.querySelectorAll('.menu details > summary, details.menu-section > summary, details.subsection > summary').forEach(sm=>{
+    sm.addEventListener('click',e=>{
+      const d=sm.parentElement;e.preventDefault();
+      const opening=!d.open||!!(d._anim&&d._closing);
+      d._closing=!opening;
+      if(opening&&d.classList.contains('menu-section'))
+        document.querySelectorAll('details.menu-section[open]').forEach(o=>{if(o!==d){o._closing=true;animate(o,false);}});
+      animate(d,opening);
+    });
+  });
+})();
+</script>
 <script src="auth.js?v=20261021"></script>
 <script>
 // === константы и доступ ===
