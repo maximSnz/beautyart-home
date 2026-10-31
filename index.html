@@ -281,6 +281,11 @@
         .pr-total-chip { margin-right: 16px; height: 30px; font-size: 1.02em; vertical-align: middle; }
         .pr-total-chip b { font-weight: 700; margin-left: 4px; }
         .pr-pot > summary { cursor: pointer; }   /* «Потенциал есть / исчерпан» — свёрнуты по умолчанию */
+        .pr-cb { margin: 0 6px 0 0; vertical-align: middle; cursor: pointer; accent-color: #16a34a; }
+        .dev-table tr.pr-done td { background: rgba(74,222,128,.16); }   /* выполнено — нежно-зелёная */
+        .dev-table tr.pr-edit td { background: rgba(20,8,34,.45); text-align: left; }
+        .pr-edit-box { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .pr-edit-box textarea { flex: 1 1 360px; min-height: 40px; font-family: 'Forum', serif; font-size: 1em; color: #fff; background: rgba(28,13,46,.5); border: 1px solid rgba(255,255,255,.3); border-radius: 8px; padding: 6px 8px; }
         .pr-head { font-family: 'Forum', serif; font-size: 1.02em; color: #fff; padding: 4px 2px 8px; }
         .pr-cnt.z { background: rgba(255,255,255,.25); }
         .dev-table td.pr-act { text-align: left; white-space: normal; min-width: 240px; }
@@ -1519,7 +1524,7 @@ async function loadProto(){
   const cur7=days.slice(-7);
   const curMon=addDays(today,-((today.getDay()+6)%7)),wkKey=keyOfMonday(addDays(curMon,-7));  // последняя закрытая неделя (маржинальность CF)
   const months=[...new Set(cur7.map(k=>k.slice(0,7)).concat(mk))];
-  const [rProd,plans,salesDays,ads,spw,hyp,ppm,restock,stockDays,limDay]=await Promise.all([
+  const [rProd,plans,salesDays,ads,spw,hyp,ppm,restock,stockDays,limDay,doneRes]=await Promise.all([
     fetch(SUPABASE_URL+`/rest/v1/products?select=product_id,offer_id,archived,raw&limit=1000`,{headers:HD}),
     fetch(SUPABASE_URL+`/rest/v1/sales_plan?month=in.(${months.join(',')})&select=month,product_id,plan_qty,price,margin_pct`,{headers:HD}),
     prDays(days,k=>`product_sales?sale_date=eq.${k}&select=offer_id,qty,revenue`),
@@ -1529,7 +1534,9 @@ async function loadProto(){
     fetchPages('product_plan_meta?work_date=not.is.null&select=product_id,month,work_date&order=product_id,month').catch(()=>[]),
     loadRestockInfo(),
     prDays(cur7,k=>`stock_history?report_date=eq.${k}&stock=gt.0&select=offer_id,stock`),
-    fetch(SUPABASE_URL+'/rest/v1/product_drr_limits?select=day&order=day.desc&limit=1',{headers:HD}).then(r=>r.ok?r.json():null).catch(()=>null)
+    fetch(SUPABASE_URL+'/rest/v1/product_drr_limits?select=day&order=day.desc&limit=1',{headers:HD}).then(r=>r.ok?r.json():null).catch(()=>null),
+    // отметки «выполнено» на сегодня; нет таблицы (SQL не запущен) — чек-боксы с подсказкой
+    fetch(SUPABASE_URL+`/rest/v1/product_protocol_done?day=eq.${todayKey}&select=pos_key,comment,user_email,updated_at`,{headers:HD}).then(async r=>r.ok?{ok:true,rows:await r.json()}:{ok:false,status:r.status}).catch(e=>({ok:false,status:e.message}))
   ]);
   if(!rProd.ok)throw new Error('products HTTP '+rProd.status);
   if(!plans.ok)throw new Error('sales_plan HTTP '+plans.status);
@@ -1601,7 +1608,7 @@ async function loadProto(){
   });
   // выручка юрлица вчера — все товары (и без плана), как график «Финансовой динамики»
   const revAllY=salesDays[C.iy].reduce((s,x)=>s+Number(x.revenue||0),0);
-  PR_CACHE={yKey,pKey,yWe,todayKey,revAllY,rows:out,limKey,hypOk:hyp.ok,hypErr:hyp.err,restockOk:restock.ok};
+  PR_CACHE={doneOk:doneRes.ok,done:new Map((doneRes.rows||[]).map(x=>[x.pos_key,x])),yKey,pKey,yWe,todayKey,revAllY,rows:out,limKey,hypOk:hyp.ok,hypErr:hyp.err,restockOk:restock.ok};
   return PR_CACHE;
 }
 async function renderProto(){
@@ -1620,9 +1627,14 @@ async function renderProto(){
       const up=x=>x.restock?' pr-up':'';
       const tri=x=>{if(!x.restock)return '';const s=x.rs,t=[s&&s.up?`пополнение: было ${fmt0(s.before)} → стало ${fmt0(s.now)} шт (+${fmt0(s.d)})`:'',x.afterZero?`снова в наличии (0 на ${dd(x.afterZero)})`:'',x.stockDays!=null?`запас ${fmt1(x.stockDays)} дн. по плановому темпу (${fmt1(x.perDay)} шт/дн = план месяца ÷ дней месяца)`:''].filter(Boolean).join('\n');return `<span class="dev-restock" title="${escH(t)}">▲</span> `;};
       const oos=x=>x.oos?' pr-oos':'',oT=x=>x.oos?` title="нет в наличии: остаток ${fmt0(x.stockNow)} шт меньше ${STOCK_DAYS} дней продаж по плану (${fmt0(x.stockNeed)} шт)"`:'';
-      const head=r.fam?`<tr class="dev-row dev-fam${oos(r)}${up(r)}"${oT(r)} onclick="toggleProtoFam('${blk}','${escH(r.offer)}')"><td class="dev-art" title="${escH(r.offer)} — группа: ${r.members.length} разм.">${open?'▾':'▸'} ${tri(r)}${escH(r.offer)} <span class="dev-neutral">(${r.members.length})</span></td>${mgc(r)}${cells(r)}</tr>`
-        :`<tr class="${(oos(r)+up(r)).trim()}"${oT(r)}><td class="dev-art" title="${escH(r.offer)}">${tri(r)}${escH(r.offer)}</td>${mgc(r)}${cells(r)}</tr>`;
-      return head+(r.fam&&open?(members?members(r):r.members).map(m=>`<tr class="dev-member${oos(m)}${up(m)}"${oT(m)}><td class="dev-art" title="${escH(m.offer)}">${tri(m)}${escH(m.offer)}</td>${mgc(m)}${cells(m)}</tr>`).join(''):'');
+      // отметка «выполнено» (решение владельца 31.10.2026): чек-бокс перед артикулом, комментарий обязателен, действует сегодня; строка — зелёная
+      const pk=prKey(r),dn=P.done.get(pk),isEd=PR_EDIT===pk,nc=6+(PR_MGR==='all'?1:0);
+      const cb=`<input type="checkbox" class="pr-cb"${dn?' checked':''} title="${escH(dn?`Выполнено: ${dn.comment}${dn.user_email?' — '+dn.user_email:''}${dn.updated_at?', '+new Date(dn.updated_at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}):''}`:'Отметить выполнение (с комментарием)')}" onclick="event.stopPropagation();event.preventDefault();prDoneOpen('${escH(pk)}')">`;
+      const dc=dn?' pr-done':'';
+      const ed=isEd?`<tr class="pr-edit"><td colspan="${nc}"><div class="pr-edit-box"><textarea id="prDoneText" placeholder="Что сделано (обязательно)">${escH(dn?dn.comment:'')}</textarea><button class="chip-glass" onclick="prDoneSave('${escH(pk)}')">✓ Выполнено</button>${dn?`<button class="chip-glass" onclick="prDoneDel('${escH(pk)}')">Снять отметку</button>`:''}<button class="chip-glass" onclick="prDoneOpen(null)">Отмена</button><span id="prDoneMsg" class="dev-neutral"></span></div></td></tr>`:'';
+      const head=r.fam?`<tr class="dev-row dev-fam${oos(r)}${up(r)}${dc}"${oT(r)} onclick="toggleProtoFam('${blk}','${escH(r.offer)}')"><td class="dev-art" title="${escH(r.offer)} — группа: ${r.members.length} разм.">${cb}${open?'▾':'▸'} ${tri(r)}${escH(r.offer)} <span class="dev-neutral">(${r.members.length})</span></td>${mgc(r)}${cells(r)}</tr>`
+        :`<tr class="${(oos(r)+up(r)+dc).trim()}"${oT(r)}><td class="dev-art" title="${escH(r.offer)}">${cb}${tri(r)}${escH(r.offer)}</td>${mgc(r)}${cells(r)}</tr>`;
+      return head+ed+(r.fam&&open?(members?members(r):r.members).map(m=>`<tr class="dev-member${oos(m)}${up(m)}"${oT(m)}><td class="dev-art" title="${escH(m.offer)}">${tri(m)}${escH(m.offer)}</td>${mgc(m)}${cells(m)}</tr>`).join(''):'');
     };
     const tbl=(head,list,row,foot)=>list.length?`<table class="dev-table"><thead><tr><th>Артикул</th>${PR_MGR==='all'?'<th>Менеджер</th>':''}${head}</tr></thead><tbody>${list.map(row).join('')}${foot?`<tr class="pr-total"><td>Итого</td>${PR_MGR==='all'?'<td></td>':''}${foot}</tr>`:''}</tbody></table>`:'<div class="dev-cap">Нет товаров — всё в порядке.</div>';
     // общий список — не сворачивается (решение владельца 31.10.2026): заголовок со счётчиками и таблицы видны сразу
@@ -1701,6 +1713,33 @@ async function renderProto(){
   }catch(e){console.error('renderProto:',e);box.innerHTML=`<div class="dev-cap dev-neg">Ошибка загрузки протокола: ${escH(e.message)}</div>`;}
 }
 function toggleProtoFam(blk,k){const key=blk+'|'+k;PR_FAM_OPEN.has(key)?PR_FAM_OPEN.delete(key):PR_FAM_OPEN.add(key);renderProto();}
+// отметки «выполнено»: ключ позиции — product_id или 'f:<семейство перчаток>'
+const prKey=r=>r.fam?'f:'+r.fam:String(r.pid);
+let PR_EDIT=null;
+function prDoneOpen(k){
+  if(k&&PR_CACHE&&!PR_CACHE.doneOk){alert('Отметки пока недоступны: нужна таблица product_protocol_done (SQL в beautyart-docs/sql, запускает владелец).');return;}
+  PR_EDIT=k;renderProto().then(()=>{const t=document.getElementById('prDoneText');if(t)t.focus();});
+}
+async function prDoneSave(k){
+  const t=document.getElementById('prDoneText'),msg=document.getElementById('prDoneMsg'),txt=(t&&t.value||'').trim();
+  if(!txt){msg.textContent='Комментарий обязателен';t.focus();return;}
+  const r=PR_CACHE.rows.find(x=>prKey(x)===k);if(!r)return;
+  const row={day:PR_CACHE.todayKey,pos_key:k,product_id:r.fam?null:r.pid,offer_id:r.offer,comment:txt,user_email:(window.BA_AUTH&&BA_AUTH.email())||null,updated_at:new Date().toISOString()};
+  msg.textContent='Сохранение…';
+  try{
+    const res=await fetch(SUPABASE_URL+'/rest/v1/product_protocol_done?on_conflict=day,pos_key',{method:'POST',headers:{...HD,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(row)});
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    PR_CACHE.done.set(k,row);PR_EDIT=null;renderProto();
+  }catch(e){msg.textContent='Ошибка: '+e.message;}
+}
+async function prDoneDel(k){
+  const msg=document.getElementById('prDoneMsg');msg.textContent='Снятие…';
+  try{
+    const res=await fetch(SUPABASE_URL+`/rest/v1/product_protocol_done?day=eq.${PR_CACHE.todayKey}&pos_key=eq.${encodeURIComponent(k)}`,{method:'DELETE',headers:HD});
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    PR_CACHE.done.delete(k);PR_EDIT=null;renderProto();
+  }catch(e){msg.textContent='Ошибка: '+e.message;}
+}
 function setProtoMgr(v){PR_MGR=v;try{localStorage.setItem('ba_proto_mgr',v);}catch(e){}renderProto();}
 function setHomeTab(tab){
   HOME_TAB=tab;
