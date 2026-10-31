@@ -282,6 +282,11 @@
         .pr-sub { margin: 8px 0 0; background: rgba(28,13,46,.12); }
         .pr-sub > summary { font-size: .92em; }
         .pr-grp { font-family: 'Forum', serif; font-size: .95em; color: #fff; margin: 10px 2px 6px; }
+        .dev-table td.pr-drr-c { white-space: nowrap; }
+        .pr-drr { position: relative; display: inline-flex; width: 110px; height: 8px; border-radius: 4px; overflow: visible; vertical-align: middle; }
+        .pr-drr .z { height: 100%; } .pr-drr .z.g { background: #16a34a; border-radius: 4px 0 0 4px; } .pr-drr .z.y { background: #eab308; } .pr-drr .z.r { background: #E33D78; border-radius: 0 4px 4px 0; }
+        .pr-drr .pt { position: absolute; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: #fff; border: 2px solid #1C0D2E; }
+        .pr-drr-v { margin-left: 6px; font-size: .9em; }
         .dev-table tr.pr-oos td { opacity: .4; }
         .dev-table tr.pr-up td { font-weight: 700; }   /* пополнение ▲ */   /* нет в наличии */
         .dev-table tr.pr-sep td { padding: 0; height: 0; border-top: 3px solid rgba(255,255,255,.85); }
@@ -1446,7 +1451,8 @@ const PR_DEEP_PCT=15,PR_PRICE_TOL=2;                // глубокая анал
 // корпоративный минимум выручки в день, ₽ (решения владельца 31.10.2026): будни — ИП 3 100 000, ООО 100 000; выходные — ИП 2 500 000,
 // ООО 70 000 (по типу вчерашнего дня). Нет минимума — цель = план дня − факт вчера
 const PR_DAY_MIN={ip:{wd:3100000,we:2500000},ooo:{wd:100000,we:70000}};
-const PR_UNDER=0.7;                                 // недофинансирование: ДРР 7 дн ниже 70% планового лимита (запас рекламы); 70–100% — «в плановой рекламе»
+const PR_UNDER=0.7;
+const NET_FLOOR_PR=5;   // порог чистой прибыли, % (NET_FLOOR plan.html, MARGIN_FLOOR главной)                                 // недофинансирование: ДРР 7 дн ниже 70% планового лимита (запас рекламы); 70–100% — «в плановой рекламе»
 let PR_MGR=(()=>{try{return localStorage.getItem('ba_proto_mgr')||'all';}catch(e){return 'all';}})(),PR_CACHE=null;
 const PR_OPEN={},PR_FAM_OPEN=new Set();  // раскрытые блоки (по умолчанию все свёрнуты) и группы перчаток — на время просмотра
 async function prDays(keys,q){const out=new Array(keys.length);let i=0;await Promise.all([0,1,2,3,4,5].map(async()=>{while(i<keys.length){const k=i++;out[k]=await fetchPages(q(keys[k]));}}));return out;}
@@ -1466,6 +1472,12 @@ function prEval(u,C){
   u.revY=u.rev[C.iy]||0;u.revP=u.rev[C.ip]||0;u.planRY=u.planR7[u.planR7.length-1]||0;u.planR7s=u.planR7.reduce((s,x)=>s+x,0);
   u.drop=u.dropQ>=PR_DROP_QTY&&Math.round(u.dropPct)>=PR_DROP_PCT;   // % — округлённый до целого, как на экране (−14,6% = −15% проходит)
   // 4. ДРР 7 дн против лимитов (у группы — средние по размерам, взвешенные выручкой 7 дн)
+  // ДРР вчера = реклама вчера ÷ выручка PNL вчера; лимиты — от цены дня, как «Рука на пульсе» (копия unitPct из plan.html при ДРР 0):
+  // до рекламы pre(P) = (r0 − комиссия(P)) − t − u ÷ (P × b); плановый = max(0, (pre − план) × b), безубыточный = max(0, (pre − 5) × b).
+  // Цена дня = выручка ÷ шт вчера; нет заказов — средняя за 7 дн, нет и её — плановая
+  u.drrY=u.revY>0?u.aY/u.revY*100:(u.aY>0?Infinity:null);
+  if(u.coef){const c=u.coef,P=u.yest>0?u.revY/u.yest:(u.price7||u.planPrice);
+    if(P>0&&c.b>0){const pre=((c.r0-(P<=300?c.lo:c.hi))-c.t-c.u/(P*c.b))*100;u.limY={price:P,pre,be:Math.max(0,(pre-NET_FLOOR_PR)*c.b),plan:c.plan==null?null:Math.max(0,(pre-c.plan)*c.b)};}}
   u.drrState=null;u.drrRub=0;
   if(u.lim){const be=u.lim.drr_be,tp=u.lim.drr_plan;
     u.drrState=u.drr7>be?'red':(tp!=null&&u.drr7>tp?'yellow':(tp!=null&&u.drr7<tp*PR_UNDER&&u.q7<u.qPlan7?'under':null));
@@ -1507,14 +1519,14 @@ async function loadProto(){
   if(!plans.ok)throw new Error('sales_plan HTTP '+plans.status);
   // лимиты ДРР — последний день расчёта ночной загрузки; нет таблицы или строк — блоки 4 и 5 с пометкой
   const limKey=limDay&&limDay[0]?limDay[0].day:null;
-  const LIM=new Map();if(limKey)(await fetchPages(`product_drr_limits?day=eq.${limKey}&select=product_id,price,pre_pct,plan_pct,drr_plan,drr_be&order=product_id`)).forEach(x=>LIM.set(String(x.product_id),x));
+  const LIM=new Map();if(limKey)(await fetchPages(`product_drr_limits?day=eq.${limKey}&select=product_id,price,pre_pct,plan_pct,drr_plan,drr_be,b,r0,comm_low,comm_high,t,u&order=product_id`)).forEach(x=>LIM.set(String(x.product_id),x));
   const products=(await rProd.json()).filter(p=>!p.archived);
   const SKU_PID={},OFFER_PID={};products.forEach(p=>{OFFER_PID[p.offer_id]=p.product_id;const s=p.raw&&p.raw.sku!=null?String(p.raw.sku):'';if(s)SKU_PID[s]=p.product_id;});
   const PLAN={};(await plans.json()).forEach(r=>{PLAN[r.month+'|'+r.product_id]=r;});
   const DI=new Map(days.map((k,i)=>[k,i]));
   const ord=new Map(),rev=new Map(),arr=(m,o)=>{let a=m.get(o);if(!a){a=new Array(days.length).fill(0);m.set(o,a);}return a;};
   salesDays.forEach((rows,i)=>rows.forEach(x=>{arr(ord,x.offer_id)[i]+=Number(x.qty||0);arr(rev,x.offer_id)[i]+=Number(x.revenue||0);}));
-  const adv=new Map();ads.forEach(x=>{const pid=SKU_PID[x.offer_id]||OFFER_PID[x.offer_id];if(pid)adv.set(pid,(adv.get(pid)||0)+Number(x.amount||0));});
+  const adv=new Map(),advY=new Map();ads.forEach(x=>{const pid=SKU_PID[x.offer_id]||OFFER_PID[x.offer_id];if(!pid)return;adv.set(pid,(adv.get(pid)||0)+Number(x.amount||0));if(x.spend_date===yKey)advY.set(pid,(advY.get(pid)||0)+Number(x.amount||0));});
   const cf=new Map();spw.forEach(x=>{if(x.fact==null)return;const c=cf.get(x.product_id)||{mar:0,revn:0};c[x.metric]+=Number(x.fact);cf.set(x.product_id,c);});
   const hy=new Map();hyp.rows.forEach(r=>{const k=String(r.product_id),c=hy.get(k);if(!c||r.deadline>c.deadline||(r.deadline===c.deadline&&r.created_at>c.created_at))hy.set(k,r);});
   const WD=new Map();ppm.forEach(x=>{const k=String(x.product_id);if(!WD.has(k)||x.work_date>WD.get(k))WD.set(k,x.work_date);});
@@ -1533,7 +1545,8 @@ async function loadProto(){
     const st=stock.get(o)||zeros(7);
     const u={pid,offer:o,mgr:matrixOf(o),ord:ord.get(o)||zeros(days.length),rev:rev.get(o)||zeros(days.length),a7:adv.get(pid)||0,
       plan7:cur7.map(k=>planDay(pid,k)),planR7:cur7.map(k=>{const pk=PLAN[k.slice(0,7)+'|'+pid];return planDay(pid,k)*(pk?Number(pk.price||0):0);}),planQ:q,planRev:q*pp,planRevPct:pct!=null?q*pp:0,planMarW:pct!=null?q*pp*pct:0,
-      cfMar:c?c.mar:0,cfRevn:c?c.revn:0,lim:L?{drr_plan:L.drr_plan!=null?Number(L.drr_plan):null,drr_be:Number(L.drr_be)}:null,stock:st,
+      cfMar:c?c.mar:0,cfRevn:c?c.revn:0,lim:L?{drr_plan:L.drr_plan!=null?Number(L.drr_plan):null,drr_be:Number(L.drr_be)}:null,aY:advY.get(pid)||0,
+      coef:L&&L.b!=null?{b:+L.b,r0:+L.r0,lo:+L.comm_low,hi:+L.comm_high,t:+L.t,u:+L.u,plan:L.plan_pct!=null?+L.plan_pct:null}:null,stock:st,
       // день с остатком — как на «Поиске отклонений»: хватает на STOCK_DAYS дней по плану месяца этого дня (без 0,95)
       need:cur7.map(k=>{const pk=PLAN[k.slice(0,7)+'|'+pid]||pl;return Number(pk.plan_qty||0)/new Date(+k.slice(0,4),+k.slice(5,7),0).getDate()*STOCK_DAYS;})};
     // 1. гипотезы: срок товара — позднее из срока контроля последней гипотезы и «даты работы» plan.html (менеджер переносит её вручную)
@@ -1553,7 +1566,10 @@ async function loadProto(){
     if(ms.length<2){out.push(...ms);return;}
     const sA=f=>ms[0][f].map((_,i)=>ms.reduce((s,m)=>s+(m[f][i]||0),0)),sN=f=>ms.reduce((s,m)=>s+(m[f]||0),0);
     const g={fam:k,offer:k,pid:'f:'+k,members:ms,mgr:ms[0].mgr,ord:sA('ord'),rev:sA('rev'),plan7:sA('plan7'),planR7:sA('planR7'),stock:sA('stock'),need:sA('need')};
-    ['a7','planQ','planRev','planRevPct','planMarW','cfMar','cfRevn'].forEach(f=>g[f]=sN(f));
+    ['a7','aY','planQ','planRev','planRevPct','planMarW','cfMar','cfRevn'].forEach(f=>g[f]=sN(f));
+    // лимиты вчерашнего дня у группы — по размерам (каждый от своей цены дня), взвешенные выручкой вчера (нет — планом дня)
+    {const wm=ms.filter(m=>m.limY),wv=m=>m.revY>0?m.revY:0,WV=wm.reduce((s,m)=>s+wv(m),0),ww=m=>WV>0?wv(m):m.planRY,WW=wm.reduce((s,m)=>s+ww(m),0),wpm=wm.filter(m=>m.limY.plan!=null),WPM=wpm.reduce((s,m)=>s+ww(m),0);
+     g.limY=wm.length&&WW>0?{be:wm.reduce((s,m)=>s+m.limY.be*ww(m),0)/WW,plan:WPM>0?wpm.reduce((s,m)=>s+m.limY.plan*ww(m),0)/WPM:null,price:null}:null;}
     // лимиты группы — средние по размерам с лимитами, взвешенные выручкой 7 дн (нет выручки — плановой)
     const wl=ms.filter(m=>m.lim),w=m=>m.r7>0?m.r7:0,W=wl.reduce((s,m)=>s+w(m),0),wt=m=>W>0?w(m):m.planRev,WT=wl.reduce((s,m)=>s+wt(m),0);
     const wp=wl.filter(m=>m.lim.drr_plan!=null),WP=wp.reduce((s,m)=>s+wt(m),0);
@@ -1614,18 +1630,25 @@ async function renderProto(){
     const b2=rows.filter(r=>r.drop).sort((a,b)=>(a.revY-a.revP)-(b.revY-b.revP));   // сверху — наибольшее падение выручки вчера к позавчера, ₽
     // отклонение: «−55% (154 / 341 / −187)» — факт / база / Δ; цвет по знаку
     const dv=(a,b)=>{const d=a-b,p=b>0?d/b*100:null,c=d<0?'dev-neg':(d>0?'dev-pos':'dev-neutral');return `<span class="${c}">${p==null?'—':sg(p)+'%'}</span> <span class="dev-neutral">(${fmt0(a)} / ${fmt0(b)} / ${sg(d)})</span>`;};
-    const H2=`<th title="заказы вчера ${dd(P.yKey)} к ${dd(P.pKey)}: факт / база / Δ">Вчера к позавчера, % (шт / шт / Δ)</th><th title="выручка PNL вчера ${dd(P.yKey)} к ${dd(P.pKey)}">Вчера к позавчера, % (₽ / ₽ / Δ)</th><th title="заказы вчера к плану дня: план месяца ÷ эфф. дни (выходной × 0,7)">Вчера к плану, % (шт / шт / Δ)</th><th title="выручка PNL вчера к плану дня (шт плана × плановая цена)">Вчера к плану, % (₽ / ₽ / Δ)</th><th title="заказы за 7 дн к плану 7 дн">7 дн к плану, % (шт / шт / Δ)</th><th title="выручка PNL за 7 дн к плану 7 дн (шт × плановая цена)">7 дн к плану, % (₽ / ₽ / Δ)</th>`;
+    const H2=`<th title="заказы вчера ${dd(P.yKey)} к ${dd(P.pKey)}: факт / база / Δ">Вчера к позавчера, % (шт / шт / Δ)</th><th title="выручка PNL вчера ${dd(P.yKey)} к ${dd(P.pKey)}">Вчера к позавчера, % (₽ / ₽ / Δ)</th><th title="заказы вчера к плану дня: план месяца ÷ эфф. дни (выходной × 0,7)">Вчера к плану, % (шт / шт / Δ)</th><th title="выручка PNL вчера к плану дня (шт плана × плановая цена)">Вчера к плану, % (₽ / ₽ / Δ)</th><th title="ДРР вчера (реклама ÷ выручка PNL заказов) на шкале лимитов от цены дня, как «Рука на пульсе»: зелёный — до планового, жёлтый — до безубыточного (5%), красный — выше">ДРР вчера</th>`;
+    // полоса ДРР: зелёный 0…плановый, жёлтый …безубыточный, красный выше; точка — ДРР вчера
+    const drrBar=r=>{const L=r.limY,d=r.drrY;
+      if(!L)return '<span class="dev-neutral" title="нет лимитов (мало продаж для модели)">—</span>';
+      const tp=L.plan!=null?L.plan:L.be,mx=Math.max(L.be*1.6,tp*1.6,isFinite(d)&&d!=null?d*1.1:0,1),x=v=>Math.min(100,v/mx*100);
+      const zone=d==null?'нет рекламы':(d>L.be?'выше безубыточного':(d>tp?'выше планового':'в плане'));
+      const tip=`ДРР вчера: ${d==null?'рекламы не было':(d===Infinity?'∞ (реклама без выручки)':fmt1(d)+'%')} — ${zone}\nреклама ${fmt0(r.aY)} ₽ / выручка ${fmt0(r.revY)} ₽\nлимиты${L.price?` при цене ${fmt0(L.price)} ₽`:' (группа — по размерам)'}: плановый ${L.plan!=null?fmt1(L.plan)+'%':'— (нет плана)'}, безубыточный ${fmt1(L.be)}%`;
+      return `<div class="pr-drr" title="${escH(tip)}"><span class="z g" style="width:${x(tp)}%"></span><span class="z y" style="width:${x(L.be)-x(tp)}%"></span><span class="z r" style="width:${100-x(L.be)}%"></span>${d==null?'':`<span class="pt" style="left:${d===Infinity?100:x(d)}%"></span>`}</div><span class="pr-drr-v">${d==null?'—':(d===Infinity?'∞':fmt1(d)+'%')}</span>`;};
     // потенциал позиции — недобор выручки вчера к плану дня, ₽ (= Δ колонки «вчера к плану, ₽»); cum — таблица «Потенциал есть»; 📉 — во всех таблицах блока
     const pot=r=>Math.max(0,r.planRY-r.revY),byPot=(a,b)=>(b.planRY-b.revY)-(a.planRY-a.revY);   // все списки блока — по потенциалу (план дня − факт), по убыванию
     const row2=cum=>line('d',r=>
-      `<td>${r.drop?'<span title="просадка заказов вчера к позавчера ≥ 15% и ≥ 5 шт">📉 </span>':''}${dv(r.yest,r.prev)}</td><td>${dv(r.revY,r.revP)}</td><td>${dv(r.yest,r.planY)}</td><td>${dv(r.revY,r.planRY)}</td><td>${dv(r.q7,r.qPlan7)}</td><td>${dv(r.r7,r.planR7s)}</td>`);
+      `<td>${r.drop?'<span title="просадка заказов вчера к позавчера ≥ 15% и ≥ 5 шт">📉 </span>':''}${dv(r.yest,r.prev)}</td><td>${dv(r.revY,r.revP)}</td><td>${dv(r.yest,r.planY)}</td><td>${dv(r.revY,r.planRY)}</td><td class="pr-drr-c">${drrBar(r)}</td>`);
     // итог — вчера к позавчера и вчера к плану дня (шт и ₽); 7 дн к плану — разного знака, не суммируем
-    const foot2=list=>(S=>`<td>${dv(S('yest'),S('prev'))}</td><td>${dv(S('revY'),S('revP'))}</td><td>${dv(S('yest'),S('planY'))}</td><td>${dv(S('revY'),S('planRY'))}</td><td>—</td><td>—</td>`)(f=>list.reduce((s,r)=>s+(r[f]||0),0));
+    const foot2=list=>(S=>`<td>${dv(S('yest'),S('prev'))}</td><td>${dv(S('revY'),S('revP'))}</td><td>${dv(S('yest'),S('planY'))}</td><td>${dv(S('revY'),S('planRY'))}</td><td title="ДРР вчера по строкам: Σ реклама ÷ Σ выручка">${S('revY')>0?fmt1(S('aY')/S('revY')*100)+'%':'—'}</td>`)(f=>list.reduce((s,r)=>s+(r[f]||0),0));
     // таблица из частей, между непустыми частями — жирная черта (только визуальный разделитель); «Итого» — одно, без товаров не в наличии
     const t2=(parts,cum)=>{
       parts=parts.filter(p=>p&&p.length);
       if(!parts.length)return tbl(H2,[],null);
-      const nc=7+(PR_MGR==='all'?1:0),r2=row2(cum);
+      const nc=6+(PR_MGR==='all'?1:0),r2=row2(cum);
       const tot=l=>`<tr class="pr-total"><td title="без товаров не в наличии">Итого</td>${PR_MGR==='all'?'<td></td>':''}${foot2(l.filter(r=>!r.oos))}</tr>`;
       return `<table class="dev-table"><thead><tr><th>Артикул</th>${PR_MGR==='all'?'<th>Менеджер</th>':''}${H2}</tr></thead><tbody>${parts.map(p=>p.map(r2).join('')).join(`<tr class="pr-sep"><td colspan="${nc}"></td></tr>`)}${tot(parts.flat())}</tbody></table>`;
     };
