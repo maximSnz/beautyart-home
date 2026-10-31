@@ -1463,7 +1463,7 @@ function prEval(u,C){
   // 2. просадка заказов: вчера к предыдущему дню того же типа (пн — к пт, вс — к сб), в штуках; план дня — вчерашний (выходной × 0,7)
   u.yest=u.ord[C.iy]||0;u.prev=u.ord[C.ip]||0;u.dropQ=u.prev-u.yest;u.dropPct=u.prev>0?u.dropQ/u.prev*100:null;u.planY=u.plan7[u.plan7.length-1]||0;
   u.revY=u.rev[C.iy]||0;u.revP=u.rev[C.ip]||0;u.planRY=u.planR7[u.planR7.length-1]||0;u.planR7s=u.planR7.reduce((s,x)=>s+x,0);
-  u.drop=u.dropQ>=PR_DROP_QTY&&u.dropPct>=PR_DROP_PCT;
+  u.drop=u.dropQ>=PR_DROP_QTY&&Math.round(u.dropPct)>=PR_DROP_PCT;   // % — округлённый до целого, как на экране (−14,6% = −15% проходит)
   // 4. ДРР 7 дн против лимитов (у группы — средние по размерам, взвешенные выручкой 7 дн)
   u.drrState=null;u.drrRub=0;
   if(u.lim){const be=u.lim.drr_be,tp=u.lim.drr_plan;
