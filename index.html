@@ -1620,33 +1620,33 @@ async function renderProto(){
       `<td>${r.drop?'<span title="просадка заказов вчера к позавчера ≥ 15% и ≥ 5 шт">📉 </span>':''}${dv(r.yest,r.prev)}</td><td>${dv(r.revY,r.revP)}</td><td>${dv(r.yest,r.planY)}</td><td>${dv(r.revY,r.planRY)}</td><td>${dv(r.q7,r.qPlan7)}</td><td>${dv(r.r7,r.planR7s)}</td>`);
     // итог — вчера к позавчера и вчера к плану дня (шт и ₽); 7 дн к плану — разного знака, не суммируем
     const foot2=list=>(S=>`<td>${dv(S('yest'),S('prev'))}</td><td>${dv(S('revY'),S('revP'))}</td><td>${dv(S('yest'),S('planY'))}</td><td>${dv(S('revY'),S('planRY'))}</td><td>—</td><td>—</td>`)(f=>list.reduce((s,r)=>s+(r[f]||0),0));
-    // below — под жирной чертой: просели (≥ 15% и ≥ 5 шт), ниже плана дня, но не вошли в отбор до минимума; «Итого» — одно, по всем строкам
-    // below — под чертой; third — под второй чертой: пополнившиеся (▲) с потенциалом, которых нет в таблицах блока (решение владельца 31.10.2026)
-    const t2=(list,cum,below,third)=>{
-      if(!list.length&&!(below&&below.length)&&!(third&&third.length))return tbl(H2,[],null);
+    // таблица из частей, между непустыми частями — жирная черта (только визуальный разделитель); «Итого» — одно, без товаров не в наличии
+    const t2=(parts,cum)=>{
+      parts=parts.filter(p=>p&&p.length);
+      if(!parts.length)return tbl(H2,[],null);
       const nc=7+(PR_MGR==='all'?1:0),r2=row2(cum);
-      const tot=l=>`<tr class="pr-total"><td title="без товаров не в наличии">Итого</td>${PR_MGR==='all'?'<td></td>':''}${foot2(l.filter(r=>!r.oos))}</tr>`;   // нет в наличии — не в итоге
-      const sep=below&&below.length?`<tr class="pr-sep"><td colspan="${nc}"></td></tr>${below.map(r2).join('')}`:'';   // черта — только визуальный разделитель
-      return `<table class="dev-table"><thead><tr><th>Артикул</th>${PR_MGR==='all'?'<th>Менеджер</th>':''}${H2}</tr></thead><tbody>${list.map(r2).join('')}${sep}${third&&third.length?`<tr class="pr-sep"><td colspan="${nc}"></td></tr>${third.map(r2).join('')}`:''}${tot(list.concat(below||[],third||[]))}</tbody></table>`;
+      const tot=l=>`<tr class="pr-total"><td title="без товаров не в наличии">Итого</td>${PR_MGR==='all'?'<td></td>':''}${foot2(l.filter(r=>!r.oos))}</tr>`;
+      return `<table class="dev-table"><thead><tr><th>Артикул</th>${PR_MGR==='all'?'<th>Менеджер</th>':''}${H2}</tr></thead><tbody>${parts.map(p=>p.map(r2).join('')).join(`<tr class="pr-sep"><td colspan="${nc}"></td></tr>`)}${tot(parts.flat())}</tbody></table>`;
     };
-    // решения владельца 31.10.2026: «Потенциал есть» — столько позиций ниже плана вчера (₽), сколько нужно, чтобы сумма их потенциалов
-    // (план дня − факт вчера по позиции) закрыла недобор юрлица (менеджера) вчера к плану дня; сверху — наибольший потенциал;
-    // 📉 — была просадка заказов (≥ 15% и ≥ 5 шт). «Потенциал исчерпан» — позиции с просадкой, у которых выручка вчера не ниже плана дня
-    // цель: корпоративный минимум − выручка юрлица вчера (все товары); нет минимума — план дня − факт по позициям с планом
-    // отбор — по всему юрлицу (решение владельца 31.10.2026); фильтр менеджера только скрывает чужие позиции (Илья + Ольга = «Все»)
+    // «Потенциал есть» (решения владельца 31.10.2026), три части через черту:
+    //  1) просадка 📉 ниже плана дня — по падению выручки вчера к позавчера, ₽ (наибольшее сверху);
+    //  2) нераскрытый потенциал (ниже плана дня, без просадки) — по потенциалу, пока Σ падения выручки части 1 + Σ потенциалов части 2
+    //     не закроет разницу «корпоративный минимум − выручка юрлица вчера (все товары)» (нет минимума — план дня − факт);
+    //  3) остальные пополнившиеся ▲ ниже плана дня — по потенциалу.
+    // Отбор — по всему юрлицу, фильтр менеджера только скрывает чужие позиции; нет в наличии — на месте, блёкло, в суммы не входит
     const dMin=PR_DAY_MIN[ENT]?PR_DAY_MIN[ENT][P.yWe?'we':'wd']:null,gap=dMin?dMin-P.revAllY:P.rows.reduce((s,r)=>s+r.planRY-r.revY,0);
-    const cand=P.rows.filter(r=>r.revY<r.planRY).sort((a,b)=>pot(b)-pot(a));
-    // нет в наличии — остаётся на месте (блёклая), но потенциал не засчитывается: добор идёт следующими (решение владельца 31.10.2026)
-    const sel=[];let got=0;for(const r of cand){if(got>=gap)break;sel.push(r);if(!r.oos)got+=pot(r);}
-    const b2n=sel.filter(r=>PR_MGR==='all'||r.mgr===PR_MGR);
-    const b2p=b2.filter(r=>!(r.revY<r.planRY)).sort(byPot);
-    const nDropN=b2.filter(r=>r.revY<r.planRY).length;   // чипы — товары с просадкой 📉 (блок про просадку; решение владельца 31.10.2026)
+    const below=r=>r.revY<r.planRY,mine=r=>PR_MGR==='all'||r.mgr===PR_MGR,lossY=r=>Math.max(0,r.revP-r.revY);
+    const g1All=P.rows.filter(r=>r.drop&&below(r));
+    let got=g1All.reduce((s,r)=>s+(r.oos?0:lossY(r)),0);
+    const sel=[];for(const r of P.rows.filter(r=>!r.drop&&below(r)).sort((a,b)=>pot(b)-pot(a))){if(got>=gap)break;sel.push(r);if(!r.oos)got+=pot(r);}
+    const g1=g1All.filter(mine).sort((a,b)=>(a.revY-a.revP)-(b.revY-b.revP)),g2=sel.filter(mine);
+    const nDropN=g1.length;   // чипы — товары с просадкой 📉 (блок про просадку)
     // пополнившиеся (▲), которых нет в таблицах блока — по потенциалу: ниже плана дня — в «Потенциал есть», иначе — в «Потенциал исчерпан»
-    const shown=new Set([...b2n,...b2]),b2r=rows.filter(r=>r.restock&&!shown.has(r));
-    const b2rN=b2r.filter(r=>r.revY<r.planRY).sort((a,b)=>pot(b)-pot(a)),b2rP=b2r.filter(r=>!(r.revY<r.planRY)).sort(byPot);
-    const inTop=new Set(sel),b2b=b2.filter(r=>r.revY<r.planRY&&!inTop.has(r)).sort((a,b)=>pot(b)-pot(a));   // под чертой — тоже по потенциалу
-    const h2=`<div class="pr-grp">▼ Потенциал есть <span class="pr-cnt${nDropN?'':' z'}" title="товаров с просадкой 📉 в таблице">${nDropN}</span></div>${gap>0?'':`<div class="dev-cap">Вчера ${dMin?'минимум':'план дня'} выполнен — добирать нечего.</div>`}${t2(gap>0?b2n:[],true,b2b,b2rN)}`
-      +`<div class="pr-grp">▲ Потенциал исчерпан <span class="pr-cnt z">${b2p.length}</span> <span class="dev-neutral">— просадка заказов, но выручка вчера не ниже плана дня</span></div>${t2(b2p,false,b2rP)}`;
+    const shown=new Set([...g1,...g2,...b2]),b2r=rows.filter(r=>r.restock&&!shown.has(r));
+    const g3=b2r.filter(below).sort((a,b)=>pot(b)-pot(a)),b2rP=b2r.filter(r=>!below(r)).sort(byPot);
+    const b2p=b2.filter(r=>!below(r)).sort(byPot);
+    const h2=`<div class="pr-grp">▼ Потенциал есть <span class="pr-cnt${nDropN?'':' z'}" title="товаров с просадкой 📉 в таблице">${nDropN}</span></div>${gap>0?'':`<div class="dev-cap">Вчера ${dMin?'минимум':'план дня'} выполнен — добирать нечего.</div>`}${t2([g1,gap>0?g2:[],g3],true)}`
+      +`<div class="pr-grp">▲ Потенциал исчерпан <span class="pr-cnt z">${b2p.length}</span> <span class="dev-neutral">— просадка заказов, но выручка вчера не ниже плана дня</span></div>${t2([b2p,b2rP],false)}`;
     // 4. ДРР: главное — убыток из-за рекламы при актуальной цене (ДРР выше безубыточного лимита); выше планового и недофинансирование — свёрнуто
     const c4=r=>`<td>${pct(r.drr7)}</td><td>${r.lim?`${r.lim.drr_plan!=null?fmt1(r.lim.drr_plan):'—'} / ${fmt1(r.lim.drr_be)}%`:'—'}</td><td>${fmt0(r.a7)}</td><td>${r.drrState?fmt0(r.drrRub):'—'}</td><td>${r.price7!=null?fmt0(r.price7):'—'}</td><td>${ordPlan(r)}</td>`;
     const H4=t=>`<th>ДРР 7 дн</th><th>Лимит план / безуб.</th><th>Реклама 7 дн, ₽</th><th>${t}</th><th>Цена 7 дн</th><th>7 дн к плану, шт</th>`;
@@ -1661,7 +1661,7 @@ async function renderProto(){
     const h5=P.limKey?tbl('<th>7 дн к плану, шт</th><th>Цена 7 дн / план</th><th>ДРР 7 дн / план. лимит</th><th>Упущ. маржа 7 дн, ₽</th>',b5,line('x',r=>
       `<td>${ordPlan(r)}</td><td>${r.price7!=null?fmt0(r.price7):'—'} / ${fmt0(r.planPrice)}</td><td>${pct(r.drr7)} / ${r.lim&&r.lim.drr_plan!=null?fmt1(r.lim.drr_plan)+'%':'—'}</td><td class="dev-neg">${r.deepLost!=null?fmt0(r.deepLost):'—'}</td>`))
       :'<div class="dev-cap dev-warn">Нужны лимиты ДРР (см. блок «ДРР»).</div>';
-    const uniq=new Set([...b1,...b2n,...b2b,...b2p,...b2r,...r4,...b5].map(r=>r.pid)).size;
+    const uniq=new Set([...b1,...g1,...g2,...g3,...b2p,...b2rP,...r4,...b5].map(r=>r.pid)).size;
     const mgrSel=`<select class="chip-glass dev-toggle" onchange="setProtoMgr(this.value)">${Object.entries(DEV_MANAGERS).map(([k,v])=>`<option value="${k}"${k===PR_MGR?' selected':''}>${v}</option>`).join('')}</select>`;
     box.innerHTML=`<div class="dev-cap">Менеджер ${mgrSel} <span style="margin-left:10px">Данные за ${dd(P.yKey)} · позиций с планом: ${rows.length} (перчатки — группой) · в протоколе: <b>${uniq}</b>${P.limKey?` · лимиты ДРР на ${dd(P.limKey)}`:''}</span></div>`
       +blk('h','🧪','Гипотезы',b1.length,`В списке — просрочено и нет гипотезы. С гипотезой — действующая гипотеза (контроль сегодня и позже); перенесено — менеджер передвинул «дату работы» в plan.html, но гипотезу не поставил; просрочено — срок (позднее из контроля последней гипотезы и даты работы) прошёл: подвести итог и поставить следующую гипотезу.${P.hypOk?'':' <span class="dev-neg">Гипотезы не загрузились: '+escH(P.hypErr||'')+'</span>'}`,h1)
