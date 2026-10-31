@@ -489,6 +489,7 @@
     a.onfinish=()=>{if(!open)d.open=false;d.style.overflow='';d._anim=null;a.cancel();};
     a.oncancel=()=>{if(d._anim!==a)return;d.style.overflow='';};
   }
+  window.BA_DETAILS_ANIM=animate;   // та же анимация — у сворачиваемых групп «Протокола работ» (31.10.2026)
   document.querySelectorAll('.menu details > summary, details.menu-section > summary, details.subsection > summary').forEach(sm=>{
     sm.addEventListener('click',e=>{
       const d=sm.parentElement;e.preventDefault();
@@ -1694,6 +1695,9 @@ async function renderProto(){
     box.innerHTML=`<div class="dev-cap">Менеджер ${mgrSel} <span style="margin-left:10px">Данные за ${dd(P.yKey)} · позиций с планом: ${rows.length} (перчатки — группой)${P.limKey?` · лимиты ДРР на ${dd(P.limKey)}`:''}</span></div>`
       +head('📉','Просадка заказов',b2.length,h2,((n,k,h,u,x)=>`<span class="pr-sum2"><span class="dev-restock">▲</span> Пополнение <span class="pr-cnt${n?'':' z'}">${n}</span></span><span class="pr-sum2">📣 Высокий ДРР <span class="pr-cnt${k?'':' z'}">${k}</span></span><span class="pr-sum2">🔍 Глубокая аналитика <span class="pr-cnt${x?'':' z'}">${x}</span></span><span class="pr-sum2">🧪 Нужна гипотеза <span class="pr-cnt${h?'':' z'}">${h}</span></span>`)(rows.filter(r=>r.restock).length,rows.filter(redY).length,rows.filter(r=>r.hState!=='hyp').length,new Set([...g1,...(gap>0?g2:[]),...gRN,...gDN,...gHN,...g3,...b2p,...gRP,...gDP,...gHP,...b2rP].filter(r=>!r.oos)).size,rows.filter(r=>r.deep).length),(u=>`<span class="chip-glass pr-total-chip" title="уникальные позиции списка (группа перчаток — одна), без товаров не в наличии">Всего в работе <b>${u}</b></span>`)(new Set([...g1,...(gap>0?g2:[]),...gRN,...gDN,...gHN,...g3,...b2p,...gRP,...gDP,...gHP,...b2rP].filter(r=>!r.oos)).size))   // доп. заголовки — пополнения и высокий ДРР вчера (блоки «Поступления» и «Убыток из-за рекламы» убраны 31.10.2026)
     box.querySelectorAll('details.pr-blk,details.pr-pot').forEach(d=>d.addEventListener('toggle',()=>{PR_OPEN[d.dataset.k]=d.open;}));
+    // плавное раскрытие / сворачивание групп «Потенциал есть / исчерпан» — как меню главной (260 мс, без анимации при reduced motion)
+    if(window.BA_DETAILS_ANIM)box.querySelectorAll('details.pr-pot > summary').forEach(sm=>sm.addEventListener('click',e=>{
+      const d=sm.parentElement;e.preventDefault();const opening=!d.open||!!(d._anim&&d._closing);d._closing=!opening;window.BA_DETAILS_ANIM(d,opening);}));
   }catch(e){console.error('renderProto:',e);box.innerHTML=`<div class="dev-cap dev-neg">Ошибка загрузки протокола: ${escH(e.message)}</div>`;}
 }
 function toggleProtoFam(blk,k){const key=blk+'|'+k;PR_FAM_OPEN.has(key)?PR_FAM_OPEN.delete(key):PR_FAM_OPEN.add(key);renderProto();}
