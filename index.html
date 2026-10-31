@@ -278,6 +278,9 @@
         .pr-cnt { display: inline-block; min-width: 22px; padding: 0 7px; margin-left: 6px; border-radius: 10px; background: #E33D78; color: #fff; font-size: .85em; text-align: center; }
         .pr-sum2 { margin-left: 18px; }
         #protoBox .dev-table thead th, #protoBox .dev-table thead th:first-child { text-align: center; vertical-align: middle; }   /* заголовки колонок протокола — по центру */
+        .pr-total-chip { margin-right: 16px; height: 30px; font-size: 1.02em; vertical-align: middle; }
+        .pr-total-chip b { font-weight: 700; margin-left: 4px; }
+        .pr-pot > summary { cursor: pointer; }   /* «Потенциал есть / исчерпан» — свёрнуты по умолчанию */
         .pr-head { font-family: 'Forum', serif; font-size: 1.02em; color: #fff; padding: 4px 2px 8px; }
         .pr-cnt.z { background: rgba(255,255,255,.25); }
         .dev-table td.pr-act { text-align: left; white-space: normal; min-width: 240px; }
@@ -1622,7 +1625,7 @@ async function renderProto(){
     };
     const tbl=(head,list,row,foot)=>list.length?`<table class="dev-table"><thead><tr><th>Артикул</th>${PR_MGR==='all'?'<th>Менеджер</th>':''}${head}</tr></thead><tbody>${list.map(row).join('')}${foot?`<tr class="pr-total"><td>Итого</td>${PR_MGR==='all'?'<td></td>':''}${foot}</tr>`:''}</tbody></table>`:'<div class="dev-cap">Нет товаров — всё в порядке.</div>';
     // общий список — не сворачивается (решение владельца 31.10.2026): заголовок со счётчиками и таблицы видны сразу
-    const head=(icon,title,n,html,extra)=>`<div class="pr-blk pr-main"><div class="pr-head">${icon} ${title} <span class="pr-cnt${n?'':' z'}">${n}</span>${extra||''}</div>${html}</div>`;
+    const head=(icon,title,n,html,extra,lead)=>`<div class="pr-main"><div class="pr-head">${lead||''}${icon} ${title} <span class="pr-cnt${n?'':' z'}">${n}</span>${extra||''}</div>${html}</div>`;
     const blk=(key,icon,title,n,hint,html,extra)=>`<details class="pr-blk" data-k="${key}"${PR_OPEN[key]?' open':''}><summary>${icon} ${title} <span class="pr-cnt${n?'':' z'}">${n}</span>${extra||''}</summary>${hint?`<div class="dev-cap">${hint}</div>`:''}${html}</details>`;
     const sub=(key,title,n,html)=>`<details class="pr-blk pr-sub" data-k="${key}"${PR_OPEN[key]?' open':''}><summary>${title} <span class="pr-cnt${n?'':' z'}">${n}</span></summary>${html}</details>`;
     // 1. блок «Гипотезы» убран 31.10.2026 (решение владельца): 🧪 и часть «Нужна гипотеза» — в «Просадке заказов»
@@ -1683,15 +1686,14 @@ async function renderProto(){
     const b2r=rows.filter(r=>r.restock&&!shown.has(r));
     const g3=b2r.filter(below).sort((a,b)=>pot(b)-pot(a)),b2rP=b2r.filter(r=>!below(r)).sort(byPot);
     const b2p=b2.filter(r=>!below(r)).sort(byPot);
-    const h2=`<div class="pr-grp">▼ Потенциал есть</div>${gap>0?'':`<div class="dev-cap">Вчера ${dMin?'минимум':'план дня'} выполнен — добирать нечего.</div>`}${t2([['📉 Просадка заказов',g1],['🎯 Потенциал заказов до условной нормы',gap>0?g2:[]],['📣 Проблемы с ДРР',gRN],['🔍 Глубокая аналитика',gDN],['🧪 Нужна гипотеза',gHN],['<span class="dev-restock">▲</span> Поступления',g3]],true,1)}`
-      +`<div class="pr-grp">▲ Потенциал исчерпан</div>${t2([['📉 Просадка заказов',b2p],['📣 Проблемы с ДРР',gRP],['🔍 Глубокая аналитика',gDP],['🧪 Нужна гипотеза',gHP],['<span class="dev-restock">▲</span> Поступления',b2rP]],false,0)}`;
+    const h2=`<details class="pr-pot" data-k="pe"${PR_OPEN.pe?' open':''}><summary class="pr-grp">▼ Потенциал есть</summary>${gap>0?'':`<div class="dev-cap">Вчера ${dMin?'минимум':'план дня'} выполнен — добирать нечего.</div>`}${t2([['📉 Просадка заказов',g1],['🎯 Потенциал заказов до условной нормы',gap>0?g2:[]],['📣 Проблемы с ДРР',gRN],['🔍 Глубокая аналитика',gDN],['🧪 Нужна гипотеза',gHN],['<span class="dev-restock">▲</span> Поступления',g3]],true,1)}`
+      +`</details><details class="pr-pot" data-k="pi"${PR_OPEN.pi?' open':''}><summary class="pr-grp">▲ Потенциал исчерпан</summary>${t2([['📉 Просадка заказов',b2p],['📣 Проблемы с ДРР',gRP],['🔍 Глубокая аналитика',gDP],['🧪 Нужна гипотеза',gHP],['<span class="dev-restock">▲</span> Поступления',b2rP]],false,0)}</details>`;
     // 4. блок «Убыток из-за рекламы» убран 31.10.2026 (решение владельца): красный ДРР вчера — часть «Просадки заказов»
     // 5. блок «Глубокая аналитика» убран 31.10.2026 (решение владельца): 🔍 и часть «Глубокая аналитика» — в общем списке
-    const uniq=new Set([...g1,...g2,...gRN,...gDN,...gHN,...g3,...b2p,...gRP,...gDP,...gHP,...b2rP].map(r=>r.pid)).size;
     const mgrSel=`<select class="chip-glass dev-toggle" onchange="setProtoMgr(this.value)">${Object.entries(DEV_MANAGERS).map(([k,v])=>`<option value="${k}"${k===PR_MGR?' selected':''}>${v}</option>`).join('')}</select>`;
-    box.innerHTML=`<div class="dev-cap">Менеджер ${mgrSel} <span style="margin-left:10px">Данные за ${dd(P.yKey)} · позиций с планом: ${rows.length} (перчатки — группой) · в протоколе: <b>${uniq}</b>${P.limKey?` · лимиты ДРР на ${dd(P.limKey)}`:''}</span></div>`
-      +head('📉','Просадка заказов',b2.length,h2,((n,k,h,u,x)=>`<span class="pr-sum2"><span class="dev-restock">▲</span> Пополнение <span class="pr-cnt${n?'':' z'}">${n}</span></span><span class="pr-sum2">📣 Высокий ДРР <span class="pr-cnt${k?'':' z'}">${k}</span></span><span class="pr-sum2">🔍 Глубокая аналитика <span class="pr-cnt${x?'':' z'}">${x}</span></span><span class="pr-sum2">🧪 Нужна гипотеза <span class="pr-cnt${h?'':' z'}">${h}</span></span><span class="pr-sum2" title="уникальные позиции в таблицах блока (группа перчаток — одна), без товаров не в наличии">Всего в работе <span class="pr-cnt${u?'':' z'}">${u}</span></span>`)(rows.filter(r=>r.restock).length,rows.filter(redY).length,rows.filter(r=>r.hState!=='hyp').length,new Set([...g1,...(gap>0?g2:[]),...gRN,...gDN,...gHN,...g3,...b2p,...gRP,...gDP,...gHP,...b2rP].filter(r=>!r.oos)).size,rows.filter(r=>r.deep).length))   // доп. заголовки — пополнения и высокий ДРР вчера (блоки «Поступления» и «Убыток из-за рекламы» убраны 31.10.2026)
-    box.querySelectorAll('details.pr-blk').forEach(d=>d.addEventListener('toggle',()=>{PR_OPEN[d.dataset.k]=d.open;}));
+    box.innerHTML=`<div class="dev-cap">Менеджер ${mgrSel} <span style="margin-left:10px">Данные за ${dd(P.yKey)} · позиций с планом: ${rows.length} (перчатки — группой)${P.limKey?` · лимиты ДРР на ${dd(P.limKey)}`:''}</span></div>`
+      +head('📉','Просадка заказов',b2.length,h2,((n,k,h,u,x)=>`<span class="pr-sum2"><span class="dev-restock">▲</span> Пополнение <span class="pr-cnt${n?'':' z'}">${n}</span></span><span class="pr-sum2">📣 Высокий ДРР <span class="pr-cnt${k?'':' z'}">${k}</span></span><span class="pr-sum2">🔍 Глубокая аналитика <span class="pr-cnt${x?'':' z'}">${x}</span></span><span class="pr-sum2">🧪 Нужна гипотеза <span class="pr-cnt${h?'':' z'}">${h}</span></span>`)(rows.filter(r=>r.restock).length,rows.filter(redY).length,rows.filter(r=>r.hState!=='hyp').length,new Set([...g1,...(gap>0?g2:[]),...gRN,...gDN,...gHN,...g3,...b2p,...gRP,...gDP,...gHP,...b2rP].filter(r=>!r.oos)).size,rows.filter(r=>r.deep).length),(u=>`<span class="chip-glass pr-total-chip" title="уникальные позиции списка (группа перчаток — одна), без товаров не в наличии">Всего в работе <b>${u}</b></span>`)(new Set([...g1,...(gap>0?g2:[]),...gRN,...gDN,...gHN,...g3,...b2p,...gRP,...gDP,...gHP,...b2rP].filter(r=>!r.oos)).size))   // доп. заголовки — пополнения и высокий ДРР вчера (блоки «Поступления» и «Убыток из-за рекламы» убраны 31.10.2026)
+    box.querySelectorAll('details.pr-blk,details.pr-pot').forEach(d=>d.addEventListener('toggle',()=>{PR_OPEN[d.dataset.k]=d.open;}));
   }catch(e){console.error('renderProto:',e);box.innerHTML=`<div class="dev-cap dev-neg">Ошибка загрузки протокола: ${escH(e.message)}</div>`;}
 }
 function toggleProtoFam(blk,k){const key=blk+'|'+k;PR_FAM_OPEN.has(key)?PR_FAM_OPEN.delete(key):PR_FAM_OPEN.add(key);renderProto();}
