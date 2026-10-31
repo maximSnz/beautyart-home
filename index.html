@@ -1620,7 +1620,7 @@ async function renderProto(){
     const t2=(list,cum,below)=>{
       if(!list.length&&!(below&&below.length))return tbl(H2,[],null);
       const nc=7+(PR_MGR==='all'?1:0),r2=row2(cum);
-      const tot=l=>`<tr class="pr-total"><td>Итого</td>${PR_MGR==='all'?'<td></td>':''}${foot2(l)}</tr>`;
+      const tot=l=>`<tr class="pr-total"><td title="без товаров не в наличии">Итого</td>${PR_MGR==='all'?'<td></td>':''}${foot2(l.filter(r=>!r.oos))}</tr>`;   // нет в наличии — не в итоге
       const sep=below&&below.length?`<tr class="pr-sep"><td colspan="${nc}"></td></tr>${below.map(r2).join('')}`:'';   // черта — только визуальный разделитель
       return `<table class="dev-table"><thead><tr><th>Артикул</th>${PR_MGR==='all'?'<th>Менеджер</th>':''}${H2}</tr></thead><tbody>${list.map(r2).join('')}${sep}${tot(list.concat(below||[]))}</tbody></table>`;
     };
@@ -1631,7 +1631,8 @@ async function renderProto(){
     // отбор — по всему юрлицу (решение владельца 31.10.2026); фильтр менеджера только скрывает чужие позиции (Илья + Ольга = «Все»)
     const dMin=PR_DAY_MIN[ENT]?PR_DAY_MIN[ENT][P.yWe?'we':'wd']:null,gap=dMin?dMin-P.revAllY:P.rows.reduce((s,r)=>s+r.planRY-r.revY,0);
     const cand=P.rows.filter(r=>r.revY<r.planRY).sort((a,b)=>pot(b)-pot(a));
-    const sel=[];let got=0;for(const r of cand){if(got>=gap)break;sel.push(r);got+=pot(r);}
+    // нет в наличии — остаётся на месте (блёклая), но потенциал не засчитывается: добор идёт следующими (решение владельца 31.10.2026)
+    const sel=[];let got=0;for(const r of cand){if(got>=gap)break;sel.push(r);if(!r.oos)got+=pot(r);}
     const b2n=sel.filter(r=>PR_MGR==='all'||r.mgr===PR_MGR);
     const b2p=b2.filter(r=>!(r.revY<r.planRY));
     const nDropN=b2.filter(r=>r.revY<r.planRY).length;   // чипы — товары с просадкой 📉 (блок про просадку; решение владельца 31.10.2026)
