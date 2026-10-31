@@ -1863,8 +1863,8 @@ async function prItem(k){
     ppmNow.forEach(x=>{if(logged.has(x.product_id)||!x.updated_at)return;if(hyp.some(h=>h.product_id===x.product_id&&h.deadline===x.work_date))return;
       addEv(keyOfMonday(new Date(x.updated_at)),`📅 ${offOf(x.product_id)}последний перенос даты работы → ${ddm(x.work_date)} (до журнала переносов — более ранние не сохранились)`);});
     hyp.forEach(h=>{const off=ms.find(m=>m.pid===h.product_id),pre=u.fam&&off?off.offer+': ':'';const v=hypoVerdict(h);
-      addEv(String(h.created_at||'').slice(0,10),`🧪 ${pre}гипотеза: ${h.action||''}`);
-      addEv(h.deadline,`🧪 ${pre}контроль гипотезы${v?' — '+VERD[v]:(h.fact_ctx==null?' — ожидает фиксации':'')}`);});
+      addEv(keyOfMonday(new Date(h.created_at)),`🧪 ${pre}гипотеза поставлена: ${h.action||''}`);
+      void v;});   // только действия менеджера: срок контроля гипотезы не отмечаем (решение владельца 31.10.2026)
     // ---- график: две панели с общей осью дат
     const W=820,L=52,R=14,x=i=>L+(i+0.5)*(W-L-R)/pts.length,bw=Math.max(4,(W-L-R)/pts.length*0.62);
     const H1=180,T1=26,B1=150,mx1=Math.max(1,...pts.map(p=>Math.max(p.rev,p.plan)))*1.1,y1=v=>B1-(B1-T1)*v/mx1;
