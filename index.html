@@ -1439,7 +1439,7 @@ const PR_DROP_PCT=15,PR_DROP_QTY=5;                // просадка: зака
 const PR_DEEP_PCT=15,PR_PRICE_TOL=2;                // глубокая аналитика: заказы 7 дн ниже плана ≥ 15%, цена 7 дн в ±2% от плановой
 const PR_UNDER=0.7;                                 // недофинансирование: ДРР 7 дн ниже 70% планового лимита (запас рекламы); 70–100% — «в плановой рекламе»
 let PR_MGR=(()=>{try{return localStorage.getItem('ba_proto_mgr')||'all';}catch(e){return 'all';}})(),PR_CACHE=null;
-const PR_OPEN={},PR_FAM_OPEN=new Set();  // свёрнутые блоки и раскрытые группы перчаток — на время просмотра
+const PR_OPEN={},PR_FAM_OPEN=new Set();  // раскрытые блоки (по умолчанию все свёрнуты) и группы перчаток — на время просмотра
 async function prDays(keys,q){const out=new Array(keys.length);let i=0;await Promise.all([0,1,2,3,4,5].map(async()=>{while(i<keys.length){const k=i++;out[k]=await fetchPages(q(keys[k]));}}));return out;}
 // охват гипотезами (решение владельца 31.10.2026): с гипотезой (действующая, контроль сегодня и позже) / перенесено без гипотезы
 // («дата работы» в будущем, действующей гипотезы нет) / просрочено (срок прошёл) / нет ни гипотезы, ни даты
@@ -1454,6 +1454,7 @@ function prEval(u,C){
   u.ordDev7=u.qPlan7>0?(u.q7-u.qPlan7)/u.qPlan7*100:null;
   // 2. просадка заказов: вчера к предыдущему дню того же типа (пн — к пт, вс — к сб), в штуках; план дня — вчерашний (выходной × 0,7)
   u.yest=u.ord[C.iy]||0;u.prev=u.ord[C.ip]||0;u.dropQ=u.prev-u.yest;u.dropPct=u.prev>0?u.dropQ/u.prev*100:null;u.planY=u.plan7[u.plan7.length-1]||0;
+  u.revY=u.rev[C.iy]||0;u.revP=u.rev[C.ip]||0;u.planRY=u.planR7[u.planR7.length-1]||0;u.planR7s=u.planR7.reduce((s,x)=>s+x,0);
   u.drop=u.dropQ>=PR_DROP_QTY&&u.dropPct>=PR_DROP_PCT;
   // 4. ДРР 7 дн против лимитов (у группы — средние по размерам, взвешенные выручкой 7 дн)
   u.drrState=null;u.drrRub=0;
@@ -1517,7 +1518,7 @@ async function loadProto(){
     const q=Number(pl.plan_qty),pp=Number(pl.price||0),pct=pl.margin_pct!=null?Number(pl.margin_pct):null,c=cf.get(pid),L=LIM.get(String(pid));
     const st=stock.get(o)||zeros(7);
     const u={pid,offer:o,mgr:matrixOf(o),ord:ord.get(o)||zeros(days.length),rev:rev.get(o)||zeros(days.length),a7:adv.get(pid)||0,
-      plan7:cur7.map(k=>planDay(pid,k)),planQ:q,planRev:q*pp,planRevPct:pct!=null?q*pp:0,planMarW:pct!=null?q*pp*pct:0,
+      plan7:cur7.map(k=>planDay(pid,k)),planR7:cur7.map(k=>{const pk=PLAN[k.slice(0,7)+'|'+pid];return planDay(pid,k)*(pk?Number(pk.price||0):0);}),planQ:q,planRev:q*pp,planRevPct:pct!=null?q*pp:0,planMarW:pct!=null?q*pp*pct:0,
       cfMar:c?c.mar:0,cfRevn:c?c.revn:0,lim:L?{drr_plan:L.drr_plan!=null?Number(L.drr_plan):null,drr_be:Number(L.drr_be)}:null,stock:st,
       // день с остатком — как на «Поиске отклонений»: хватает на STOCK_DAYS дней по плану месяца этого дня (без 0,95)
       need:cur7.map(k=>{const pk=PLAN[k.slice(0,7)+'|'+pid]||pl;return Number(pk.plan_qty||0)/new Date(+k.slice(0,4),+k.slice(5,7),0).getDate()*STOCK_DAYS;})};
@@ -1537,7 +1538,7 @@ async function loadProto(){
   fam.forEach((ms,k)=>{
     if(ms.length<2){out.push(...ms);return;}
     const sA=f=>ms[0][f].map((_,i)=>ms.reduce((s,m)=>s+(m[f][i]||0),0)),sN=f=>ms.reduce((s,m)=>s+(m[f]||0),0);
-    const g={fam:k,offer:k,pid:'f:'+k,members:ms,mgr:ms[0].mgr,ord:sA('ord'),rev:sA('rev'),plan7:sA('plan7'),stock:sA('stock'),need:sA('need')};
+    const g={fam:k,offer:k,pid:'f:'+k,members:ms,mgr:ms[0].mgr,ord:sA('ord'),rev:sA('rev'),plan7:sA('plan7'),planR7:sA('planR7'),stock:sA('stock'),need:sA('need')};
     ['a7','planQ','planRev','planRevPct','planMarW','cfMar','cfRevn'].forEach(f=>g[f]=sN(f));
     // лимиты группы — средние по размерам с лимитами, взвешенные выручкой 7 дн (нет выручки — плановой)
     const wl=ms.filter(m=>m.lim),w=m=>m.r7>0?m.r7:0,W=wl.reduce((s,m)=>s+w(m),0),wt=m=>W>0?w(m):m.planRev,WT=wl.reduce((s,m)=>s+wt(m),0);
@@ -1571,7 +1572,7 @@ async function renderProto(){
       return head+(r.fam&&open?(members?members(r):r.members).map(m=>`<tr class="dev-member"><td class="dev-art" title="${escH(m.offer)}">${escH(m.offer)}</td>${mgc(m)}${cells(m)}</tr>`).join(''):'');
     };
     const tbl=(head,list,row)=>list.length?`<table class="dev-table"><thead><tr><th>Артикул</th>${PR_MGR==='all'?'<th>Менеджер</th>':''}${head}</tr></thead><tbody>${list.map(row).join('')}</tbody></table>`:'<div class="dev-cap">Нет товаров — всё в порядке.</div>';
-    const blk=(key,icon,title,n,hint,html)=>`<details class="pr-blk" data-k="${key}"${PR_OPEN[key]===false?'':' open'}><summary>${icon} ${title} <span class="pr-cnt${n?'':' z'}">${n}</span></summary><div class="dev-cap">${hint}</div>${html}</details>`;
+    const blk=(key,icon,title,n,hint,html)=>`<details class="pr-blk" data-k="${key}"${PR_OPEN[key]?' open':''}><summary>${icon} ${title} <span class="pr-cnt${n?'':' z'}">${n}</span></summary><div class="dev-cap">${hint}</div>${html}</details>`;
     const sub=(key,title,n,html)=>`<details class="pr-blk pr-sub" data-k="${key}"${PR_OPEN[key]?' open':''}><summary>${title} <span class="pr-cnt${n?'':' z'}">${n}</span></summary>${html}</details>`;
     const VERD={success:'успешна',partial:'частичный успех',fail:'неудачна'};
     // 1. гипотезы: охват по товарам (размеры перчаток — отдельно), в таблице — позиции (перчатки группой)
@@ -1592,9 +1593,10 @@ async function renderProto(){
       +sub('hm','📅 Перенесено без гипотезы — «дата работы» в будущем, действующей гипотезы нет',m1.length,tbl(H1,m1,line('hm',hCells,r=>r.members.filter(m=>m.hState==='moved'))));
     // 2. просадка
     const b2=rows.filter(r=>r.drop).sort((a,b)=>b.dropQ-a.dropQ);
-    const dc=v=>v>0?'dev-neg':(v<0?'dev-pos':'dev-neutral');
-    const h2=tbl(`<th>Вчера ${dd(P.yKey)}, шт</th><th>${dd(P.pKey)}, шт</th><th>Откл., шт</th><th>Откл., %</th><th>План дня, шт</th><th>7 дн к плану, шт</th>`,b2,line('d',r=>
-      `<td>${fmt0(r.yest)}</td><td>${fmt0(r.prev)}</td><td class="${dc(r.dropQ)}">${sg(-r.dropQ)}</td><td class="${dc(r.dropQ)}">${r.dropPct==null?'—':sg(-r.dropPct)+'%'}</td><td>${fmt0(r.planY)}</td><td>${ordPlan(r)}</td>`));
+    // отклонение: «−55% (154 / 341 / −187)» — факт / база / Δ; цвет по знаку
+    const dv=(a,b)=>{const d=a-b,p=b>0?d/b*100:null,c=d<0?'dev-neg':(d>0?'dev-pos':'dev-neutral');return `<span class="${c}">${p==null?'—':sg(p)+'%'}</span> <span class="dev-neutral">(${fmt0(a)} / ${fmt0(b)} / ${sg(d)})</span>`;};
+    const h2=tbl(`<th title="заказы вчера ${dd(P.yKey)} к ${dd(P.pKey)}: факт / база / Δ">Вчера к позавчера, % (шт / шт / Δ)</th><th title="выручка PNL вчера ${dd(P.yKey)} к ${dd(P.pKey)}">Вчера к позавчера, % (₽ / ₽ / Δ)</th><th title="план вчерашнего дня: план месяца ÷ эфф. дни (выходной × 0,7); ₽ — по плановой цене">План дня, шт / ₽</th><th title="заказы за 7 дн к плану 7 дн">7 дн к плану, % (шт / шт / Δ)</th><th title="выручка PNL за 7 дн к плану 7 дн (шт × плановая цена)">7 дн к плану, % (₽ / ₽ / Δ)</th>`,b2,line('d',r=>
+      `<td>${dv(r.yest,r.prev)}</td><td>${dv(r.revY,r.revP)}</td><td>${fmt0(r.planY)} / ${fmt0(r.planRY)}</td><td>${dv(r.q7,r.qPlan7)}</td><td>${dv(r.r7,r.planR7s)}</td>`));
     // 3. поступления
     const b3=rows.filter(r=>r.restock).sort((a,b)=>((b.rs&&b.rs.d)||0)-((a.rs&&a.rs.d)||0));
     const h3=tbl('<th>Было, шт</th><th>Стало, шт</th><th>Пришло, шт</th><th>% плана мес.</th><th>Причина</th><th>7 дн к плану, шт</th>',b3,line('s',r=>{const s=r.rs;
