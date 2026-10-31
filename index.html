@@ -1644,7 +1644,7 @@ async function renderProto(){
     const row2=cum=>line('d',r=>
       `<td>${r.drop?'<span title="просадка заказов вчера к позавчера ≥ 15% и ≥ 5 шт">📉 </span>':''}${dv(r.yest,r.prev)}</td><td>${dv(r.revY,r.revP)}</td><td>${dv(r.yest,r.planY)}</td><td>${dv(r.revY,r.planRY)}</td><td class="pr-drr-c">${r.limY&&r.drrY!=null&&r.drrY>r.limY.be?'<span title="ДРР вчера выше безубыточного лимита — реклама в убыток">📣 </span>':''}${drrBar(r)}</td>`);
     // итог — вчера к позавчера и вчера к плану дня (шт и ₽); 7 дн к плану — разного знака, не суммируем
-    const foot2=list=>(S=>`<td>${dv(S('yest'),S('prev'))}</td><td>${dv(S('revY'),S('revP'))}</td><td>${dv(S('yest'),S('planY'))}</td><td>${dv(S('revY'),S('planRY'))}</td><td title="ДРР вчера по строкам: Σ реклама ÷ Σ выручка">${S('revY')>0?fmt1(S('aY')/S('revY')*100)+'%':'—'}</td>`)(f=>list.reduce((s,r)=>s+(r[f]||0),0));
+    const foot2=list=>(S=>`<td>${dv(S('yest'),S('prev'))}</td><td>${dv(S('revY'),S('revP'))}</td><td>${dv(S('yest'),S('planY'))}</td><td>${dv(S('revY'),S('planRY'))}</td><td></td>`)(f=>list.reduce((s,r)=>s+(r[f]||0),0));
     // таблица из частей [подзаголовок, список]: у каждой непустой части — подзаголовок на тёмном стекле (решение владельца 31.10.2026,
     // заменил жирные черты); «Итого» — одно, без товаров не в наличии
     const t2=(parts,cum)=>{
@@ -1666,7 +1666,6 @@ async function renderProto(){
     let got=g1All.reduce((s,r)=>s+(r.oos?0:pot(r)),0);   // часть 1 засчитывается недобором к плану дня (решение владельца 31.10.2026, сужение списка)
     const sel=[];for(const r of P.rows.filter(r=>!r.drop&&below(r)).sort((a,b)=>pot(b)-pot(a))){if(got>=gap)break;sel.push(r);if(!r.oos)got+=pot(r);}
     const g1=g1All.filter(mine).sort((a,b)=>(a.revY-a.revP)-(b.revY-b.revP)),g2=sel.filter(mine);
-    const nDropN=g1.length;   // чипы — товары с просадкой 📉 (блок про просадку)
     // пополнившиеся (▲), которых нет в таблицах блока — по потенциалу: ниже плана дня — в «Потенциал есть», иначе — в «Потенциал исчерпан»
     // ДРР вчера в красной зоне (выше безубыточного лимита от цены дня, как РНП), которых нет в таблицах блока — отдельной частью перед
     // пополнениями, по потенциалу: ниже плана дня — в «Потенциал есть», иначе — в «Потенциал исчерпан» (решение владельца 31.10.2026)
@@ -1677,8 +1676,8 @@ async function renderProto(){
     const b2r=rows.filter(r=>r.restock&&!shown.has(r));
     const g3=b2r.filter(below).sort((a,b)=>pot(b)-pot(a)),b2rP=b2r.filter(r=>!below(r)).sort(byPot);
     const b2p=b2.filter(r=>!below(r)).sort(byPot);
-    const h2=`<div class="pr-grp">▼ Потенциал есть <span class="pr-cnt${nDropN?'':' z'}" title="товаров с просадкой 📉 в таблице">${nDropN}</span></div>${gap>0?'':`<div class="dev-cap">Вчера ${dMin?'минимум':'план дня'} выполнен — добирать нечего.</div>`}${t2([['📉 Просадка заказов',g1],['🎯 Потенциал заказов до условной нормы',gap>0?g2:[]],['📣 Проблемы с ДРР',gRN],['▲ Поступления',g3]],true)}`
-      +`<div class="pr-grp">▲ Потенциал исчерпан <span class="pr-cnt z">${b2p.length}</span></div>${t2([['📉 Просадка заказов',b2p],['📣 Проблемы с ДРР',gRP],['▲ Поступления',b2rP]],false)}`;
+    const h2=`<div class="pr-grp">▼ Потенциал есть</div>${gap>0?'':`<div class="dev-cap">Вчера ${dMin?'минимум':'план дня'} выполнен — добирать нечего.</div>`}${t2([['📉 Просадка заказов',g1],['🎯 Потенциал заказов до условной нормы',gap>0?g2:[]],['📣 Проблемы с ДРР',gRN],['▲ Поступления',g3]],true)}`
+      +`<div class="pr-grp">▲ Потенциал исчерпан</div>${t2([['📉 Просадка заказов',b2p],['📣 Проблемы с ДРР',gRP],['▲ Поступления',b2rP]],false)}`;
     // 4. блок «Убыток из-за рекламы» убран 31.10.2026 (решение владельца): красный ДРР вчера — часть «Просадки заказов»
     // 5. глубокая аналитика
     const b5=rows.filter(r=>r.deep).sort((a,b)=>(b.deepLost||0)-(a.deepLost||0));
@@ -1689,7 +1688,7 @@ async function renderProto(){
     const mgrSel=`<select class="chip-glass dev-toggle" onchange="setProtoMgr(this.value)">${Object.entries(DEV_MANAGERS).map(([k,v])=>`<option value="${k}"${k===PR_MGR?' selected':''}>${v}</option>`).join('')}</select>`;
     box.innerHTML=`<div class="dev-cap">Менеджер ${mgrSel} <span style="margin-left:10px">Данные за ${dd(P.yKey)} · позиций с планом: ${rows.length} (перчатки — группой) · в протоколе: <b>${uniq}</b>${P.limKey?` · лимиты ДРР на ${dd(P.limKey)}`:''}</span></div>`
       +blk('h','🧪','Гипотезы',b1.length,`В списке — просрочено и нет гипотезы. С гипотезой — действующая гипотеза (контроль сегодня и позже); перенесено — менеджер передвинул «дату работы» в plan.html, но гипотезу не поставил; просрочено — срок (позднее из контроля последней гипотезы и даты работы) прошёл: подвести итог и поставить следующую гипотезу.${P.hypOk?'':' <span class="dev-neg">Гипотезы не загрузились: '+escH(P.hypErr||'')+'</span>'}`,h1)
-      +blk('d','📉','Просадка заказов',b2.length,'',h2,(n=>`<span class="pr-sum2"><span class="dev-restock">▲</span> Пополнение <span class="pr-cnt${n?'':' z'}">${n}</span></span>`)(rows.filter(r=>r.restock).length))   // второй заголовок — пополнения (блок «Поступления» убран 31.10.2026)
+      +blk('d','📉','Просадка заказов',b2.length,'',h2,((n,k)=>`<span class="pr-sum2"><span class="dev-restock">▲</span> Пополнение <span class="pr-cnt${n?'':' z'}">${n}</span></span><span class="pr-sum2">📣 Высокий ДРР <span class="pr-cnt${k?'':' z'}">${k}</span></span>`)(rows.filter(r=>r.restock).length,rows.filter(redY).length))   // доп. заголовки — пополнения и высокий ДРР вчера (блоки «Поступления» и «Убыток из-за рекламы» убраны 31.10.2026)
       +blk('x','🔍','Глубокая аналитика',b5.length,`Цена 7 дн в ±${PR_PRICE_TOL}% от плановой, ДРР в плановом коридоре (${fmt0(PR_UNDER*100)}–100% планового лимита), остаток все 7 дн (на ${STOCK_DAYS} дня продаж), а заказы 7 дн ниже плана на ${PR_DEEP_PCT}% и больше. Рычаги менеджера в норме — нужна аналитика (карточка, конкуренты, спрос).`,h5);
     box.querySelectorAll('details.pr-blk').forEach(d=>d.addEventListener('toggle',()=>{PR_OPEN[d.dataset.k]=d.open;}));
   }catch(e){console.error('renderProto:',e);box.innerHTML=`<div class="dev-cap dev-neg">Ошибка загрузки протокола: ${escH(e.message)}</div>`;}
