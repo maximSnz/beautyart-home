@@ -289,6 +289,7 @@
         .pr-drr-v { margin-left: 6px; font-size: .9em; }
         .dev-table tr.pr-oos td { opacity: .4; }
         .dev-table tr.pr-up td { font-weight: 700; }   /* пополнение ▲ */   /* нет в наличии */
+        .dev-table tr.pr-subh td { text-align: left; font-weight: 600; font-size: 1.02em; color: #fff; padding: 6px 10px; background: rgba(20,8,34,.62); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); border-top: 1px solid rgba(255,255,255,.25); border-bottom: 1px solid rgba(255,255,255,.18); }
         .dev-table tr.pr-sep td { padding: 0; height: 0; border-top: 3px solid rgba(255,255,255,.85); }
         .dev-table tr.pr-total td { font-weight: 700; background: rgba(255,255,255,.14); border-top: 1px solid rgba(255,255,255,.4); }
         .pr-cov { font-family: 'Forum', serif; font-size: .9em; color: #fff; margin: 2px 2px 8px; padding: 6px 8px; border-radius: 8px; background: rgba(255,255,255,.08); }
@@ -1641,16 +1642,17 @@ async function renderProto(){
     // потенциал позиции — недобор выручки вчера к плану дня, ₽ (= Δ колонки «вчера к плану, ₽»); cum — таблица «Потенциал есть»; 📉 — во всех таблицах блока
     const pot=r=>Math.max(0,r.planRY-r.revY),byPot=(a,b)=>(b.planRY-b.revY)-(a.planRY-a.revY);   // все списки блока — по потенциалу (план дня − факт), по убыванию
     const row2=cum=>line('d',r=>
-      `<td>${r.drop?'<span title="просадка заказов вчера к позавчера ≥ 15% и ≥ 5 шт">📉 </span>':''}${dv(r.yest,r.prev)}</td><td>${dv(r.revY,r.revP)}</td><td>${dv(r.yest,r.planY)}</td><td>${dv(r.revY,r.planRY)}</td><td class="pr-drr-c">${drrBar(r)}</td>`);
+      `<td>${r.drop?'<span title="просадка заказов вчера к позавчера ≥ 15% и ≥ 5 шт">📉 </span>':''}${dv(r.yest,r.prev)}</td><td>${dv(r.revY,r.revP)}</td><td>${dv(r.yest,r.planY)}</td><td>${dv(r.revY,r.planRY)}</td><td class="pr-drr-c">${r.limY&&r.drrY!=null&&r.drrY>r.limY.be?'<span title="ДРР вчера выше безубыточного лимита — реклама в убыток">📣 </span>':''}${drrBar(r)}</td>`);
     // итог — вчера к позавчера и вчера к плану дня (шт и ₽); 7 дн к плану — разного знака, не суммируем
     const foot2=list=>(S=>`<td>${dv(S('yest'),S('prev'))}</td><td>${dv(S('revY'),S('revP'))}</td><td>${dv(S('yest'),S('planY'))}</td><td>${dv(S('revY'),S('planRY'))}</td><td title="ДРР вчера по строкам: Σ реклама ÷ Σ выручка">${S('revY')>0?fmt1(S('aY')/S('revY')*100)+'%':'—'}</td>`)(f=>list.reduce((s,r)=>s+(r[f]||0),0));
-    // таблица из частей, между непустыми частями — жирная черта (только визуальный разделитель); «Итого» — одно, без товаров не в наличии
+    // таблица из частей [подзаголовок, список]: у каждой непустой части — подзаголовок на тёмном стекле (решение владельца 31.10.2026,
+    // заменил жирные черты); «Итого» — одно, без товаров не в наличии
     const t2=(parts,cum)=>{
-      parts=parts.filter(p=>p&&p.length);
+      parts=parts.filter(p=>p[1]&&p[1].length);
       if(!parts.length)return tbl(H2,[],null);
       const nc=6+(PR_MGR==='all'?1:0),r2=row2(cum);
       const tot=l=>`<tr class="pr-total"><td title="без товаров не в наличии">Итого</td>${PR_MGR==='all'?'<td></td>':''}${foot2(l.filter(r=>!r.oos))}</tr>`;
-      return `<table class="dev-table"><thead><tr><th>Артикул</th>${PR_MGR==='all'?'<th>Менеджер</th>':''}${H2}</tr></thead><tbody>${parts.map(p=>p.map(r2).join('')).join(`<tr class="pr-sep"><td colspan="${nc}"></td></tr>`)}${tot(parts.flat())}</tbody></table>`;
+      return `<table class="dev-table"><thead><tr><th>Артикул</th>${PR_MGR==='all'?'<th>Менеджер</th>':''}${H2}</tr></thead><tbody>${parts.map(([h,l])=>`<tr class="pr-subh"><td colspan="${nc}">${h} <span class="pr-cnt z">${l.length}</span></td></tr>${l.map(r2).join('')}`).join('')}${tot(parts.flatMap(p=>p[1]))}</tbody></table>`;
     };
     // «Потенциал есть» (решения владельца 31.10.2026), три части через черту:
     //  1) просадка 📉 ниже плана дня — по падению выручки вчера к позавчера, ₽ (наибольшее сверху);
@@ -1675,8 +1677,8 @@ async function renderProto(){
     const b2r=rows.filter(r=>r.restock&&!shown.has(r));
     const g3=b2r.filter(below).sort((a,b)=>pot(b)-pot(a)),b2rP=b2r.filter(r=>!below(r)).sort(byPot);
     const b2p=b2.filter(r=>!below(r)).sort(byPot);
-    const h2=`<div class="pr-grp">▼ Потенциал есть <span class="pr-cnt${nDropN?'':' z'}" title="товаров с просадкой 📉 в таблице">${nDropN}</span></div>${gap>0?'':`<div class="dev-cap">Вчера ${dMin?'минимум':'план дня'} выполнен — добирать нечего.</div>`}${t2([g1,gap>0?g2:[],gRN,g3],true)}`
-      +`<div class="pr-grp">▲ Потенциал исчерпан <span class="pr-cnt z">${b2p.length}</span></div>${t2([b2p,gRP,b2rP],false)}`;
+    const h2=`<div class="pr-grp">▼ Потенциал есть <span class="pr-cnt${nDropN?'':' z'}" title="товаров с просадкой 📉 в таблице">${nDropN}</span></div>${gap>0?'':`<div class="dev-cap">Вчера ${dMin?'минимум':'план дня'} выполнен — добирать нечего.</div>`}${t2([['📉 Просадка заказов',g1],['🎯 Потенциал заказов до условной нормы',gap>0?g2:[]],['📣 Проблемы с ДРР',gRN],['▲ Поступления',g3]],true)}`
+      +`<div class="pr-grp">▲ Потенциал исчерпан <span class="pr-cnt z">${b2p.length}</span></div>${t2([['📉 Просадка заказов',b2p],['📣 Проблемы с ДРР',gRP],['▲ Поступления',b2rP]],false)}`;
     // 4. блок «Убыток из-за рекламы» убран 31.10.2026 (решение владельца): красный ДРР вчера — часть «Просадки заказов»
     // 5. глубокая аналитика
     const b5=rows.filter(r=>r.deep).sort((a,b)=>(b.deepLost||0)-(a.deepLost||0));
