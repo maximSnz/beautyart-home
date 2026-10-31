@@ -1642,7 +1642,7 @@ async function renderProto(){
     // потенциал позиции — недобор выручки вчера к плану дня, ₽ (= Δ колонки «вчера к плану, ₽»); cum — таблица «Потенциал есть»; 📉 — во всех таблицах блока
     const pot=r=>Math.max(0,r.planRY-r.revY),byPot=(a,b)=>(b.planRY-b.revY)-(a.planRY-a.revY);   // все списки блока — по потенциалу (план дня − факт), по убыванию
     const row2=cum=>line('d',r=>
-      `<td>${r.drop?'<span title="просадка заказов вчера к позавчера ≥ 15% и ≥ 5 шт">📉 </span>':''}${dv(r.yest,r.prev)}</td><td>${dv(r.revY,r.revP)}</td><td>${dv(r.yest,r.planY)}</td><td>${dv(r.revY,r.planRY)}</td><td class="pr-drr-c">${r.limY&&r.drrY!=null&&r.drrY>r.limY.be?'<span title="ДРР вчера выше безубыточного лимита — реклама в убыток">📣 </span>':''}${drrBar(r)}</td>`);
+      `<td>${dv(r.yest,r.prev)}</td><td>${r.drop?'<span title="просадка заказов вчера к позавчера ≥ 15% и ≥ 5 шт">📉 </span>':''}${dv(r.revY,r.revP)}</td><td>${dv(r.yest,r.planY)}</td><td>${dv(r.revY,r.planRY)}</td><td class="pr-drr-c">${r.limY&&r.drrY!=null&&r.drrY>r.limY.be?'<span title="ДРР вчера выше безубыточного лимита — реклама в убыток">📣 </span>':''}${drrBar(r)}</td>`);
     // итог — вчера к позавчера и вчера к плану дня (шт и ₽); 7 дн к плану — разного знака, не суммируем
     const foot2=list=>(S=>`<td>${dv(S('yest'),S('prev'))}</td><td>${dv(S('revY'),S('revP'))}</td><td>${dv(S('yest'),S('planY'))}</td><td>${dv(S('revY'),S('planRY'))}</td><td></td>`)(f=>list.reduce((s,r)=>s+(r[f]||0),0));
     // таблица из частей [подзаголовок, список]: у каждой непустой части — подзаголовок на тёмном стекле (решение владельца 31.10.2026,
