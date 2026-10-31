@@ -1630,14 +1630,14 @@ async function renderProto(){
     };
     // «Потенциал есть» (решения владельца 31.10.2026), три части через черту:
     //  1) просадка 📉 ниже плана дня — по падению выручки вчера к позавчера, ₽ (наибольшее сверху);
-    //  2) нераскрытый потенциал (ниже плана дня, без просадки) — по потенциалу, пока Σ падения выручки части 1 + Σ потенциалов части 2
+    //  2) нераскрытый потенциал (ниже плана дня, без просадки) — по потенциалу, пока Σ потенциалов частей 1 и 2 (план дня − факт)
     //     не закроет разницу «корпоративный минимум − выручка юрлица вчера (все товары)» (нет минимума — план дня − факт);
     //  3) остальные пополнившиеся ▲ ниже плана дня — по потенциалу.
     // Отбор — по всему юрлицу, фильтр менеджера только скрывает чужие позиции; нет в наличии — на месте, блёкло, в суммы не входит
     const dMin=PR_DAY_MIN[ENT]?PR_DAY_MIN[ENT][P.yWe?'we':'wd']:null,gap=dMin?dMin-P.revAllY:P.rows.reduce((s,r)=>s+r.planRY-r.revY,0);
-    const below=r=>r.revY<r.planRY,mine=r=>PR_MGR==='all'||r.mgr===PR_MGR,lossY=r=>Math.max(0,r.revP-r.revY);
+    const below=r=>r.revY<r.planRY,mine=r=>PR_MGR==='all'||r.mgr===PR_MGR;
     const g1All=P.rows.filter(r=>r.drop&&below(r));
-    let got=g1All.reduce((s,r)=>s+(r.oos?0:lossY(r)),0);
+    let got=g1All.reduce((s,r)=>s+(r.oos?0:pot(r)),0);   // часть 1 засчитывается недобором к плану дня (решение владельца 31.10.2026, сужение списка)
     const sel=[];for(const r of P.rows.filter(r=>!r.drop&&below(r)).sort((a,b)=>pot(b)-pot(a))){if(got>=gap)break;sel.push(r);if(!r.oos)got+=pot(r);}
     const g1=g1All.filter(mine).sort((a,b)=>(a.revY-a.revP)-(b.revY-b.revP)),g2=sel.filter(mine);
     const nDropN=g1.length;   // чипы — товары с просадкой 📉 (блок про просадку)
