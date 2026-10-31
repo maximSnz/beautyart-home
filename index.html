@@ -1670,7 +1670,7 @@ async function renderProto(){
     const g3=b2r.filter(below).sort((a,b)=>pot(b)-pot(a)),b2rP=b2r.filter(r=>!below(r)).sort(byPot);
     const b2p=b2.filter(r=>!below(r)).sort(byPot);
     const h2=`<div class="pr-grp">▼ Потенциал есть <span class="pr-cnt${nDropN?'':' z'}" title="товаров с просадкой 📉 в таблице">${nDropN}</span></div>${gap>0?'':`<div class="dev-cap">Вчера ${dMin?'минимум':'план дня'} выполнен — добирать нечего.</div>`}${t2([g1,gap>0?g2:[],g3],true)}`
-      +`<div class="pr-grp">▲ Потенциал исчерпан <span class="pr-cnt z">${b2p.length}</span> <span class="dev-neutral">— просадка заказов, но выручка вчера не ниже плана дня</span></div>${t2([b2p,b2rP],false)}`;
+      +`<div class="pr-grp">▲ Потенциал исчерпан <span class="pr-cnt z">${b2p.length}</span></div>${t2([b2p,b2rP],false)}`;
     // 4. ДРР: главное — убыток из-за рекламы при актуальной цене (ДРР выше безубыточного лимита); выше планового и недофинансирование — свёрнуто
     const c4=r=>`<td>${pct(r.drr7)}</td><td>${r.lim?`${r.lim.drr_plan!=null?fmt1(r.lim.drr_plan):'—'} / ${fmt1(r.lim.drr_be)}%`:'—'}</td><td>${fmt0(r.a7)}</td><td>${r.drrState?fmt0(r.drrRub):'—'}</td><td>${r.price7!=null?fmt0(r.price7):'—'}</td><td>${ordPlan(r)}</td>`;
     const H4=t=>`<th>ДРР 7 дн</th><th>Лимит план / безуб.</th><th>Реклама 7 дн, ₽</th><th>${t}</th><th>Цена 7 дн</th><th>7 дн к плану, шт</th>`;
