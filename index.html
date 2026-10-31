@@ -276,6 +276,7 @@
         .pr-blk { margin: 0 0 10px; border: 1px solid rgba(255,255,255,.22); border-radius: 10px; background: rgba(28,13,46,.18); padding: 4px 8px 8px; }
         .pr-blk > summary { cursor: pointer; font-family: 'Forum', serif; font-size: 1.02em; color: #fff; padding: 4px 2px; list-style-position: inside; }
         .pr-cnt { display: inline-block; min-width: 22px; padding: 0 7px; margin-left: 6px; border-radius: 10px; background: #E33D78; color: #fff; font-size: .85em; text-align: center; }
+        .pr-sum2 { margin-left: 18px; }
         .pr-cnt.z { background: rgba(255,255,255,.25); }
         .dev-table td.pr-act { text-align: left; white-space: normal; min-width: 240px; }
         .pr-sub { margin: 8px 0 0; background: rgba(28,13,46,.12); }
@@ -1590,7 +1591,7 @@ async function renderProto(){
       return head+(r.fam&&open?(members?members(r):r.members).map(m=>`<tr class="dev-member${oos(m)}${up(m)}"${oT(m)}><td class="dev-art" title="${escH(m.offer)}">${tri(m)}${escH(m.offer)}</td>${mgc(m)}${cells(m)}</tr>`).join(''):'');
     };
     const tbl=(head,list,row,foot)=>list.length?`<table class="dev-table"><thead><tr><th>Артикул</th>${PR_MGR==='all'?'<th>Менеджер</th>':''}${head}</tr></thead><tbody>${list.map(row).join('')}${foot?`<tr class="pr-total"><td>Итого</td>${PR_MGR==='all'?'<td></td>':''}${foot}</tr>`:''}</tbody></table>`:'<div class="dev-cap">Нет товаров — всё в порядке.</div>';
-    const blk=(key,icon,title,n,hint,html)=>`<details class="pr-blk" data-k="${key}"${PR_OPEN[key]?' open':''}><summary>${icon} ${title} <span class="pr-cnt${n?'':' z'}">${n}</span></summary>${hint?`<div class="dev-cap">${hint}</div>`:''}${html}</details>`;
+    const blk=(key,icon,title,n,hint,html,extra)=>`<details class="pr-blk" data-k="${key}"${PR_OPEN[key]?' open':''}><summary>${icon} ${title} <span class="pr-cnt${n?'':' z'}">${n}</span>${extra||''}</summary>${hint?`<div class="dev-cap">${hint}</div>`:''}${html}</details>`;
     const sub=(key,title,n,html)=>`<details class="pr-blk pr-sub" data-k="${key}"${PR_OPEN[key]?' open':''}><summary>${title} <span class="pr-cnt${n?'':' z'}">${n}</span></summary>${html}</details>`;
     const VERD={success:'успешна',partial:'частичный успех',fail:'неудачна'};
     // 1. гипотезы: охват по товарам (размеры перчаток — отдельно), в таблице — позиции (перчатки группой)
@@ -1665,7 +1666,7 @@ async function renderProto(){
     const mgrSel=`<select class="chip-glass dev-toggle" onchange="setProtoMgr(this.value)">${Object.entries(DEV_MANAGERS).map(([k,v])=>`<option value="${k}"${k===PR_MGR?' selected':''}>${v}</option>`).join('')}</select>`;
     box.innerHTML=`<div class="dev-cap">Менеджер ${mgrSel} <span style="margin-left:10px">Данные за ${dd(P.yKey)} · позиций с планом: ${rows.length} (перчатки — группой) · в протоколе: <b>${uniq}</b>${P.limKey?` · лимиты ДРР на ${dd(P.limKey)}`:''}</span></div>`
       +blk('h','🧪','Гипотезы',b1.length,`В списке — просрочено и нет гипотезы. С гипотезой — действующая гипотеза (контроль сегодня и позже); перенесено — менеджер передвинул «дату работы» в plan.html, но гипотезу не поставил; просрочено — срок (позднее из контроля последней гипотезы и даты работы) прошёл: подвести итог и поставить следующую гипотезу.${P.hypOk?'':' <span class="dev-neg">Гипотезы не загрузились: '+escH(P.hypErr||'')+'</span>'}`,h1)
-      +blk('d','📉','Просадка заказов',b2.length,'',h2)
+      +blk('d','📉','Просадка заказов',b2.length,'',h2,(n=>`<span class="pr-sum2"><span class="dev-restock">▲</span> Пополнение <span class="pr-cnt${n?'':' z'}">${n}</span></span>`)(rows.filter(r=>r.restock).length))   // второй заголовок — пополнения (блок «Поступления» убран 31.10.2026)
       +blk('a','📣','Убыток из-за рекламы',r4.length,`ДРР 7 дн выше безубыточного лимита: при текущей цене (средняя за 7 дн) реклама уводит маржинальность ниже 5% — убыток по чистой прибыли. Лимиты — модель «Руки на пульсе» (ночной расчёт). ДРР 7 дн = реклама ÷ выручка PNL заказов. Ниже — свёрнуто: выше планового ${y4.length} · недофинансирование ${u4.length}.`,h4)
       +blk('x','🔍','Глубокая аналитика',b5.length,`Цена 7 дн в ±${PR_PRICE_TOL}% от плановой, ДРР в плановом коридоре (${fmt0(PR_UNDER*100)}–100% планового лимита), остаток все 7 дн (на ${STOCK_DAYS} дня продаж), а заказы 7 дн ниже плана на ${PR_DEEP_PCT}% и больше. Рычаги менеджера в норме — нужна аналитика (карточка, конкуренты, спрос).`,h5);
     box.querySelectorAll('details.pr-blk').forEach(d=>d.addEventListener('toggle',()=>{PR_OPEN[d.dataset.k]=d.open;}));
