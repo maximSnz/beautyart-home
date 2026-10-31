@@ -1615,7 +1615,7 @@ async function renderProto(){
     const dv=(a,b)=>{const d=a-b,p=b>0?d/b*100:null,c=d<0?'dev-neg':(d>0?'dev-pos':'dev-neutral');return `<span class="${c}">${p==null?'—':sg(p)+'%'}</span> <span class="dev-neutral">(${fmt0(a)} / ${fmt0(b)} / ${sg(d)})</span>`;};
     const H2=`<th title="заказы вчера ${dd(P.yKey)} к ${dd(P.pKey)}: факт / база / Δ">Вчера к позавчера, % (шт / шт / Δ)</th><th title="выручка PNL вчера ${dd(P.yKey)} к ${dd(P.pKey)}">Вчера к позавчера, % (₽ / ₽ / Δ)</th><th title="заказы вчера к плану дня: план месяца ÷ эфф. дни (выходной × 0,7)">Вчера к плану, % (шт / шт / Δ)</th><th title="выручка PNL вчера к плану дня (шт плана × плановая цена)">Вчера к плану, % (₽ / ₽ / Δ)</th><th title="заказы за 7 дн к плану 7 дн">7 дн к плану, % (шт / шт / Δ)</th><th title="выручка PNL за 7 дн к плану 7 дн (шт × плановая цена)">7 дн к плану, % (₽ / ₽ / Δ)</th>`;
     // потенциал позиции — недобор выручки вчера к плану дня, ₽ (= Δ колонки «вчера к плану, ₽»); cum — таблица «Потенциал есть» (значок 📉)
-    const pot=r=>Math.max(0,r.planRY-r.revY);
+    const pot=r=>Math.max(0,r.planRY-r.revY),byPot=(a,b)=>(b.planRY-b.revY)-(a.planRY-a.revY);   // все списки блока — по потенциалу (план дня − факт), по убыванию
     const row2=cum=>line('d',r=>
       `<td>${cum&&r.drop?'<span title="просадка заказов вчера к позавчера ≥ 15% и ≥ 5 шт">📉 </span>':''}${dv(r.yest,r.prev)}</td><td>${dv(r.revY,r.revP)}</td><td>${dv(r.yest,r.planY)}</td><td>${dv(r.revY,r.planRY)}</td><td>${dv(r.q7,r.qPlan7)}</td><td>${dv(r.r7,r.planR7s)}</td>`);
     // итог — вчера к позавчера и вчера к плану дня (шт и ₽); 7 дн к плану — разного знака, не суммируем
@@ -1639,11 +1639,11 @@ async function renderProto(){
     // нет в наличии — остаётся на месте (блёклая), но потенциал не засчитывается: добор идёт следующими (решение владельца 31.10.2026)
     const sel=[];let got=0;for(const r of cand){if(got>=gap)break;sel.push(r);if(!r.oos)got+=pot(r);}
     const b2n=sel.filter(r=>PR_MGR==='all'||r.mgr===PR_MGR);
-    const b2p=b2.filter(r=>!(r.revY<r.planRY));
-    const nDropN=b2.filter(r=>r.revY<r.planRY).length;
+    const b2p=b2.filter(r=>!(r.revY<r.planRY)).sort(byPot);
+    const nDropN=b2.filter(r=>r.revY<r.planRY).length;   // чипы — товары с просадкой 📉 (блок про просадку; решение владельца 31.10.2026)
     // пополнившиеся (▲), которых нет в таблицах блока — по потенциалу: ниже плана дня — в «Потенциал есть», иначе — в «Потенциал исчерпан»
     const shown=new Set([...b2n,...b2]),b2r=rows.filter(r=>r.restock&&!shown.has(r));
-    const b2rN=b2r.filter(r=>r.revY<r.planRY).sort((a,b)=>pot(b)-pot(a)),b2rP=b2r.filter(r=>!(r.revY<r.planRY)).sort((a,b)=>((b.rs&&b.rs.d)||0)-((a.rs&&a.rs.d)||0));   // чипы — товары с просадкой 📉 (блок про просадку; решение владельца 31.10.2026)
+    const b2rN=b2r.filter(r=>r.revY<r.planRY).sort((a,b)=>pot(b)-pot(a)),b2rP=b2r.filter(r=>!(r.revY<r.planRY)).sort(byPot);
     const inTop=new Set(sel),b2b=b2.filter(r=>r.revY<r.planRY&&!inTop.has(r)).sort((a,b)=>pot(b)-pot(a));   // под чертой — тоже по потенциалу
     const h2=`<div class="pr-grp">▼ Потенциал есть <span class="pr-cnt${nDropN?'':' z'}" title="товаров с просадкой 📉 в таблице">${nDropN}</span></div>${gap>0?'':`<div class="dev-cap">Вчера ${dMin?'минимум':'план дня'} выполнен — добирать нечего.</div>`}${t2(gap>0?b2n:[],true,b2b,b2rN)}`
       +`<div class="pr-grp">▲ Потенциал исчерпан <span class="pr-cnt z">${b2p.length}</span> <span class="dev-neutral">— просадка заказов, но выручка вчера не ниже плана дня</span></div>${t2(b2p,false,b2rP)}`;
