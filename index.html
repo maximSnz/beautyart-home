@@ -286,6 +286,12 @@
         .dev-table tr.pr-edit td { background: rgba(20,8,34,.45); text-align: left; }
         .pr-edit-box { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
         .pr-edit-box textarea { flex: 1 1 360px; min-height: 40px; font-family: 'Forum', serif; font-size: 1em; color: #fff; background: rgba(28,13,46,.5); border: 1px solid rgba(255,255,255,.3); border-radius: 8px; padding: 6px 8px; }
+        .pr-stat-btn { cursor: pointer; }
+        .pr-modal { position: fixed; inset: 0; z-index: 1000; background: rgba(20,8,34,.55); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; padding: 16px; }
+        .pr-modal-card { width: min(860px, 100%); max-height: 90vh; overflow: auto; background: rgba(60,24,80,.85); border: 1px solid rgba(255,255,255,.35); border-radius: 14px; padding: 14px 16px; color: #fff; box-shadow: 0 10px 40px rgba(0,0,0,.4); }
+        .pr-modal-head { display: flex; align-items: center; gap: 10px; font-family: 'Forum', serif; margin-bottom: 8px; }
+        .pr-modal-head .chip-glass { margin-left: auto; height: 28px; cursor: pointer; }
+        .pr-stat-svg { width: 100%; height: auto; display: block; font-family: 'Forum', serif; }
         .pr-head { font-family: 'Forum', serif; font-size: 1.02em; color: #fff; padding: 4px 2px 8px; }
         .pr-cnt.z { background: rgba(255,255,255,.25); }
         .dev-table td.pr-act { text-align: left; white-space: normal; min-width: 240px; }
@@ -1687,6 +1693,10 @@ async function renderProto(){
     // ДРР вчера в красной зоне (выше безубыточного лимита от цены дня, как РНП), которых нет в таблицах блока — отдельной частью перед
     // пополнениями, по потенциалу: ниже плана дня — в «Потенциал есть», иначе — в «Потенциал исчерпан» (решение владельца 31.10.2026)
     const redY=r=>!!(r.limY&&r.drrY!=null&&r.drrY>r.limY.be);
+    // план отработки дня («Всего в работе») по юрлицу и менеджерам — независимо от фильтра: позиция в списке хотя бы по одной причине,
+    // в наличии (список менеджера = список юрлица ∩ его позиции); пишется с отметкой «выполнено» для «Статистики»
+    {const selS=new Set(gap>0?sel:[]),w=P.rows.filter(r=>!r.oos&&(r.drop||selS.has(r)||redY(r)||r.deep||r.hState!=='hyp'||r.restock));
+     P.work={all:w.length,m1:w.filter(r=>r.mgr==='m1').length,m2:w.filter(r=>r.mgr==='m2').length};}
     const shown=new Set([...g1,...g2,...b2]),rX=rows.filter(r=>redY(r)&&!shown.has(r));
     const gRN=rX.filter(below).sort((a,b)=>pot(b)-pot(a)),gRP=rX.filter(r=>!below(r)).sort(byPot);
     rX.forEach(r=>shown.add(r));
@@ -1705,7 +1715,7 @@ async function renderProto(){
     // 5. блок «Глубокая аналитика» убран 31.10.2026 (решение владельца): 🔍 и часть «Глубокая аналитика» — в общем списке
     const mgrSel=`<select class="chip-glass dev-toggle" onchange="setProtoMgr(this.value)">${Object.entries(DEV_MANAGERS).map(([k,v])=>`<option value="${k}"${k===PR_MGR?' selected':''}>${v}</option>`).join('')}</select>`;
     box.innerHTML=`<div class="dev-cap">Менеджер ${mgrSel} <span style="margin-left:10px">Данные за ${dd(P.yKey)} · позиций с планом: ${rows.length} (перчатки — группой)${P.limKey?` · лимиты ДРР на ${dd(P.limKey)}`:''}</span></div>`
-      +head('📉','Просадка заказов',b2.length,h2,((n,k,h,u,x)=>`<span class="pr-sum2"><span class="dev-restock">▲</span> Пополнение <span class="pr-cnt${n?'':' z'}">${n}</span></span><span class="pr-sum2">📣 Высокий ДРР <span class="pr-cnt${k?'':' z'}">${k}</span></span><span class="pr-sum2">🔍 Глубокая аналитика <span class="pr-cnt${x?'':' z'}">${x}</span></span><span class="pr-sum2">🧪 Нужна гипотеза <span class="pr-cnt${h?'':' z'}">${h}</span></span>`)(rows.filter(r=>r.restock).length,rows.filter(redY).length,rows.filter(r=>r.hState!=='hyp').length,new Set([...g1,...(gap>0?g2:[]),...gRN,...gDN,...gHN,...g3,...b2p,...gRP,...gDP,...gHP,...b2rP].filter(r=>!r.oos)).size,rows.filter(r=>r.deep).length),(u=>`<span class="chip-glass pr-total-chip" title="уникальные позиции списка (группа перчаток — одна), без товаров не в наличии">Всего в работе <b>${u}</b></span>`)(new Set([...g1,...(gap>0?g2:[]),...gRN,...gDN,...gHN,...g3,...b2p,...gRP,...gDP,...gHP,...b2rP].filter(r=>!r.oos)).size))   // доп. заголовки — пополнения и высокий ДРР вчера (блоки «Поступления» и «Убыток из-за рекламы» убраны 31.10.2026)
+      +head('📉','Просадка заказов',b2.length,h2,((n,k,h,u,x)=>`<span class="pr-sum2"><span class="dev-restock">▲</span> Пополнение <span class="pr-cnt${n?'':' z'}">${n}</span></span><span class="pr-sum2">📣 Высокий ДРР <span class="pr-cnt${k?'':' z'}">${k}</span></span><span class="pr-sum2">🔍 Глубокая аналитика <span class="pr-cnt${x?'':' z'}">${x}</span></span><span class="pr-sum2">🧪 Нужна гипотеза <span class="pr-cnt${h?'':' z'}">${h}</span></span>`)(rows.filter(r=>r.restock).length,rows.filter(redY).length,rows.filter(r=>r.hState!=='hyp').length,new Set([...g1,...(gap>0?g2:[]),...gRN,...gDN,...gHN,...g3,...b2p,...gRP,...gDP,...gHP,...b2rP].filter(r=>!r.oos)).size,rows.filter(r=>r.deep).length),(u=>`<span class="chip-glass pr-total-chip" title="уникальные позиции списка (группа перчаток — одна), без товаров не в наличии">Всего в работе <b>${u}</b></span><button class="chip-glass pr-total-chip pr-stat-btn" onclick="prStats()" title="план и факт отработки по дням">📊 Статистика</button>`)(new Set([...g1,...(gap>0?g2:[]),...gRN,...gDN,...gHN,...g3,...b2p,...gRP,...gDP,...gHP,...b2rP].filter(r=>!r.oos)).size))   // доп. заголовки — пополнения и высокий ДРР вчера (блоки «Поступления» и «Убыток из-за рекламы» убраны 31.10.2026)
     box.querySelectorAll('details.pr-blk,details.pr-pot').forEach(d=>d.addEventListener('toggle',()=>{PR_OPEN[d.dataset.k]=d.open;}));
     // плавное раскрытие / сворачивание групп «Потенциал есть / исчерпан» — как меню главной (260 мс, без анимации при reduced motion)
     if(window.BA_DETAILS_ANIM)box.querySelectorAll('details.pr-pot > summary').forEach(sm=>sm.addEventListener('click',e=>{
@@ -1724,7 +1734,8 @@ async function prDoneSave(k){
   const t=document.getElementById('prDoneText'),msg=document.getElementById('prDoneMsg'),txt=(t&&t.value||'').trim();
   if(!txt){msg.textContent='Комментарий обязателен';t.focus();return;}
   const r=PR_CACHE.rows.find(x=>prKey(x)===k);if(!r)return;
-  const row={day:PR_CACHE.todayKey,pos_key:k,product_id:r.fam?null:r.pid,offer_id:r.offer,comment:txt,user_email:(window.BA_AUTH&&BA_AUTH.email())||null,updated_at:new Date().toISOString()};
+  const W=PR_CACHE.work||{};
+  const row={plan_all:W.all??null,plan_m1:W.m1??null,plan_m2:W.m2??null,day:PR_CACHE.todayKey,pos_key:k,product_id:r.fam?null:r.pid,offer_id:r.offer,comment:txt,user_email:(window.BA_AUTH&&BA_AUTH.email())||null,updated_at:new Date().toISOString()};
   msg.textContent='Сохранение…';
   try{
     const res=await fetch(SUPABASE_URL+'/rest/v1/product_protocol_done?on_conflict=day,pos_key',{method:'POST',headers:{...HD,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(row)});
@@ -1739,6 +1750,40 @@ async function prDoneDel(k){
     if(!res.ok)throw new Error('HTTP '+res.status);
     PR_CACHE.done.delete(k);PR_EDIT=null;renderProto();
   }catch(e){msg.textContent='Ошибка: '+e.message;}
+}
+// «Статистика» (решение владельца 31.10.2026): по дням — план (Всего в работе на момент отметок; сегодня — с экрана) и факт (число отметок
+// «выполнено»), по выбранному менеджеру; 30 дней, с первого дня с данными. Дни без отметок — без точки плана (план не записан)
+async function prStats(){
+  const P=PR_CACHE;if(!P)return;
+  const ov=document.createElement('div');ov.className='pr-modal';ov.innerHTML='<div class="pr-modal-card"><div class="dev-cap">Загрузка…</div></div>';
+  const close=()=>{ov.remove();document.removeEventListener('keydown',esc);},esc=e=>{if(e.key==='Escape')close();};
+  ov.addEventListener('click',e=>{if(e.target===ov)close();});document.addEventListener('keydown',esc);document.body.appendChild(ov);
+  const card=ov.querySelector('.pr-modal-card'),pk=PR_MGR==='all'?'plan_all':'plan_'+PR_MGR;
+  const head=`<div class="pr-modal-head"><b>📊 Статистика отработки</b> <span class="dev-neutral">${ENTITIES[ENT].name} · ${DEV_MANAGERS[PR_MGR]} · последние 30 дней</span><button class="chip-glass" onclick="this.closest('.pr-modal').remove()">✕</button></div>`;
+  if(!P.doneOk){card.innerHTML=head+'<div class="dev-cap dev-warn">Нет таблицы отметок product_protocol_done (SQL).</div>';return;}
+  try{
+    const from=keyOfMonday(addDays(new Date(P.todayKey+'T00:00'),-29));
+    const rows=await fetchPages(`product_protocol_done?day=gte.${from}&day=lte.${P.todayKey}&select=day,pos_key,offer_id,plan_all,plan_m1,plan_m2&order=day,pos_key`);
+    const by=new Map();rows.forEach(x=>{if(PR_MGR!=='all'&&matrixOf(x.offer_id||'')!==PR_MGR)return;const d=by.get(x.day)||{fact:0,plan:null};d.fact++;const v=x[pk];if(v!=null)d.plan=Math.max(d.plan??0,v);by.set(x.day,d);});
+    // план дня по всем отметкам дня (у менеджера — его план), а не только его отметкам
+    rows.forEach(x=>{const v=x[pk];if(v==null)return;const d=by.get(x.day)||{fact:0,plan:null};d.plan=Math.max(d.plan??0,v);by.set(x.day,d);});
+    const today=by.get(P.todayKey)||{fact:0,plan:null};today.plan=(P.work||{})[PR_MGR==='all'?'all':PR_MGR]??today.plan;by.set(P.todayKey,today);
+    const first=[...by.keys()].sort()[0]||P.todayKey,days=[];for(let d=new Date(first+'T00:00');keyOfMonday(d)<=P.todayKey;d=addDays(d,1))days.push(keyOfMonday(d));
+    const pts=days.map(k=>({k,...(by.get(k)||{fact:0,plan:null})}));
+    const W=780,H=300,L=40,R=16,T=16,B=36,mx=Math.max(1,...pts.map(p=>Math.max(p.fact,p.plan||0)))*1.15;
+    const x=i=>L+(pts.length>1?i*(W-L-R)/(pts.length-1):(W-L-R)/2),y=v=>T+(H-T-B)*(1-v/mx),dd=k=>k.slice(8,10)+'.'+k.slice(5,7);
+    let g='';for(let i=0;i<=4;i++){const v=mx/1.15*i/4,yy=y(v);g+=`<line x1="${L}" x2="${W-R}" y1="${yy}" y2="${yy}" stroke="rgba(255,255,255,.12)"/><text x="${L-6}" y="${yy+4}" text-anchor="end" font-size="11" fill="rgba(255,255,255,.6)">${Math.round(v)}</text>`;}
+    const step=Math.ceil(pts.length/15);pts.forEach((p,i)=>{if(i%step===0||i===pts.length-1)g+=`<text x="${x(i)}" y="${H-12}" text-anchor="middle" font-size="11" fill="rgba(255,255,255,.6)">${dd(p.k)}</text>`;});
+    const path=(f)=>{let d='',on=false;pts.forEach((p,i)=>{const v=f(p);if(v==null){on=false;return;}d+=(on?'L':'M')+x(i)+' '+y(v);on=true;});return d;};
+    g+=`<path d="${path(p=>p.plan)}" fill="none" stroke="#fde047" stroke-width="2" stroke-dasharray="6 4"/><path d="${path(p=>p.fact)}" fill="none" stroke="#4ade80" stroke-width="2"/>`;
+    pts.forEach((p,i)=>{const tip=`${dd(p.k)}: план ${p.plan??'— (не записан)'}, факт ${p.fact}${p.plan?` (${Math.round(p.fact/p.plan*100)}%)`:''}`;
+      if(p.plan!=null)g+=`<circle cx="${x(i)}" cy="${y(p.plan)}" r="4" fill="#1C0D2E" stroke="#fde047" stroke-width="2"><title>${tip}</title></circle>`;
+      g+=`<circle cx="${x(i)}" cy="${y(p.fact)}" r="4" fill="#4ade80"><title>${tip}</title></circle>`;});
+    const withP=pts.filter(p=>p.plan&&p.k!==P.todayKey),   // сегодня день не закончен — в сводный % не входит
+    sp=withP.reduce((s,p)=>s+p.plan,0),sf=withP.reduce((s,p)=>s+p.fact,0);
+    card.innerHTML=head+`<svg viewBox="0 0 ${W} ${H}" class="pr-stat-svg">${g}</svg>`
+      +`<div class="dev-cap"><span style="color:#fde047">- - план</span> (всего в работе) · <span style="color:#4ade80">— факт</span> (отмечено выполненным)${withP.length?` · за прошедшие дни с планом: ${sf} из ${sp} (${Math.round(sf/sp*100)}%)`:''}. Дни без отметок — без точки плана: план записывается вместе с отметкой.</div>`;
+  }catch(e){card.innerHTML=head+`<div class="dev-cap dev-neg">Ошибка загрузки: ${escH(e.message)}</div>`;}
 }
 function setProtoMgr(v){PR_MGR=v;try{localStorage.setItem('ba_proto_mgr',v);}catch(e){}renderProto();}
 function setHomeTab(tab){
