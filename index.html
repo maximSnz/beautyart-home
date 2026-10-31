@@ -280,6 +280,7 @@
         .dev-table td.pr-act { text-align: left; white-space: normal; min-width: 240px; }
         .pr-sub { margin: 8px 0 0; background: rgba(28,13,46,.12); }
         .pr-sub > summary { font-size: .92em; }
+        .dev-table tr.pr-total td { font-weight: 700; background: rgba(255,255,255,.14); border-top: 1px solid rgba(255,255,255,.4); }
         .pr-cov { font-family: 'Forum', serif; font-size: .9em; color: #fff; margin: 2px 2px 8px; padding: 6px 8px; border-radius: 8px; background: rgba(255,255,255,.08); }
 
         .hide { display: none !important; }
@@ -1571,7 +1572,7 @@ async function renderProto(){
         :`<tr><td class="dev-art" title="${escH(r.offer)}">${escH(r.offer)}</td>${mgc(r)}${cells(r)}</tr>`;
       return head+(r.fam&&open?(members?members(r):r.members).map(m=>`<tr class="dev-member"><td class="dev-art" title="${escH(m.offer)}">${escH(m.offer)}</td>${mgc(m)}${cells(m)}</tr>`).join(''):'');
     };
-    const tbl=(head,list,row)=>list.length?`<table class="dev-table"><thead><tr><th>Артикул</th>${PR_MGR==='all'?'<th>Менеджер</th>':''}${head}</tr></thead><tbody>${list.map(row).join('')}</tbody></table>`:'<div class="dev-cap">Нет товаров — всё в порядке.</div>';
+    const tbl=(head,list,row,foot)=>list.length?`<table class="dev-table"><thead><tr><th>Артикул</th>${PR_MGR==='all'?'<th>Менеджер</th>':''}${head}</tr></thead><tbody>${list.map(row).join('')}${foot?`<tr class="pr-total"><td>Итого</td>${PR_MGR==='all'?'<td></td>':''}${foot}</tr>`:''}</tbody></table>`:'<div class="dev-cap">Нет товаров — всё в порядке.</div>';
     const blk=(key,icon,title,n,hint,html)=>`<details class="pr-blk" data-k="${key}"${PR_OPEN[key]?' open':''}><summary>${icon} ${title} <span class="pr-cnt${n?'':' z'}">${n}</span></summary><div class="dev-cap">${hint}</div>${html}</details>`;
     const sub=(key,title,n,html)=>`<details class="pr-blk pr-sub" data-k="${key}"${PR_OPEN[key]?' open':''}><summary>${title} <span class="pr-cnt${n?'':' z'}">${n}</span></summary>${html}</details>`;
     const VERD={success:'успешна',partial:'частичный успех',fail:'неудачна'};
@@ -1596,7 +1597,9 @@ async function renderProto(){
     // отклонение: «−55% (154 / 341 / −187)» — факт / база / Δ; цвет по знаку
     const dv=(a,b)=>{const d=a-b,p=b>0?d/b*100:null,c=d<0?'dev-neg':(d>0?'dev-pos':'dev-neutral');return `<span class="${c}">${p==null?'—':sg(p)+'%'}</span> <span class="dev-neutral">(${fmt0(a)} / ${fmt0(b)} / ${sg(d)})</span>`;};
     const h2=tbl(`<th title="заказы вчера ${dd(P.yKey)} к ${dd(P.pKey)}: факт / база / Δ">Вчера к позавчера, % (шт / шт / Δ)</th><th title="выручка PNL вчера ${dd(P.yKey)} к ${dd(P.pKey)}">Вчера к позавчера, % (₽ / ₽ / Δ)</th><th title="план вчерашнего дня: план месяца ÷ эфф. дни (выходной × 0,7); ₽ — по плановой цене">План дня, шт / ₽</th><th title="заказы за 7 дн к плану 7 дн">7 дн к плану, % (шт / шт / Δ)</th><th title="выручка PNL за 7 дн к плану 7 дн (шт × плановая цена)">7 дн к плану, % (₽ / ₽ / Δ)</th>`,b2,line('d',r=>
-      `<td>${dv(r.yest,r.prev)}</td><td>${dv(r.revY,r.revP)}</td><td>${fmt0(r.planY)} / ${fmt0(r.planRY)}</td><td>${dv(r.q7,r.qPlan7)}</td><td>${dv(r.r7,r.planR7s)}</td>`));
+      `<td>${dv(r.yest,r.prev)}</td><td>${dv(r.revY,r.revP)}</td><td>${fmt0(r.planY)} / ${fmt0(r.planRY)}</td><td>${dv(r.q7,r.qPlan7)}</td><td>${dv(r.r7,r.planR7s)}</td>`),
+      // итог — только вчера к позавчера (у всех позиций списка падение); 7 дн к плану — разного знака, не суммируем
+      (S=>`<td>${dv(S('yest'),S('prev'))}</td><td>${dv(S('revY'),S('revP'))}</td><td>—</td><td>—</td><td>—</td>`)(f=>b2.reduce((s,r)=>s+(r[f]||0),0)));
     // 3. поступления
     const b3=rows.filter(r=>r.restock).sort((a,b)=>((b.rs&&b.rs.d)||0)-((a.rs&&a.rs.d)||0));
     const h3=tbl('<th>Было, шт</th><th>Стало, шт</th><th>Пришло, шт</th><th>% плана мес.</th><th>Причина</th><th>7 дн к плану, шт</th>',b3,line('s',r=>{const s=r.rs;
