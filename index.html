@@ -277,6 +277,7 @@
         .pr-blk > summary { cursor: pointer; font-family: 'Forum', serif; font-size: 1.02em; color: #fff; padding: 4px 2px; list-style-position: inside; }
         .pr-cnt { display: inline-block; min-width: 22px; padding: 0 7px; margin-left: 6px; border-radius: 10px; background: #E33D78; color: #fff; font-size: .85em; text-align: center; }
         .pr-sum2 { margin-left: 18px; }
+        #protoBox .dev-table thead th, #protoBox .dev-table thead th:first-child { text-align: center; vertical-align: middle; }   /* заголовки колонок протокола — по центру */
         .pr-cnt.z { background: rgba(255,255,255,.25); }
         .dev-table td.pr-act { text-align: left; white-space: normal; min-width: 240px; }
         .pr-sub { margin: 8px 0 0; background: rgba(28,13,46,.12); }
@@ -292,7 +293,6 @@
         .dev-table tr.pr-subh td { text-align: left; font-weight: 600; font-size: 1.02em; color: #fff; padding: 6px 10px; background: rgba(20,8,34,.62); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); border-top: 1px solid rgba(255,255,255,.25); border-bottom: 1px solid rgba(255,255,255,.18); }
         .dev-table tr.pr-sep td { padding: 0; height: 0; border-top: 3px solid rgba(255,255,255,.85); }
         .dev-table tr.pr-total td { font-weight: 700; background: rgba(255,255,255,.14); border-top: 1px solid rgba(255,255,255,.4); }
-        .pr-cov { font-family: 'Forum', serif; font-size: .9em; color: #fff; margin: 2px 2px 8px; padding: 6px 8px; border-radius: 8px; background: rgba(255,255,255,.08); }
 
         .hide { display: none !important; }
         /* вход — как в plan.html */
@@ -1610,23 +1610,7 @@ async function renderProto(){
     const tbl=(head,list,row,foot)=>list.length?`<table class="dev-table"><thead><tr><th>Артикул</th>${PR_MGR==='all'?'<th>Менеджер</th>':''}${head}</tr></thead><tbody>${list.map(row).join('')}${foot?`<tr class="pr-total"><td>Итого</td>${PR_MGR==='all'?'<td></td>':''}${foot}</tr>`:''}</tbody></table>`:'<div class="dev-cap">Нет товаров — всё в порядке.</div>';
     const blk=(key,icon,title,n,hint,html,extra)=>`<details class="pr-blk" data-k="${key}"${PR_OPEN[key]?' open':''}><summary>${icon} ${title} <span class="pr-cnt${n?'':' z'}">${n}</span>${extra||''}</summary>${hint?`<div class="dev-cap">${hint}</div>`:''}${html}</details>`;
     const sub=(key,title,n,html)=>`<details class="pr-blk pr-sub" data-k="${key}"${PR_OPEN[key]?' open':''}><summary>${title} <span class="pr-cnt${n?'':' z'}">${n}</span></summary>${html}</details>`;
-    const VERD={success:'успешна',partial:'частичный успех',fail:'неудачна'};
-    // 1. гипотезы: охват по товарам (размеры перчаток — отдельно), в таблице — позиции (перчатки группой)
-    const hLbl={late:'<span class="dev-neg">просрочено</span>',none:'<span class="dev-warn">нет гипотезы</span>',moved:'<span class="dev-warn">перенесено</span>',hyp:'<span class="dev-pos">с гипотезой</span>'};
-    const prods=rows.flatMap(r=>r.fam?r.members:[r]),nP=prods.length,cnt=st=>prods.filter(m=>m.hState===st).length;
-    const n1={hyp:cnt('hyp'),moved:cnt('moved'),late:cnt('late'),none:cnt('none'),today:prods.filter(m=>m.dueToday).length};
-    const pc=n=>nP?` (${fmt0(n/nP*100)}%)`:'';
-    const cov=`<div class="pr-cov"><b>Охват: ${nP} товаров</b> · <span class="dev-pos">с гипотезой ${n1.hyp}${pc(n1.hyp)}</span> · <span class="dev-warn">перенесено без гипотезы ${n1.moved}${pc(n1.moved)}</span> · <span class="dev-neg">просрочено ${n1.late}${pc(n1.late)}</span> · нет ни гипотезы, ни даты ${n1.none}${pc(n1.none)}${n1.today?` · срок сегодня ${n1.today}`:''}</div>`;
-    const hCells=r=>{
-      if(r.fam){const n=r.members.filter(m=>m.hState!=='hyp').length;return `<td>${hLbl[r.hState]}</td><td>${dd(r.due)}</td><td colspan="5" style="text-align:left" class="dev-neutral">без действующей гипотезы ${n} из ${r.members.length} разм.</td>`;}
-      const h=r.hypo,v=h?hypoVerdict(h):null;
-      return `<td>${hLbl[r.hState]}</td><td>${dd(r.due)}</td><td>${h?dd(h.deadline):'—'}</td><td>${r.wd?dd(r.wd):'—'}</td><td>${h?(h.metric==='margin'?'маржин.':'заказы'):'—'}</td><td>${h?(v?VERD[v]:(h.fact_ctx==null?'ожидает фиксации':'—')):'—'}</td><td class="pr-act">${h?escH(h.action||''):''}</td>`;};
-    const H1='<th>Статус</th><th>Срок</th><th>Контроль посл. гипотезы</th><th>Дата работы</th><th>Метрика</th><th>Итог</th><th style="text-align:left">Действие посл. гипотезы</th>';
-    const srt=(a,b)=>PR_HRANK[a.hState]-PR_HRANK[b.hState]||String(a.due||'').localeCompare(String(b.due||''))||a.offer.localeCompare(b.offer);
-    const b1=rows.filter(r=>r.hState==='late'||r.hState==='none'||(r.fam&&r.members.some(m=>m.hState==='late'||m.hState==='none'))).sort(srt);
-    const m1=rows.filter(r=>r.fam?r.members.some(m=>m.hState==='moved'):r.hState==='moved').sort(srt);
-    const h1=cov+tbl(H1,b1,line('h',hCells,r=>r.members.filter(m=>m.hState==='late'||m.hState==='none')))
-      +sub('hm','📅 Перенесено без гипотезы — «дата работы» в будущем, действующей гипотезы нет',m1.length,tbl(H1,m1,line('hm',hCells,r=>r.members.filter(m=>m.hState==='moved'))));
+    // 1. блок «Гипотезы» убран 31.10.2026 (решение владельца): 🧪 и часть «Нужна гипотеза» — в «Просадке заказов»
     // 2. просадка
     const b2=rows.filter(r=>r.drop).sort((a,b)=>(a.revY-a.revP)-(b.revY-b.revP));   // сверху — наибольшее падение выручки вчера к позавчера, ₽
     // отклонение: «−55% (154 / 341 / −187)» — факт / база / Δ; цвет по знаку
@@ -1687,10 +1671,9 @@ async function renderProto(){
     const h5=P.limKey?tbl('<th>7 дн к плану, шт</th><th>Цена 7 дн / план</th><th>ДРР 7 дн / план. лимит</th><th>Упущ. маржа 7 дн, ₽</th>',b5,line('x',r=>
       `<td>${ordPlan(r)}</td><td>${r.price7!=null?fmt0(r.price7):'—'} / ${fmt0(r.planPrice)}</td><td>${pct(r.drr7)} / ${r.lim&&r.lim.drr_plan!=null?fmt1(r.lim.drr_plan)+'%':'—'}</td><td class="dev-neg">${r.deepLost!=null?fmt0(r.deepLost):'—'}</td>`))
       :'<div class="dev-cap dev-warn">Нужны лимиты ДРР (таблица product_drr_limits, ночная загрузка).</div>';
-    const uniq=new Set([...b1,...g1,...g2,...gRN,...gHN,...g3,...b2p,...gRP,...gHP,...b2rP,...b5].map(r=>r.pid)).size;
+    const uniq=new Set([...g1,...g2,...gRN,...gHN,...g3,...b2p,...gRP,...gHP,...b2rP,...b5].map(r=>r.pid)).size;
     const mgrSel=`<select class="chip-glass dev-toggle" onchange="setProtoMgr(this.value)">${Object.entries(DEV_MANAGERS).map(([k,v])=>`<option value="${k}"${k===PR_MGR?' selected':''}>${v}</option>`).join('')}</select>`;
     box.innerHTML=`<div class="dev-cap">Менеджер ${mgrSel} <span style="margin-left:10px">Данные за ${dd(P.yKey)} · позиций с планом: ${rows.length} (перчатки — группой) · в протоколе: <b>${uniq}</b>${P.limKey?` · лимиты ДРР на ${dd(P.limKey)}`:''}</span></div>`
-      +blk('h','🧪','Гипотезы',b1.length,`В списке — просрочено и нет гипотезы. С гипотезой — действующая гипотеза (контроль сегодня и позже); перенесено — менеджер передвинул «дату работы» в plan.html, но гипотезу не поставил; просрочено — срок (позднее из контроля последней гипотезы и даты работы) прошёл: подвести итог и поставить следующую гипотезу.${P.hypOk?'':' <span class="dev-neg">Гипотезы не загрузились: '+escH(P.hypErr||'')+'</span>'}`,h1)
       +blk('d','📉','Просадка заказов',b2.length,'',h2,((n,k,h)=>`<span class="pr-sum2"><span class="dev-restock">▲</span> Пополнение <span class="pr-cnt${n?'':' z'}">${n}</span></span><span class="pr-sum2">📣 Высокий ДРР <span class="pr-cnt${k?'':' z'}">${k}</span></span><span class="pr-sum2">🧪 Нужна гипотеза <span class="pr-cnt${h?'':' z'}">${h}</span></span>`)(rows.filter(r=>r.restock).length,rows.filter(redY).length,rows.filter(r=>r.hState!=='hyp').length))   // доп. заголовки — пополнения и высокий ДРР вчера (блоки «Поступления» и «Убыток из-за рекламы» убраны 31.10.2026)
       +blk('x','🔍','Глубокая аналитика',b5.length,`Цена 7 дн в ±${PR_PRICE_TOL}% от плановой, ДРР в плановом коридоре (${fmt0(PR_UNDER*100)}–100% планового лимита), остаток все 7 дн (на ${STOCK_DAYS} дня продаж), а заказы 7 дн ниже плана на ${PR_DEEP_PCT}% и больше. Рычаги менеджера в норме — нужна аналитика (карточка, конкуренты, спрос).`,h5);
     box.querySelectorAll('details.pr-blk').forEach(d=>d.addEventListener('toggle',()=>{PR_OPEN[d.dataset.k]=d.open;}));
