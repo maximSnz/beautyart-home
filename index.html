@@ -280,6 +280,7 @@
         .dev-table td.pr-act { text-align: left; white-space: normal; min-width: 240px; }
         .pr-sub { margin: 8px 0 0; background: rgba(28,13,46,.12); }
         .pr-sub > summary { font-size: .92em; }
+        .pr-grp { font-family: 'Forum', serif; font-size: .95em; color: #fff; margin: 10px 2px 6px; }
         .dev-table tr.pr-total td { font-weight: 700; background: rgba(255,255,255,.14); border-top: 1px solid rgba(255,255,255,.4); }
         .pr-cov { font-family: 'Forum', serif; font-size: .9em; color: #fff; margin: 2px 2px 8px; padding: 6px 8px; border-radius: 8px; background: rgba(255,255,255,.08); }
 
@@ -1596,10 +1597,15 @@ async function renderProto(){
     const b2=rows.filter(r=>r.drop).sort((a,b)=>(a.revY-a.revP)-(b.revY-b.revP));   // сверху — наибольшее падение выручки вчера к позавчера, ₽
     // отклонение: «−55% (154 / 341 / −187)» — факт / база / Δ; цвет по знаку
     const dv=(a,b)=>{const d=a-b,p=b>0?d/b*100:null,c=d<0?'dev-neg':(d>0?'dev-pos':'dev-neutral');return `<span class="${c}">${p==null?'—':sg(p)+'%'}</span> <span class="dev-neutral">(${fmt0(a)} / ${fmt0(b)} / ${sg(d)})</span>`;};
-    const h2=tbl(`<th title="заказы вчера ${dd(P.yKey)} к ${dd(P.pKey)}: факт / база / Δ">Вчера к позавчера, % (шт / шт / Δ)</th><th title="выручка PNL вчера ${dd(P.yKey)} к ${dd(P.pKey)}">Вчера к позавчера, % (₽ / ₽ / Δ)</th><th title="заказы вчера к плану дня: план месяца ÷ эфф. дни (выходной × 0,7)">Вчера к плану, % (шт / шт / Δ)</th><th title="выручка PNL вчера к плану дня (шт плана × плановая цена)">Вчера к плану, % (₽ / ₽ / Δ)</th><th title="заказы за 7 дн к плану 7 дн">7 дн к плану, % (шт / шт / Δ)</th><th title="выручка PNL за 7 дн к плану 7 дн (шт × плановая цена)">7 дн к плану, % (₽ / ₽ / Δ)</th>`,b2,line('d',r=>
+    const H2=`<th title="заказы вчера ${dd(P.yKey)} к ${dd(P.pKey)}: факт / база / Δ">Вчера к позавчера, % (шт / шт / Δ)</th><th title="выручка PNL вчера ${dd(P.yKey)} к ${dd(P.pKey)}">Вчера к позавчера, % (₽ / ₽ / Δ)</th><th title="заказы вчера к плану дня: план месяца ÷ эфф. дни (выходной × 0,7)">Вчера к плану, % (шт / шт / Δ)</th><th title="выручка PNL вчера к плану дня (шт плана × плановая цена)">Вчера к плану, % (₽ / ₽ / Δ)</th><th title="заказы за 7 дн к плану 7 дн">7 дн к плану, % (шт / шт / Δ)</th><th title="выручка PNL за 7 дн к плану 7 дн (шт × плановая цена)">7 дн к плану, % (₽ / ₽ / Δ)</th>`;
+    const t2=list=>tbl(H2,list,line('d',r=>
       `<td>${dv(r.yest,r.prev)}</td><td>${dv(r.revY,r.revP)}</td><td>${dv(r.yest,r.planY)}</td><td>${dv(r.revY,r.planRY)}</td><td>${dv(r.q7,r.qPlan7)}</td><td>${dv(r.r7,r.planR7s)}</td>`),
       // итог — вчера к позавчера и вчера к плану дня (шт и ₽); 7 дн к плану — разного знака, не суммируем
-      (S=>`<td>${dv(S('yest'),S('prev'))}</td><td>${dv(S('revY'),S('revP'))}</td><td>${dv(S('yest'),S('planY'))}</td><td>${dv(S('revY'),S('planRY'))}</td><td>—</td><td>—</td>`)(f=>b2.reduce((s,r)=>s+(r[f]||0),0)));
+      (S=>`<td>${dv(S('yest'),S('prev'))}</td><td>${dv(S('revY'),S('revP'))}</td><td>${dv(S('yest'),S('planY'))}</td><td>${dv(S('revY'),S('planRY'))}</td><td>—</td><td>—</td>`)(f=>list.reduce((s,r)=>s+(r[f]||0),0)));
+    // делим по выручке вчера к плану дня (решение владельца 31.10.2026): ниже плана — потенциал есть, план и выше — потенциал исчерпан
+    const b2n=b2.filter(r=>r.revY<r.planRY),b2p=b2.filter(r=>!(r.revY<r.planRY));
+    const h2=`<div class="pr-grp">▼ Ниже плана вчера, ₽ — потенциал есть <span class="pr-cnt${b2n.length?'':' z'}">${b2n.length}</span></div>${t2(b2n)}`
+      +`<div class="pr-grp">▲ План и выше вчера, ₽ — потенциал исчерпан <span class="pr-cnt z">${b2p.length}</span></div>${t2(b2p)}`;
     // 3. поступления
     const b3=rows.filter(r=>r.restock).sort((a,b)=>((b.rs&&b.rs.d)||0)-((a.rs&&a.rs.d)||0));
     const h3=tbl('<th>Было, шт</th><th>Стало, шт</th><th>Пришло, шт</th><th>% плана мес.</th><th>Причина</th><th>7 дн к плану, шт</th>',b3,line('s',r=>{const s=r.rs;
