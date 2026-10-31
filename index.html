@@ -1603,12 +1603,12 @@ async function renderProto(){
     // отклонение: «−55% (154 / 341 / −187)» — факт / база / Δ; цвет по знаку
     const dv=(a,b)=>{const d=a-b,p=b>0?d/b*100:null,c=d<0?'dev-neg':(d>0?'dev-pos':'dev-neutral');return `<span class="${c}">${p==null?'—':sg(p)+'%'}</span> <span class="dev-neutral">(${fmt0(a)} / ${fmt0(b)} / ${sg(d)})</span>`;};
     const H2=`<th title="заказы вчера ${dd(P.yKey)} к ${dd(P.pKey)}: факт / база / Δ">Вчера к позавчера, % (шт / шт / Δ)</th><th title="выручка PNL вчера ${dd(P.yKey)} к ${dd(P.pKey)}">Вчера к позавчера, % (₽ / ₽ / Δ)</th><th title="заказы вчера к плану дня: план месяца ÷ эфф. дни (выходной × 0,7)">Вчера к плану, % (шт / шт / Δ)</th><th title="выручка PNL вчера к плану дня (шт плана × плановая цена)">Вчера к плану, % (₽ / ₽ / Δ)</th><th title="заказы за 7 дн к плану 7 дн">7 дн к плану, % (шт / шт / Δ)</th><th title="выручка PNL за 7 дн к плану 7 дн (шт × плановая цена)">7 дн к плану, % (₽ / ₽ / Δ)</th>`;
-    // потенциал позиции — недобор выручки вчера к плану дня, ₽; в «Потенциал есть» — накопительный итог
-    const pot=r=>Math.max(0,r.planRY-r.revY);let TOP2=new Set();
-    const t2=(list,cum)=>{let acc=0;return tbl(H2+(cum?'<th title="недобор вчера к плану дня, ₽; в скобках — накопительно сверху вниз">Потенциал, ₽ (накопит.)</th>':''),list,line('d',r=>
-      `<td>${cum&&r.drop?'<span title="просадка заказов вчера к позавчера ≥ 15% и ≥ 5 шт">📉 </span>':''}${dv(r.yest,r.prev)}</td><td>${dv(r.revY,r.revP)}</td><td>${dv(r.yest,r.planY)}</td><td>${dv(r.revY,r.planRY)}</td><td>${dv(r.q7,r.qPlan7)}</td><td>${dv(r.r7,r.planR7s)}</td>${cum?`<td>${fmt0(pot(r))}${TOP2.has(r)?` <span class="dev-neutral">(${fmt0(acc+=pot(r))})</span>`:''}</td>`:''}`),
+    // потенциал позиции — недобор выручки вчера к плану дня, ₽ (= Δ колонки «вчера к плану, ₽»); cum — таблица «Потенциал есть» (значок 📉)
+    const pot=r=>Math.max(0,r.planRY-r.revY);
+    const t2=(list,cum)=>tbl(H2,list,line('d',r=>
+      `<td>${cum&&r.drop?'<span title="просадка заказов вчера к позавчера ≥ 15% и ≥ 5 шт">📉 </span>':''}${dv(r.yest,r.prev)}</td><td>${dv(r.revY,r.revP)}</td><td>${dv(r.yest,r.planY)}</td><td>${dv(r.revY,r.planRY)}</td><td>${dv(r.q7,r.qPlan7)}</td><td>${dv(r.r7,r.planR7s)}</td>`),
       // итог — вчера к позавчера и вчера к плану дня (шт и ₽); 7 дн к плану — разного знака, не суммируем
-      (S=>`<td>${dv(S('yest'),S('prev'))}</td><td>${dv(S('revY'),S('revP'))}</td><td>${dv(S('yest'),S('planY'))}</td><td>${dv(S('revY'),S('planRY'))}</td><td>—</td><td>—</td>${cum?`<td>${fmt0(list.reduce((s,r)=>s+pot(r),0))}</td>`:''}`)(f=>list.reduce((s,r)=>s+(r[f]||0),0)));};
+      (S=>`<td>${dv(S('yest'),S('prev'))}</td><td>${dv(S('revY'),S('revP'))}</td><td>${dv(S('yest'),S('planY'))}</td><td>${dv(S('revY'),S('planRY'))}</td><td>—</td><td>—</td>`)(f=>list.reduce((s,r)=>s+(r[f]||0),0)));
     // решения владельца 31.10.2026: «Потенциал есть» — столько позиций ниже плана вчера (₽), сколько нужно, чтобы сумма их потенциалов
     // (план дня − факт вчера по позиции) закрыла недобор юрлица (менеджера) вчера к плану дня; сверху — наибольший потенциал;
     // 📉 — была просадка заказов (≥ 15% и ≥ 5 шт). «Потенциал исчерпан» — позиции с просадкой, у которых выручка вчера не ниже плана дня
@@ -1616,7 +1616,6 @@ async function renderProto(){
     const dMin=PR_DAY_MIN[ENT]?PR_DAY_MIN[ENT][P.yWe?'we':'wd']:null,gap=dMin?dMin-P.revAllY:rows.reduce((s,r)=>s+r.planRY-r.revY,0);
     const cand=rows.filter(r=>r.revY<r.planRY).sort((a,b)=>pot(b)-pot(a));
     const b2n=[];let got=0;for(const r of cand){if(got>=gap)break;b2n.push(r);got+=pot(r);}
-    TOP2=new Set(b2n);
     const b2p=b2.filter(r=>!(r.revY<r.planRY));
     const h2=`<div class="pr-grp">▼ Потенциал есть <span class="pr-cnt${b2n.length?'':' z'}">${b2n.length}</span> <span class="dev-neutral">— добрать ${fmt0(Math.max(0,gap))} ₽ = ${dMin?`корпоративный минимум ${P.yWe?'выходного':'буднего'} дня ${fmt0(dMin)} − выручка вчера ${fmt0(P.revAllY)} (все товары)`:`план дня ${fmt0(rows.reduce((s,r)=>s+r.planRY,0))} − факт ${fmt0(rows.reduce((s,r)=>s+r.revY,0))}`}; ${got>=gap?`закрывают ${b2n.length} из ${cand.length} позиций ниже плана дня: ${fmt0(got)} ₽`:`все ${cand.length} позиций ниже плана дня дают ${fmt0(got)} ₽ — не хватает ${fmt0(gap-got)} ₽`}${PR_MGR==='all'?'':' (позиции — выбранного менеджера, цель — юрлица)'}</span></div>${gap>0?t2(b2n,true):`<div class="dev-cap">Вчера ${dMin?'минимум':'план дня'} выполнен — добирать нечего.</div>`}`
       +`<div class="pr-grp">▲ Потенциал исчерпан <span class="pr-cnt z">${b2p.length}</span> <span class="dev-neutral">— просадка заказов, но выручка вчера не ниже плана дня</span></div>${t2(b2p,false)}`;
