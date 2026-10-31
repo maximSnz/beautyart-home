@@ -281,6 +281,7 @@
         .pr-sub { margin: 8px 0 0; background: rgba(28,13,46,.12); }
         .pr-sub > summary { font-size: .92em; }
         .pr-grp { font-family: 'Forum', serif; font-size: .95em; color: #fff; margin: 10px 2px 6px; }
+        .dev-table tr.pr-oos td { opacity: .4; }   /* нет в наличии */
         .dev-table tr.pr-sep td { padding: 0; height: 0; border-top: 3px solid rgba(255,255,255,.85); }
         .dev-table tr.pr-total td { font-weight: 700; background: rgba(255,255,255,.14); border-top: 1px solid rgba(255,255,255,.4); }
         .pr-cov { font-family: 'Forum', serif; font-size: .9em; color: #fff; margin: 2px 2px 8px; padding: 6px 8px; border-radius: 8px; background: rgba(255,255,255,.08); }
@@ -1468,6 +1469,10 @@ function prEval(u,C){
     u.drrState=u.drr7>be?'red':(tp!=null&&u.drr7>tp?'yellow':(tp!=null&&u.drr7<tp*PR_UNDER&&u.q7<u.qPlan7?'under':null));
     u.drrRub=u.drrState==='under'?(tp-u.drr7)/100*u.r7:(u.drrState?(u.drr7-(u.drrState==='red'?be:tp))/100*u.r7:0);}
   // 5. глубокая аналитика: цена плановая, реклама в плановом коридоре (70–100% лимита), остаток все 7 дн, а заказы ниже плана ≥ 15%
+  // наличие — как «день с остатком» (Поиск отклонений): последний снимок stock_history (Σ по складам) ≥ план месяца ÷ дней месяца × STOCK_DAYS
+  // (4 дня продаж по плану, без 0,95); нет — строка обесцвечена
+  u.stockNow=C.lastI>=0?(u.stock[C.lastI]||0):null;u.stockNeed=C.lastI>=0?(u.need[C.lastI]||0):null;
+  u.oos=u.stockNow!=null&&!(u.stockNow>0&&u.stockNow>=u.stockNeed);
   const stockOk=u.stock.every((st,i)=>!C.hasSnap[i]||(st>0&&st>=u.need[i]));
   u.priceOk=u.price7!=null&&u.planPrice>0&&Math.abs(u.price7/u.planPrice-1)*100<=PR_PRICE_TOL;
   u.adsOk=!!(u.lim&&u.lim.drr_plan!=null&&u.drr7<=u.lim.drr_plan&&u.drr7>=u.lim.drr_plan*PR_UNDER);
@@ -1514,7 +1519,7 @@ async function loadProto(){
   stockDays.forEach((rows,i)=>rows.forEach(x=>{let a=stock.get(x.offer_id);if(!a){a=new Array(7).fill(0);stock.set(x.offer_id,a);}a[i]+=Number(x.stock||0);}));
   // предыдущий день того же типа, что вчера: будний — ближайший будний (пн → пт), выходной — ближайший выходной (вс → сб, сб → вс)
   const yWe=isWeekendD(yD);let pD=addDays(yD,-1);while(isWeekendD(pD)!==yWe)pD=addDays(pD,-1);const pKey=keyOfMonday(pD);
-  const C={i7:cur7.map(k=>DI.get(k)),iy:DI.get(yKey),ip:DI.get(pKey),hasSnap};
+  const C={i7:cur7.map(k=>DI.get(k)),iy:DI.get(yKey),ip:DI.get(pKey),hasSnap,lastI:hasSnap.lastIndexOf(true)};
   const planDay=(pid,k)=>{const pl=PLAN[k.slice(0,7)+'|'+pid];if(!pl||!(Number(pl.plan_qty)>0))return 0;const [y,m,d]=k.split('-').map(Number);const e=effDaysOfMonth(y,m);return e>0?Number(pl.plan_qty)/e*(isWeekendD(new Date(y,m-1,d))?0.7:1):0;};
   const zeros=n=>new Array(n).fill(0);
   const units=[];
@@ -1575,12 +1580,13 @@ async function renderProto(){
     // строка позиции; у группы перчаток — ▸ и размеры по щелчку (members: какие размеры показать)
     const line=(blk,cells,members)=>r=>{
       const key=blk+'|'+r.offer,open=PR_FAM_OPEN.has(key),mgc=x=>PR_MGR==='all'?`<td class="dev-neutral">${DEV_MANAGERS[x.mgr]}</td>`:'';
-      const head=r.fam?`<tr class="dev-row dev-fam" onclick="toggleProtoFam('${blk}','${escH(r.offer)}')"><td class="dev-art" title="${escH(r.offer)} — группа: ${r.members.length} разм.">${open?'▾':'▸'} ${escH(r.offer)} <span class="dev-neutral">(${r.members.length})</span></td>${mgc(r)}${cells(r)}</tr>`
-        :`<tr><td class="dev-art" title="${escH(r.offer)}">${escH(r.offer)}</td>${mgc(r)}${cells(r)}</tr>`;
-      return head+(r.fam&&open?(members?members(r):r.members).map(m=>`<tr class="dev-member"><td class="dev-art" title="${escH(m.offer)}">${escH(m.offer)}</td>${mgc(m)}${cells(m)}</tr>`).join(''):'');
+      const oos=x=>x.oos?' pr-oos':'',oT=x=>x.oos?` title="нет в наличии: остаток ${fmt0(x.stockNow)} шт меньше ${STOCK_DAYS} дней продаж по плану (${fmt0(x.stockNeed)} шт)"`:'';
+      const head=r.fam?`<tr class="dev-row dev-fam${oos(r)}"${oT(r)} onclick="toggleProtoFam('${blk}','${escH(r.offer)}')"><td class="dev-art" title="${escH(r.offer)} — группа: ${r.members.length} разм.">${open?'▾':'▸'} ${escH(r.offer)} <span class="dev-neutral">(${r.members.length})</span></td>${mgc(r)}${cells(r)}</tr>`
+        :`<tr class="${oos(r).trim()}"${oT(r)}><td class="dev-art" title="${escH(r.offer)}">${escH(r.offer)}</td>${mgc(r)}${cells(r)}</tr>`;
+      return head+(r.fam&&open?(members?members(r):r.members).map(m=>`<tr class="dev-member${oos(m)}"${oT(m)}><td class="dev-art" title="${escH(m.offer)}">${escH(m.offer)}</td>${mgc(m)}${cells(m)}</tr>`).join(''):'');
     };
     const tbl=(head,list,row,foot)=>list.length?`<table class="dev-table"><thead><tr><th>Артикул</th>${PR_MGR==='all'?'<th>Менеджер</th>':''}${head}</tr></thead><tbody>${list.map(row).join('')}${foot?`<tr class="pr-total"><td>Итого</td>${PR_MGR==='all'?'<td></td>':''}${foot}</tr>`:''}</tbody></table>`:'<div class="dev-cap">Нет товаров — всё в порядке.</div>';
-    const blk=(key,icon,title,n,hint,html)=>`<details class="pr-blk" data-k="${key}"${PR_OPEN[key]?' open':''}><summary>${icon} ${title} <span class="pr-cnt${n?'':' z'}">${n}</span></summary><div class="dev-cap">${hint}</div>${html}</details>`;
+    const blk=(key,icon,title,n,hint,html)=>`<details class="pr-blk" data-k="${key}"${PR_OPEN[key]?' open':''}><summary>${icon} ${title} <span class="pr-cnt${n?'':' z'}">${n}</span></summary>${hint?`<div class="dev-cap">${hint}</div>`:''}${html}</details>`;
     const sub=(key,title,n,html)=>`<details class="pr-blk pr-sub" data-k="${key}"${PR_OPEN[key]?' open':''}><summary>${title} <span class="pr-cnt${n?'':' z'}">${n}</span></summary>${html}</details>`;
     const VERD={success:'успешна',partial:'частичный успех',fail:'неудачна'};
     // 1. гипотезы: охват по товарам (размеры перчаток — отдельно), в таблице — позиции (перчатки группой)
@@ -1628,8 +1634,9 @@ async function renderProto(){
     const sel=[];let got=0;for(const r of cand){if(got>=gap)break;sel.push(r);got+=pot(r);}
     const b2n=sel.filter(r=>PR_MGR==='all'||r.mgr===PR_MGR);
     const b2p=b2.filter(r=>!(r.revY<r.planRY));
+    const nDropN=b2.filter(r=>r.revY<r.planRY).length;   // чипы — товары с просадкой 📉 (блок про просадку; решение владельца 31.10.2026)
     const inTop=new Set(sel),b2b=b2.filter(r=>r.revY<r.planRY&&!inTop.has(r)).sort((a,b)=>pot(b)-pot(a));   // под чертой — тоже по потенциалу
-    const h2=`<div class="pr-grp">▼ Потенциал есть <span class="pr-cnt${b2n.length?'':' z'}">${b2n.length}</span> <span class="dev-neutral">— добрать ${fmt0(Math.max(0,gap))} ₽ = ${dMin?`корпоративный минимум ${P.yWe?'выходного':'буднего'} дня ${fmt0(dMin)} − выручка вчера ${fmt0(P.revAllY)} (все товары)`:`план дня ${fmt0(P.rows.reduce((s,r)=>s+r.planRY,0))} − факт ${fmt0(P.rows.reduce((s,r)=>s+r.revY,0))}`}; ${got>=gap?`закрывают ${sel.length} из ${cand.length} позиций ниже плана дня: ${fmt0(got)} ₽`:`все ${cand.length} позиций ниже плана дня дают ${fmt0(got)} ₽ — не хватает ${fmt0(gap-got)} ₽`}${PR_MGR==='all'?'':`; у менеджера из них ${b2n.length}: ${fmt0(b2n.reduce((s,r)=>s+pot(r),0))} ₽`}</span></div>${gap>0?'':`<div class="dev-cap">Вчера ${dMin?'минимум':'план дня'} выполнен — добирать нечего.</div>`}${t2(gap>0?b2n:[],true,b2b)}`
+    const h2=`<div class="pr-grp">▼ Потенциал есть <span class="pr-cnt${nDropN?'':' z'}" title="товаров с просадкой 📉 в таблице">${nDropN}</span></div>${gap>0?'':`<div class="dev-cap">Вчера ${dMin?'минимум':'план дня'} выполнен — добирать нечего.</div>`}${t2(gap>0?b2n:[],true,b2b)}`
       +`<div class="pr-grp">▲ Потенциал исчерпан <span class="pr-cnt z">${b2p.length}</span> <span class="dev-neutral">— просадка заказов, но выручка вчера не ниже плана дня</span></div>${t2(b2p,false)}`;
     // 3. поступления
     const b3=rows.filter(r=>r.restock).sort((a,b)=>((b.rs&&b.rs.d)||0)-((a.rs&&a.rs.d)||0));
@@ -1653,7 +1660,7 @@ async function renderProto(){
     const mgrSel=`<select class="chip-glass dev-toggle" onchange="setProtoMgr(this.value)">${Object.entries(DEV_MANAGERS).map(([k,v])=>`<option value="${k}"${k===PR_MGR?' selected':''}>${v}</option>`).join('')}</select>`;
     box.innerHTML=`<div class="dev-cap">Менеджер ${mgrSel} <span style="margin-left:10px">Данные за ${dd(P.yKey)} · позиций с планом: ${rows.length} (перчатки — группой) · в протоколе: <b>${uniq}</b>${P.limKey?` · лимиты ДРР на ${dd(P.limKey)}`:''}</span></div>`
       +blk('h','🧪','Гипотезы',b1.length,`В списке — просрочено и нет гипотезы. С гипотезой — действующая гипотеза (контроль сегодня и позже); перенесено — менеджер передвинул «дату работы» в plan.html, но гипотезу не поставил; просрочено — срок (позднее из контроля последней гипотезы и даты работы) прошёл: подвести итог и поставить следующую гипотезу.${P.hypOk?'':' <span class="dev-neg">Гипотезы не загрузились: '+escH(P.hypErr||'')+'</span>'}`,h1)
-      +blk('d','📉','Просадка заказов',b2n.length+b2b.length+b2p.length,`«Потенциал есть» — где добрать недобор вчера к плану дня: позиции ниже плана дня (выручка PNL), с наибольшим потенциалом (план дня − факт вчера, ₽), столько, чтобы их сумма закрыла разницу «корпоративный минимум в день − выручка вчера» (нет минимума — недобор к плану дня); 📉 — у позиции просадка заказов. «Потенциал исчерпан» — просадка заказов (вчера к ${dd(P.pKey)}, тот же тип дня: будний к буднему, пн — к пт; падение ≥ ${PR_DROP_PCT}% и ≥ ${PR_DROP_QTY} шт), но выручка вчера не ниже плана дня. Сортировка: «Потенциал есть» — по потенциалу, «Потенциал исчерпан» — по падению выручки вчера к позавчера, ₽.`,h2)
+      +blk('d','📉','Просадка заказов',b2.length,'',h2)
       +blk('s','📦','Поступления',b3.length,`▲ — остаток вырос больше чем на 10% плана месяца (последний снимок к снимку не позже чем за 2 дня) или товар снова в наличии после нуля за 7 дн. Проверить стратегию: цена и реклама под новый остаток.${P.restockOk?'':' <span class="dev-neg">Снимки остатков не загрузились.</span>'}`,h3)
       +blk('a','📣','Убыток из-за рекламы',r4.length,`ДРР 7 дн выше безубыточного лимита: при текущей цене (средняя за 7 дн) реклама уводит маржинальность ниже 5% — убыток по чистой прибыли. Лимиты — модель «Руки на пульсе» (ночной расчёт). ДРР 7 дн = реклама ÷ выручка PNL заказов. Ниже — свёрнуто: выше планового ${y4.length} · недофинансирование ${u4.length}.`,h4)
       +blk('x','🔍','Глубокая аналитика',b5.length,`Цена 7 дн в ±${PR_PRICE_TOL}% от плановой, ДРР в плановом коридоре (${fmt0(PR_UNDER*100)}–100% планового лимита), остаток все 7 дн (на ${STOCK_DAYS} дня продаж), а заказы 7 дн ниже плана на ${PR_DEEP_PCT}% и больше. Рычаги менеджера в норме — нужна аналитика (карточка, конкуренты, спрос).`,h5);
