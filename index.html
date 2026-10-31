@@ -1642,7 +1642,7 @@ async function renderProto(){
     // потенциал позиции — недобор выручки вчера к плану дня, ₽ (= Δ колонки «вчера к плану, ₽»); cum — таблица «Потенциал есть»; 📉 — во всех таблицах блока
     const pot=r=>Math.max(0,r.planRY-r.revY),byPot=(a,b)=>(b.planRY-b.revY)-(a.planRY-a.revY);   // все списки блока — по потенциалу (план дня − факт), по убыванию
     const row2=cum=>line('d',r=>
-      `<td>${dv(r.yest,r.prev)}</td><td>${r.drop?'<span title="просадка заказов вчера к позавчера ≥ 15% и ≥ 5 шт">📉 </span>':''}${dv(r.revY,r.revP)}</td><td>${dv(r.yest,r.planY)}</td><td>${dv(r.revY,r.planRY)}</td><td class="pr-drr-c">${r.limY&&r.drrY!=null&&r.drrY>r.limY.be?'<span title="ДРР вчера выше безубыточного лимита — реклама в убыток">📣 </span>':''}${drrBar(r)}</td>`);
+      `<td>${dv(r.yest,r.prev)}</td><td>${r.drop?'<span title="просадка заказов вчера к позавчера ≥ 15% и ≥ 5 шт">📉 </span>':''}${dv(r.revY,r.revP)}</td><td>${dv(r.yest,r.planY)}</td><td>${r.hState!=='hyp'?`<span title="нужна гипотеза: ${{late:'срок прошёл',none:'нет ни гипотезы, ни даты',moved:'дата работы перенесена без гипотезы'}[r.hState]||'есть размеры без гипотезы'}">🧪 </span>`:''}${dv(r.revY,r.planRY)}</td><td class="pr-drr-c">${r.limY&&r.drrY!=null&&r.drrY>r.limY.be?'<span title="ДРР вчера выше безубыточного лимита — реклама в убыток">📣 </span>':''}${drrBar(r)}</td>`);
     // итог — вчера к позавчера и вчера к плану дня (шт и ₽); 7 дн к плану — разного знака, не суммируем
     const foot2=list=>(S=>`<td>${dv(S('yest'),S('prev'))}</td><td>${dv(S('revY'),S('revP'))}</td><td>${dv(S('yest'),S('planY'))}</td><td>${dv(S('revY'),S('planRY'))}</td><td></td>`)(f=>list.reduce((s,r)=>s+(r[f]||0),0));
     // таблица из частей [подзаголовок, список]: у каждой непустой части — подзаголовок на тёмном стекле (решение владельца 31.10.2026,
@@ -1673,18 +1673,21 @@ async function renderProto(){
     const shown=new Set([...g1,...g2,...b2]),rX=rows.filter(r=>redY(r)&&!shown.has(r));
     const gRN=rX.filter(below).sort((a,b)=>pot(b)-pot(a)),gRP=rX.filter(r=>!below(r)).sort(byPot);
     rX.forEach(r=>shown.add(r));
+    // нужна гипотеза (нет действующей: просрочено, нет, перенесено), которых нет в частях выше — перед поступлениями (решение владельца 31.10.2026)
+    const hX=rows.filter(r=>r.hState!=='hyp'&&!shown.has(r)),gHN=hX.filter(below).sort((a,b)=>pot(b)-pot(a)),gHP=hX.filter(r=>!below(r)).sort(byPot);
+    hX.forEach(r=>shown.add(r));
     const b2r=rows.filter(r=>r.restock&&!shown.has(r));
     const g3=b2r.filter(below).sort((a,b)=>pot(b)-pot(a)),b2rP=b2r.filter(r=>!below(r)).sort(byPot);
     const b2p=b2.filter(r=>!below(r)).sort(byPot);
-    const h2=`<div class="pr-grp">▼ Потенциал есть</div>${gap>0?'':`<div class="dev-cap">Вчера ${dMin?'минимум':'план дня'} выполнен — добирать нечего.</div>`}${t2([['📉 Просадка заказов',g1],['🎯 Потенциал заказов до условной нормы',gap>0?g2:[]],['📣 Проблемы с ДРР',gRN],['▲ Поступления',g3]],true)}`
-      +`<div class="pr-grp">▲ Потенциал исчерпан</div>${t2([['📉 Просадка заказов',b2p],['📣 Проблемы с ДРР',gRP],['▲ Поступления',b2rP]],false)}`;
+    const h2=`<div class="pr-grp">▼ Потенциал есть</div>${gap>0?'':`<div class="dev-cap">Вчера ${dMin?'минимум':'план дня'} выполнен — добирать нечего.</div>`}${t2([['📉 Просадка заказов',g1],['🎯 Потенциал заказов до условной нормы',gap>0?g2:[]],['📣 Проблемы с ДРР',gRN],['🧪 Нужна гипотеза',gHN],['▲ Поступления',g3]],true)}`
+      +`<div class="pr-grp">▲ Потенциал исчерпан</div>${t2([['📉 Просадка заказов',b2p],['📣 Проблемы с ДРР',gRP],['🧪 Нужна гипотеза',gHP],['▲ Поступления',b2rP]],false)}`;
     // 4. блок «Убыток из-за рекламы» убран 31.10.2026 (решение владельца): красный ДРР вчера — часть «Просадки заказов»
     // 5. глубокая аналитика
     const b5=rows.filter(r=>r.deep).sort((a,b)=>(b.deepLost||0)-(a.deepLost||0));
     const h5=P.limKey?tbl('<th>7 дн к плану, шт</th><th>Цена 7 дн / план</th><th>ДРР 7 дн / план. лимит</th><th>Упущ. маржа 7 дн, ₽</th>',b5,line('x',r=>
       `<td>${ordPlan(r)}</td><td>${r.price7!=null?fmt0(r.price7):'—'} / ${fmt0(r.planPrice)}</td><td>${pct(r.drr7)} / ${r.lim&&r.lim.drr_plan!=null?fmt1(r.lim.drr_plan)+'%':'—'}</td><td class="dev-neg">${r.deepLost!=null?fmt0(r.deepLost):'—'}</td>`))
       :'<div class="dev-cap dev-warn">Нужны лимиты ДРР (таблица product_drr_limits, ночная загрузка).</div>';
-    const uniq=new Set([...b1,...g1,...g2,...gRN,...g3,...b2p,...gRP,...b2rP,...b5].map(r=>r.pid)).size;
+    const uniq=new Set([...b1,...g1,...g2,...gRN,...gHN,...g3,...b2p,...gRP,...gHP,...b2rP,...b5].map(r=>r.pid)).size;
     const mgrSel=`<select class="chip-glass dev-toggle" onchange="setProtoMgr(this.value)">${Object.entries(DEV_MANAGERS).map(([k,v])=>`<option value="${k}"${k===PR_MGR?' selected':''}>${v}</option>`).join('')}</select>`;
     box.innerHTML=`<div class="dev-cap">Менеджер ${mgrSel} <span style="margin-left:10px">Данные за ${dd(P.yKey)} · позиций с планом: ${rows.length} (перчатки — группой) · в протоколе: <b>${uniq}</b>${P.limKey?` · лимиты ДРР на ${dd(P.limKey)}`:''}</span></div>`
       +blk('h','🧪','Гипотезы',b1.length,`В списке — просрочено и нет гипотезы. С гипотезой — действующая гипотеза (контроль сегодня и позже); перенесено — менеджер передвинул «дату работы» в plan.html, но гипотезу не поставил; просрочено — срок (позднее из контроля последней гипотезы и даты работы) прошёл: подвести итог и поставить следующую гипотезу.${P.hypOk?'':' <span class="dev-neg">Гипотезы не загрузились: '+escH(P.hypErr||'')+'</span>'}`,h1)
