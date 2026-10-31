@@ -1622,12 +1622,14 @@ async function renderProto(){
     // (план дня − факт вчера по позиции) закрыла недобор юрлица (менеджера) вчера к плану дня; сверху — наибольший потенциал;
     // 📉 — была просадка заказов (≥ 15% и ≥ 5 шт). «Потенциал исчерпан» — позиции с просадкой, у которых выручка вчера не ниже плана дня
     // цель: корпоративный минимум − выручка юрлица вчера (все товары); нет минимума — план дня − факт по позициям с планом
-    const dMin=PR_DAY_MIN[ENT]?PR_DAY_MIN[ENT][P.yWe?'we':'wd']:null,gap=dMin?dMin-P.revAllY:rows.reduce((s,r)=>s+r.planRY-r.revY,0);
-    const cand=rows.filter(r=>r.revY<r.planRY).sort((a,b)=>pot(b)-pot(a));
-    const b2n=[];let got=0;for(const r of cand){if(got>=gap)break;b2n.push(r);got+=pot(r);}
+    // отбор — по всему юрлицу (решение владельца 31.10.2026); фильтр менеджера только скрывает чужие позиции (Илья + Ольга = «Все»)
+    const dMin=PR_DAY_MIN[ENT]?PR_DAY_MIN[ENT][P.yWe?'we':'wd']:null,gap=dMin?dMin-P.revAllY:P.rows.reduce((s,r)=>s+r.planRY-r.revY,0);
+    const cand=P.rows.filter(r=>r.revY<r.planRY).sort((a,b)=>pot(b)-pot(a));
+    const sel=[];let got=0;for(const r of cand){if(got>=gap)break;sel.push(r);got+=pot(r);}
+    const b2n=sel.filter(r=>PR_MGR==='all'||r.mgr===PR_MGR);
     const b2p=b2.filter(r=>!(r.revY<r.planRY));
-    const inTop=new Set(b2n),b2b=b2.filter(r=>r.revY<r.planRY&&!inTop.has(r)).sort((a,b)=>pot(b)-pot(a));   // под чертой — тоже по потенциалу
-    const h2=`<div class="pr-grp">▼ Потенциал есть <span class="pr-cnt${b2n.length?'':' z'}">${b2n.length}</span> <span class="dev-neutral">— добрать ${fmt0(Math.max(0,gap))} ₽ = ${dMin?`корпоративный минимум ${P.yWe?'выходного':'буднего'} дня ${fmt0(dMin)} − выручка вчера ${fmt0(P.revAllY)} (все товары)`:`план дня ${fmt0(rows.reduce((s,r)=>s+r.planRY,0))} − факт ${fmt0(rows.reduce((s,r)=>s+r.revY,0))}`}; ${got>=gap?`закрывают ${b2n.length} из ${cand.length} позиций ниже плана дня: ${fmt0(got)} ₽`:`все ${cand.length} позиций ниже плана дня дают ${fmt0(got)} ₽ — не хватает ${fmt0(gap-got)} ₽`}${PR_MGR==='all'?'':' (позиции — выбранного менеджера, цель — юрлица)'}</span></div>${gap>0?'':`<div class="dev-cap">Вчера ${dMin?'минимум':'план дня'} выполнен — добирать нечего.</div>`}${t2(gap>0?b2n:[],true,b2b)}`
+    const inTop=new Set(sel),b2b=b2.filter(r=>r.revY<r.planRY&&!inTop.has(r)).sort((a,b)=>pot(b)-pot(a));   // под чертой — тоже по потенциалу
+    const h2=`<div class="pr-grp">▼ Потенциал есть <span class="pr-cnt${b2n.length?'':' z'}">${b2n.length}</span> <span class="dev-neutral">— добрать ${fmt0(Math.max(0,gap))} ₽ = ${dMin?`корпоративный минимум ${P.yWe?'выходного':'буднего'} дня ${fmt0(dMin)} − выручка вчера ${fmt0(P.revAllY)} (все товары)`:`план дня ${fmt0(P.rows.reduce((s,r)=>s+r.planRY,0))} − факт ${fmt0(P.rows.reduce((s,r)=>s+r.revY,0))}`}; ${got>=gap?`закрывают ${sel.length} из ${cand.length} позиций ниже плана дня: ${fmt0(got)} ₽`:`все ${cand.length} позиций ниже плана дня дают ${fmt0(got)} ₽ — не хватает ${fmt0(gap-got)} ₽`}${PR_MGR==='all'?'':`; у менеджера из них ${b2n.length}: ${fmt0(b2n.reduce((s,r)=>s+pot(r),0))} ₽`}</span></div>${gap>0?'':`<div class="dev-cap">Вчера ${dMin?'минимум':'план дня'} выполнен — добирать нечего.</div>`}${t2(gap>0?b2n:[],true,b2b)}`
       +`<div class="pr-grp">▲ Потенциал исчерпан <span class="pr-cnt z">${b2p.length}</span> <span class="dev-neutral">— просадка заказов, но выручка вчера не ниже плана дня</span></div>${t2(b2p,false)}`;
     // 3. поступления
     const b3=rows.filter(r=>r.restock).sort((a,b)=>((b.rs&&b.rs.d)||0)-((a.rs&&a.rs.d)||0));
