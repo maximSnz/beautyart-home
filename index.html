@@ -1448,12 +1448,17 @@ function toggleDevDetails(){
 // лимиты ДРР — ночная загрузка → product_drr_limits (модель «Руки на пульсе»); глубокая аналитика — заказы 7 дн ниже плана ≥ 15%;
 // срок товара — позднее из срока контроля гипотезы и «даты работы» plan.html; ДРР — сначала убыток из-за рекламы; перчатки — группой
 const PR_DROP_PCT=15,PR_DROP_QTY=5;                // просадка: заказы вчера ниже предыдущего дня того же типа на ≥ 15% и ≥ 5 шт
-const PR_DEEP_PCT=15,PR_PRICE_TOL=2;                // глубокая аналитика: заказы 7 дн ниже плана ≥ 15%, цена 7 дн в ±2% от плановой
+// глубокая аналитика (решения владельца 31.10.2026): окно 3 дня — заказы ниже плана ≥ 15%, цена в ±10% от плановой, остаток все дни,
+// ДРР окна в коридоре 70–130% планового лимита и не выше безубыточного (до 31.10: 7 дн, цена ±2%, ДРР 70–100%)
+const PR_DEEP_PCT=15,PR_PRICE_TOL=10,PR_DEEP_DAYS=3,PR_DEEP_LO=0.7,PR_DEEP_HI=1.3;
 // корпоративный минимум выручки в день, ₽ (решения владельца 31.10.2026): будни — ИП 3 100 000, ООО 100 000; выходные — ИП 2 500 000,
 // ООО 70 000 (по типу вчерашнего дня). Нет минимума — цель = план дня − факт вчера
 const PR_DAY_MIN={ip:{wd:3100000,we:2500000},ooo:{wd:100000,we:70000}};
 const PR_UNDER=0.7;
-const NET_FLOOR_PR=5;   // порог чистой прибыли, % (NET_FLOOR plan.html, MARGIN_FLOOR главной)                                 // недофинансирование: ДРР 7 дн ниже 70% планового лимита (запас рекламы); 70–100% — «в плановой рекламе»
+const NET_FLOOR_PR=5;   // порог чистой прибыли, % (NET_FLOOR plan.html, MARGIN_FLOOR главной)
+// лимиты ДРР при цене P — копия unitPct из plan.html при ДРР 0: pre(P) = (r0 − комиссия(P)) − t − u ÷ (P × b);
+// плановый = max(0, (pre − план) × b), безубыточный = max(0, (pre − 5) × b)
+function prLim(c,P){if(!c||!(P>0)||!(c.b>0))return null;const pre=((c.r0-(P<=300?c.lo:c.hi))-c.t-c.u/(P*c.b))*100;return {price:P,pre,be:Math.max(0,(pre-NET_FLOOR_PR)*c.b),plan:c.plan==null?null:Math.max(0,(pre-c.plan)*c.b)};}                                 // недофинансирование: ДРР 7 дн ниже 70% планового лимита (запас рекламы); 70–100% — «в плановой рекламе»
 let PR_MGR=(()=>{try{return localStorage.getItem('ba_proto_mgr')||'all';}catch(e){return 'all';}})(),PR_CACHE=null;
 const PR_OPEN={},PR_FAM_OPEN=new Set();  // раскрытые блоки (по умолчанию все свёрнуты) и группы перчаток — на время просмотра
 async function prDays(keys,q){const out=new Array(keys.length);let i=0;await Promise.all([0,1,2,3,4,5].map(async()=>{while(i<keys.length){const k=i++;out[k]=await fetchPages(q(keys[k]));}}));return out;}
@@ -1477,23 +1482,28 @@ function prEval(u,C){
   // до рекламы pre(P) = (r0 − комиссия(P)) − t − u ÷ (P × b); плановый = max(0, (pre − план) × b), безубыточный = max(0, (pre − 5) × b).
   // Цена дня = выручка ÷ шт вчера; нет заказов — средняя за 7 дн, нет и её — плановая
   u.drrY=u.revY>0?u.aY/u.revY*100:(u.aY>0?Infinity:null);
-  if(u.coef){const c=u.coef,P=u.yest>0?u.revY/u.yest:(u.price7||u.planPrice);
-    if(P>0&&c.b>0){const pre=((c.r0-(P<=300?c.lo:c.hi))-c.t-c.u/(P*c.b))*100;u.limY={price:P,pre,be:Math.max(0,(pre-NET_FLOOR_PR)*c.b),plan:c.plan==null?null:Math.max(0,(pre-c.plan)*c.b)};}}
+  if(u.coef)u.limY=prLim(u.coef,u.yest>0?u.revY/u.yest:(u.price7||u.planPrice));
   u.drrState=null;u.drrRub=0;
   if(u.lim){const be=u.lim.drr_be,tp=u.lim.drr_plan;
     u.drrState=u.drr7>be?'red':(tp!=null&&u.drr7>tp?'yellow':(tp!=null&&u.drr7<tp*PR_UNDER&&u.q7<u.qPlan7?'under':null));
     u.drrRub=u.drrState==='under'?(tp-u.drr7)/100*u.r7:(u.drrState?(u.drr7-(u.drrState==='red'?be:tp))/100*u.r7:0);}
-  // 5. глубокая аналитика: цена плановая, реклама в плановом коридоре (70–100% лимита), остаток все 7 дн, а заказы ниже плана ≥ 15%
+  // 5. глубокая аналитика — см. PR_DEEP_*
   // наличие — как «день с остатком» (Поиск отклонений): последний снимок stock_history (Σ по складам) ≥ план месяца ÷ дней месяца × STOCK_DAYS
   // (4 дня продаж по плану, без 0,95); нет — строка обесцвечена
   u.stockNow=C.lastI>=0?(u.stock[C.lastI]||0):null;u.stockNeed=C.lastI>=0?(u.need[C.lastI]||0):null;
   u.oos=u.stockNow!=null&&!(u.stockNow>0&&u.stockNow>=u.stockNeed);
   u.perDay=u.stockNeed!=null?u.stockNeed/STOCK_DAYS:null;u.stockDays=u.perDay>0?u.stockNow/u.perDay:null;   // запас в днях по плановому темпу (план ÷ дней месяца)
   const stockOk=u.stock.every((st,i)=>!C.hasSnap[i]||(st>0&&st>=u.need[i]));
-  u.priceOk=u.price7!=null&&u.planPrice>0&&Math.abs(u.price7/u.planPrice-1)*100<=PR_PRICE_TOL;
-  u.adsOk=!!(u.lim&&u.lim.drr_plan!=null&&u.drr7<=u.lim.drr_plan&&u.drr7>=u.lim.drr_plan*PR_UNDER);
-  u.deep=u.priceOk&&u.adsOk&&stockOk&&u.ordDev7!=null&&u.ordDev7<=-PR_DEEP_PCT;
-  u.deepLost=u.deep&&u.mar!=null?(u.qPlan7-u.q7)*u.price7*u.mar/100*0.95:null;
+  // окно PR_DEEP_DAYS последних дней: цена, заказы, остаток и ДРР — за одно окно; лимиты — по средней цене окна (у группы — по размерам)
+  const W3=C.i7.slice(-PR_DEEP_DAYS),n3=PR_DEEP_DAYS,t3=a=>a.slice(-n3).reduce((s,x)=>s+(x||0),0);
+  u.q3=sum(u.ord,W3);u.r3=sum(u.rev,W3);u.a3=t3(u.ad7);u.qPlan3=t3(u.plan7);u.price3=u.q3>0?u.r3/u.q3:null;
+  u.drr3=u.r3>0?u.a3/u.r3*100:(u.a3>0?Infinity:0);u.ordDev3=u.qPlan3>0?(u.q3-u.qPlan3)/u.qPlan3*100:null;
+  if(u.coef)u.lim3=prLim(u.coef,u.price3||u.price7||u.planPrice);
+  const stock3=u.stock.every((st,i)=>i<7-n3||!C.hasSnap[i]||(st>0&&st>=u.need[i]));
+  u.priceOk=u.price3!=null&&u.planPrice>0&&Math.abs(u.price3/u.planPrice-1)*100<=PR_PRICE_TOL;
+  u.adsOk=!!(u.lim3&&u.lim3.plan!=null&&u.drr3>=u.lim3.plan*PR_DEEP_LO&&u.drr3<=u.lim3.plan*PR_DEEP_HI&&u.drr3<=u.lim3.be);
+  u.deep=u.priceOk&&u.adsOk&&stock3&&u.ordDev3!=null&&u.ordDev3<=-PR_DEEP_PCT;
+  u.deepLost=u.deep&&u.mar!=null?(u.qPlan3-u.q3)*u.price3*u.mar/100*0.95:null;
   return u;
 }
 async function loadProto(){
@@ -1527,7 +1537,7 @@ async function loadProto(){
   const DI=new Map(days.map((k,i)=>[k,i]));
   const ord=new Map(),rev=new Map(),arr=(m,o)=>{let a=m.get(o);if(!a){a=new Array(days.length).fill(0);m.set(o,a);}return a;};
   salesDays.forEach((rows,i)=>rows.forEach(x=>{arr(ord,x.offer_id)[i]+=Number(x.qty||0);arr(rev,x.offer_id)[i]+=Number(x.revenue||0);}));
-  const adv=new Map(),advY=new Map();ads.forEach(x=>{const pid=SKU_PID[x.offer_id]||OFFER_PID[x.offer_id];if(!pid)return;adv.set(pid,(adv.get(pid)||0)+Number(x.amount||0));if(x.spend_date===yKey)advY.set(pid,(advY.get(pid)||0)+Number(x.amount||0));});
+  const adv=new Map(),advY=new Map(),advD=new Map();ads.forEach(x=>{const pid=SKU_PID[x.offer_id]||OFFER_PID[x.offer_id];if(!pid)return;{const i=cur7.indexOf(x.spend_date);if(i>=0){let a=advD.get(pid);if(!a){a=new Array(7).fill(0);advD.set(pid,a);}a[i]+=Number(x.amount||0);}}adv.set(pid,(adv.get(pid)||0)+Number(x.amount||0));if(x.spend_date===yKey)advY.set(pid,(advY.get(pid)||0)+Number(x.amount||0));});
   const cf=new Map();spw.forEach(x=>{if(x.fact==null)return;const c=cf.get(x.product_id)||{mar:0,revn:0};c[x.metric]+=Number(x.fact);cf.set(x.product_id,c);});
   const hy=new Map();hyp.rows.forEach(r=>{const k=String(r.product_id),c=hy.get(k);if(!c||r.deadline>c.deadline||(r.deadline===c.deadline&&r.created_at>c.created_at))hy.set(k,r);});
   const WD=new Map();ppm.forEach(x=>{const k=String(x.product_id);if(!WD.has(k)||x.work_date>WD.get(k))WD.set(k,x.work_date);});
@@ -1546,7 +1556,7 @@ async function loadProto(){
     const st=stock.get(o)||zeros(7);
     const u={pid,offer:o,mgr:matrixOf(o),ord:ord.get(o)||zeros(days.length),rev:rev.get(o)||zeros(days.length),a7:adv.get(pid)||0,
       plan7:cur7.map(k=>planDay(pid,k)),planR7:cur7.map(k=>{const pk=PLAN[k.slice(0,7)+'|'+pid];return planDay(pid,k)*(pk?Number(pk.price||0):0);}),planQ:q,planRev:q*pp,planRevPct:pct!=null?q*pp:0,planMarW:pct!=null?q*pp*pct:0,
-      cfMar:c?c.mar:0,cfRevn:c?c.revn:0,lim:L?{drr_plan:L.drr_plan!=null?Number(L.drr_plan):null,drr_be:Number(L.drr_be)}:null,aY:advY.get(pid)||0,
+      cfMar:c?c.mar:0,cfRevn:c?c.revn:0,lim:L?{drr_plan:L.drr_plan!=null?Number(L.drr_plan):null,drr_be:Number(L.drr_be)}:null,aY:advY.get(pid)||0,ad7:advD.get(pid)||zeros(7),
       coef:L&&L.b!=null?{b:+L.b,r0:+L.r0,lo:+L.comm_low,hi:+L.comm_high,t:+L.t,u:+L.u,plan:L.plan_pct!=null?+L.plan_pct:null}:null,stock:st,
       // день с остатком — как на «Поиске отклонений»: хватает на STOCK_DAYS дней по плану месяца этого дня (без 0,95)
       need:cur7.map(k=>{const pk=PLAN[k.slice(0,7)+'|'+pid]||pl;return Number(pk.plan_qty||0)/new Date(+k.slice(0,4),+k.slice(5,7),0).getDate()*STOCK_DAYS;})};
@@ -1566,7 +1576,7 @@ async function loadProto(){
   fam.forEach((ms,k)=>{
     if(ms.length<2){out.push(...ms);return;}
     const sA=f=>ms[0][f].map((_,i)=>ms.reduce((s,m)=>s+(m[f][i]||0),0)),sN=f=>ms.reduce((s,m)=>s+(m[f]||0),0);
-    const g={fam:k,offer:k,pid:'f:'+k,members:ms,mgr:ms[0].mgr,ord:sA('ord'),rev:sA('rev'),plan7:sA('plan7'),planR7:sA('planR7'),stock:sA('stock'),need:sA('need')};
+    const g={fam:k,offer:k,pid:'f:'+k,members:ms,mgr:ms[0].mgr,ord:sA('ord'),rev:sA('rev'),plan7:sA('plan7'),planR7:sA('planR7'),ad7:sA('ad7'),stock:sA('stock'),need:sA('need')};
     ['a7','aY','planQ','planRev','planRevPct','planMarW','cfMar','cfRevn'].forEach(f=>g[f]=sN(f));
     // лимиты вчерашнего дня у группы — по размерам (каждый от своей цены дня), взвешенные выручкой вчера (нет — планом дня)
     {const wm=ms.filter(m=>m.limY),wv=m=>m.revY>0?m.revY:0,WV=wm.reduce((s,m)=>s+wv(m),0),ww=m=>WV>0?wv(m):m.planRY,WW=wm.reduce((s,m)=>s+ww(m),0),wpm=wm.filter(m=>m.limY.plan!=null),WPM=wpm.reduce((s,m)=>s+ww(m),0);
@@ -1575,6 +1585,8 @@ async function loadProto(){
     const wl=ms.filter(m=>m.lim),w=m=>m.r7>0?m.r7:0,W=wl.reduce((s,m)=>s+w(m),0),wt=m=>W>0?w(m):m.planRev,WT=wl.reduce((s,m)=>s+wt(m),0);
     const wp=wl.filter(m=>m.lim.drr_plan!=null),WP=wp.reduce((s,m)=>s+wt(m),0);
     g.lim=wl.length&&WT>0?{drr_be:wl.reduce((s,m)=>s+m.lim.drr_be*wt(m),0)/WT,drr_plan:WP>0?wp.reduce((s,m)=>s+m.lim.drr_plan*wt(m),0)/WP:null}:null;
+    {const wm=ms.filter(m=>m.lim3),wv=m=>m.r3>0?m.r3:0,WV=wm.reduce((s,m)=>s+wv(m),0),ww=m=>WV>0?wv(m):m.planRY,WW=wm.reduce((s,m)=>s+ww(m),0),wpm=wm.filter(m=>m.lim3.plan!=null),WPM=wpm.reduce((s,m)=>s+ww(m),0);
+     g.lim3=wm.length&&WW>0?{be:wm.reduce((s,m)=>s+m.lim3.be*ww(m),0)/WW,plan:WPM>0?wpm.reduce((s,m)=>s+m.lim3.plan*ww(m),0)/WPM:null,price:null}:null;}   // лимиты окна глубокой аналитики — по размерам, вес — выручка окна
     // гипотезы — по размерам: у группы худшее состояние; поступления — если есть у любого размера, остатки — суммы
     g.hState=ms.reduce((a,m)=>PR_HRANK[m.hState]<PR_HRANK[a]?m.hState:a,'hyp');g.dueToday=ms.some(m=>m.dueToday);
     g.due=ms.map(m=>m.due).filter(Boolean).sort()[0]||null;
@@ -1668,14 +1680,14 @@ async function renderProto(){
     // 4. блок «Убыток из-за рекламы» убран 31.10.2026 (решение владельца): красный ДРР вчера — часть «Просадки заказов»
     // 5. глубокая аналитика
     const b5=rows.filter(r=>r.deep).sort((a,b)=>(b.deepLost||0)-(a.deepLost||0));
-    const h5=P.limKey?tbl('<th>7 дн к плану, шт</th><th>Цена 7 дн / план</th><th>ДРР 7 дн / план. лимит</th><th>Упущ. маржа 7 дн, ₽</th>',b5,line('x',r=>
-      `<td>${ordPlan(r)}</td><td>${r.price7!=null?fmt0(r.price7):'—'} / ${fmt0(r.planPrice)}</td><td>${pct(r.drr7)} / ${r.lim&&r.lim.drr_plan!=null?fmt1(r.lim.drr_plan)+'%':'—'}</td><td class="dev-neg">${r.deepLost!=null?fmt0(r.deepLost):'—'}</td>`))
+    const h5=P.limKey?tbl(`<th>${PR_DEEP_DAYS} дн к плану, % (шт / шт / Δ)</th><th>Цена ${PR_DEEP_DAYS} дн / план, ₽</th><th>ДРР ${PR_DEEP_DAYS} дн / план. лимит</th><th>Упущ. маржа ${PR_DEEP_DAYS} дн, ₽</th>`,b5,line('x',r=>
+      `<td>${dv(r.q3,r.qPlan3)}</td><td>${r.price3!=null?fmt0(r.price3):'—'} / ${fmt0(r.planPrice)}</td><td title="коридор ${fmt0(PR_DEEP_LO*100)}–${fmt0(PR_DEEP_HI*100)}% планового лимита и не выше безубыточного${r.lim3?` (${fmt1(r.lim3.be)}%)`:''}">${pct(r.drr3)} / ${r.lim3&&r.lim3.plan!=null?fmt1(r.lim3.plan)+'%':'—'}${r.lim3&&r.lim3.plan>0?` <span class="dev-neutral">(${fmt0(r.drr3/r.lim3.plan*100)}%)</span>`:''}</td><td class="dev-neg">${r.deepLost!=null?fmt0(r.deepLost):'—'}</td>`))
       :'<div class="dev-cap dev-warn">Нужны лимиты ДРР (таблица product_drr_limits, ночная загрузка).</div>';
     const uniq=new Set([...g1,...g2,...gRN,...gHN,...g3,...b2p,...gRP,...gHP,...b2rP,...b5].map(r=>r.pid)).size;
     const mgrSel=`<select class="chip-glass dev-toggle" onchange="setProtoMgr(this.value)">${Object.entries(DEV_MANAGERS).map(([k,v])=>`<option value="${k}"${k===PR_MGR?' selected':''}>${v}</option>`).join('')}</select>`;
     box.innerHTML=`<div class="dev-cap">Менеджер ${mgrSel} <span style="margin-left:10px">Данные за ${dd(P.yKey)} · позиций с планом: ${rows.length} (перчатки — группой) · в протоколе: <b>${uniq}</b>${P.limKey?` · лимиты ДРР на ${dd(P.limKey)}`:''}</span></div>`
       +blk('d','📉','Просадка заказов',b2.length,'',h2,((n,k,h,u)=>`<span class="pr-sum2"><span class="dev-restock">▲</span> Пополнение <span class="pr-cnt${n?'':' z'}">${n}</span></span><span class="pr-sum2">📣 Высокий ДРР <span class="pr-cnt${k?'':' z'}">${k}</span></span><span class="pr-sum2">🧪 Нужна гипотеза <span class="pr-cnt${h?'':' z'}">${h}</span></span><span class="pr-sum2" title="уникальные позиции в таблицах блока (группа перчаток — одна), без товаров не в наличии">Всего в работе <span class="pr-cnt${u?'':' z'}">${u}</span></span>`)(rows.filter(r=>r.restock).length,rows.filter(redY).length,rows.filter(r=>r.hState!=='hyp').length,new Set([...g1,...(gap>0?g2:[]),...gRN,...gHN,...g3,...b2p,...gRP,...gHP,...b2rP].filter(r=>!r.oos)).size))   // доп. заголовки — пополнения и высокий ДРР вчера (блоки «Поступления» и «Убыток из-за рекламы» убраны 31.10.2026)
-      +blk('x','🔍','Глубокая аналитика',b5.length,`Цена 7 дн в ±${PR_PRICE_TOL}% от плановой, ДРР в плановом коридоре (${fmt0(PR_UNDER*100)}–100% планового лимита), остаток все 7 дн (на ${STOCK_DAYS} дня продаж), а заказы 7 дн ниже плана на ${PR_DEEP_PCT}% и больше. Рычаги менеджера в норме — нужна аналитика (карточка, конкуренты, спрос).`,h5);
+      +blk('x','🔍','Глубокая аналитика',b5.length,`За ${PR_DEEP_DAYS} дн: цена в ±${PR_PRICE_TOL}% от плановой, ДРР в коридоре ${fmt0(PR_DEEP_LO*100)}–${fmt0(PR_DEEP_HI*100)}% планового лимита и не выше безубыточного (лимиты — по средней цене окна), остаток все дни (на ${STOCK_DAYS} дня продаж), а заказы ниже плана на ${PR_DEEP_PCT}% и больше. Рычаги менеджера в норме — нужна аналитика (карточка, конкуренты, спрос).`,h5);
     box.querySelectorAll('details.pr-blk').forEach(d=>d.addEventListener('toggle',()=>{PR_OPEN[d.dataset.k]=d.open;}));
   }catch(e){console.error('renderProto:',e);box.innerHTML=`<div class="dev-cap dev-neg">Ошибка загрузки протокола: ${escH(e.message)}</div>`;}
 }
