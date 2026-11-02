@@ -309,7 +309,7 @@
         .pr-cal-d.edge { background: #16a34a; border-color: #4ade80; color: #fff; }
         .pr-cal-btns { display: flex; gap: 8px; margin-top: 6px; }
         .pr-cal-btns .chip-glass { cursor: pointer; }
-        .pr-head { font-family: 'Forum', serif; font-size: 1.02em; color: #fff; padding: 4px 2px 8px; }
+        .pr-head { font-family: 'Forum', serif; font-size: 1.02em; color: #fff; padding: 4px 2px 8px; white-space: nowrap; overflow: hidden; }   /* заголовок — всегда одна строка, масштаб подгоняет prFitHead */
         .pr-cnt.z { background: rgba(255,255,255,.25); }
         .dev-table td.pr-act { text-align: left; white-space: normal; min-width: 240px; }
         .pr-sub { margin: 8px 0 0; background: rgba(28,13,46,.12); }
@@ -1787,12 +1787,19 @@ async function renderProto(){
     box.innerHTML=`<div class="dev-cap">Менеджер ${mgrSel} <span style="margin-left:10px">Просадка: сравнить</span> ${aSel} <span>с</span> ${cmpSel}${P.bNote?` <span class="dev-warn">${P.bNote}</span>`:''} <span style="margin-left:10px">Данные за ${dd(P.yKey)} · позиций с планом: ${rows.length} (перчатки — группой)${P.limKey?` · лимиты ДРР на ${dd(P.limKey)}`:''}</span></div>`
       +head('📉','Просадка заказов',b2.length,h2,((n,k,h,u,x)=>`<span class="pr-sum2"><span class="dev-restock">▲</span> Пополнение <span class="pr-cnt${n?'':' z'}">${n}</span></span><span class="pr-sum2">📣 Высокий ДРР <span class="pr-cnt${k?'':' z'}">${k}</span></span><span class="pr-sum2">🔍 Глубокая аналитика <span class="pr-cnt${x?'':' z'}">${x}</span></span><span class="pr-sum2">🧪 Нужна гипотеза <span class="pr-cnt${h?'':' z'}">${h}</span></span>`)(rows.filter(r=>r.restock).length,rows.filter(redY).length,rows.filter(r=>r.hState!=='hyp').length,new Set([...g1,...(gap>0?g2:[]),...gRN,...gDN,...gHN,...g3,...b2p,...gRP,...gDP,...gHP,...b2rP].filter(r=>!r.oos)).size,rows.filter(r=>r.deep).length),(W=>`<span class="chip-glass pr-total-chip" title="отмечено «выполнено» / позиции в работе (уникальные позиции списка, группа перчаток — одна, без товаров не в наличии)">Отработано позиций <b>${[...W].filter(r=>P.done.has(prKey(r))).length}/${W.size}</b></span><button class="chip-glass pr-total-chip pr-stat-btn" onclick="prStats()" title="план и факт отработки по дням">📊 Статистика</button>`)(new Set([...g1,...(gap>0?g2:[]),...gRN,...gDN,...gHN,...g3,...b2p,...gRP,...gDP,...gHP,...b2rP].filter(r=>!r.oos))))   // доп. заголовки — пополнения и высокий ДРР вчера (блоки «Поступления» и «Убыток из-за рекламы» убраны 31.10.2026)
     box.querySelectorAll('details.pr-blk,details.pr-pot').forEach(d=>d.addEventListener('toggle',()=>{PR_OPEN[d.dataset.k]=d.open;}));
+    prFitHead();
     // плавное раскрытие / сворачивание групп «Потенциал есть / исчерпан» — как меню главной (260 мс, без анимации при reduced motion)
     if(window.BA_DETAILS_ANIM)box.querySelectorAll('details.pr-pot > summary').forEach(sm=>sm.addEventListener('click',e=>{
       const d=sm.parentElement;e.preventDefault();const opening=!d.open||!!(d._anim&&d._closing);d._closing=!opening;window.BA_DETAILS_ANIM(d,opening);}));
   }catch(e){console.error('renderProto:',e);box.innerHTML=`<div class="dev-cap dev-neg">Ошибка загрузки протокола: ${escH(e.message)}</div>`;}
 }
 function toggleProtoFam(blk,k){const key=blk+'|'+k;PR_FAM_OPEN.has(key)?PR_FAM_OPEN.delete(key):PR_FAM_OPEN.add(key);renderProto();}
+// заголовок списка — строго в одну строку (решение владельца 02.11.2026): не помещается — весь заголовок (текст, чипы, отступы)
+// пропорционально уменьшается (zoom) до ширины блока
+function prFitHead(){const h=document.querySelector('#protoBox .pr-head');if(!h||!h.clientWidth)return;h.style.zoom='';
+  if(h.scrollWidth>h.clientWidth)h.style.zoom=Math.floor(h.clientWidth/h.scrollWidth*985)/1000;}   // 1,5% запаса на округление ширин
+if(window.ResizeObserver)new ResizeObserver(e=>{const w=Math.round(e[0].contentRect.width);if(w!==prFitHead.w){prFitHead.w=w;prFitHead();}}).observe(document.getElementById('protoBox'));   // смена ширины окна и разворот ⤢
+window.addEventListener('resize',()=>prFitHead());
 // отметки «выполнено»: ключ позиции — product_id или 'f:<семейство перчаток>'
 const prKey=r=>r.fam?'f:'+r.fam:String(r.pid);
 let PR_EDIT=null;
