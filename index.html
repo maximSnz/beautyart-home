@@ -296,6 +296,19 @@
         .pr-art:hover { color: #fde047; }
         .pr-tog { cursor: pointer; padding: 0 3px; }
         .pr-item-card { width: min(900px, 100%); }
+        .pr-cal-card { width: min(640px, 100%); }
+        .pr-cal-ms { display: flex; gap: 18px; flex-wrap: wrap; }
+        .pr-cal-m { flex: 0 0 270px; }
+        .pr-cal-t { font-family: 'Forum', serif; text-transform: capitalize; margin: 4px 0 6px; }
+        .pr-cal-g { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+        .pr-cal-wd { font-size: .75em; text-align: center; color: rgba(255,255,255,.6); }
+        .pr-cal-wd.we, .pr-cal-d.we { color: #f9a8d4; }
+        .pr-cal-d { height: 30px; border: 1px solid rgba(255,255,255,.15); border-radius: 6px; background: rgba(255,255,255,.06); color: #fff; font-family: inherit; cursor: pointer; text-align: center; line-height: 28px; }
+        .pr-cal-d.off { opacity: .25; cursor: default; }
+        .pr-cal-d.in { background: rgba(74,222,128,.28); }
+        .pr-cal-d.edge { background: #16a34a; border-color: #4ade80; color: #fff; }
+        .pr-cal-btns { display: flex; gap: 8px; margin-top: 6px; }
+        .pr-cal-btns .chip-glass { cursor: pointer; }
         .pr-head { font-family: 'Forum', serif; font-size: 1.02em; color: #fff; padding: 4px 2px 8px; }
         .pr-cnt.z { background: rgba(255,255,255,.25); }
         .dev-table td.pr-act { text-align: left; white-space: normal; min-width: 240px; }
@@ -1486,17 +1499,42 @@ async function prDays(keys,q){const out=new Array(keys.length);let i=0;await Pro
 // («дата работы» в будущем, действующей гипотезы нет) / просрочено (срок прошёл) / нет ни гипотезы, ни даты
 // просадка заказов к дню сравнения ip (индекс в P.days): по умолчанию — предыдущий день того же типа; селектор «Сравнить вчера с»
 // меняет только просадку (решение владельца 02.11.2026). % — округлённый до целого, как на экране (−14,6% = −15% проходит)
-function prDropAt(u,ip,ia){if(ia==null)ia=u.ord.length-1;   // по умолчанию день А — вчера (последний день ряда)
-  u.cur=u.ord[ia]||0;u.revC=u.rev[ia]||0;u.prev=u.ord[ip]||0;u.revP=u.rev[ip]||0;u.dropQ=u.prev-u.cur;u.dropPct=u.prev>0?u.dropQ/u.prev*100:null;
+// просадка: среднее за период А против среднего за период Б (решения владельца 02.11.2026: периоды — календарём, простое среднее
+// = сумма ÷ дни, Б — любые дни). По умолчанию А = вчера, Б = ближайший день того же типа. ib / ia — индекс дня в P.days или массив
+// индексов. % — округлённый до целого, как на экране (−14,6% = −15% проходит)
+function prDropAt(u,ib,ia){const A=ia==null?[u.ord.length-1]:[].concat(ia),B=[].concat(ib),av=(a,ix)=>ix.reduce((s,i)=>s+(a[i]||0),0)/ix.length;
+  u.cur=av(u.ord,A);u.revC=av(u.rev,A);u.prev=av(u.ord,B);u.revP=av(u.rev,B);u.dropQ=u.prev-u.cur;u.dropPct=u.prev>0?u.dropQ/u.prev*100:null;
   u.drop=u.dropQ>=PR_DROP_QTY&&Math.round(u.dropPct)>=PR_DROP_PCT;}
-// селекторы «Сравнить [день А] с [днём Б]» (решение владельца 02.11.2026): А — по умолчанию вчера; Б — дни того же типа, что А
-// (будни / выходные), по умолчанию ближайший перед А. Меняют только просадку (📉, колонки «А к Б»); остальное — по вчера
-const prSameType=(a,b)=>isWeekendD(new Date(a+'T00:00'))===isWeekendD(new Date(b+'T00:00'));
-function prDefB(a){return PR_CACHE.days.filter(k=>k<a&&prSameType(k,a)).pop()||null;}
-function prApplyCmp(){const P=PR_CACHE,ia=P.days.indexOf(P.aKey),ip=P.days.indexOf(P.pKey);
-  P.rows.forEach(r=>{(r.members||[]).forEach(m=>prDropAt(m,ip,ia));prDropAt(r,ip,ia);});renderProto();}
-function prSetCmpA(k){const P=PR_CACHE;if(!P)return;P.aKey=k||P.yKey;P.pKey=P.aKey===P.yKey?P.pKeyDef:prDefB(P.aKey);prApplyCmp();}
-function prSetCmp(k){const P=PR_CACHE;if(!P)return;P.pKey=k||prDefB(P.aKey);prApplyCmp();}
+const prIdx=r=>{const P=PR_CACHE,out=[];P.days.forEach((k,i)=>{if(k>=r[0]&&k<=r[1])out.push(i);});return out;};
+function prApplyCmp(){const P=PR_CACHE,ia=prIdx(P.aRange),ib=prIdx(P.bRange);
+  P.rows.forEach(r=>{(r.members||[]).forEach(m=>prDropAt(m,ib,ia));prDropAt(r,ib,ia);});renderProto();}
+const prIsDef=P=>P.aRange[0]===P.yKey&&P.aRange[1]===P.yKey&&P.bRange[0]===P.pKeyDef&&P.bRange[1]===P.pKeyDef;
+// подпись периода: «Вчера» / «ДД.ММ» / «ДД.ММ–ДД.ММ (ср.)»
+const prRangeLbl=(r,P)=>{const d=k=>k.slice(8,10)+'.'+k.slice(5,7);return r[0]===r[1]?(r[0]===P.yKey?'Вчера':d(r[0])):`${d(r[0])}–${d(r[1])} (ср.)`;};
+// календарь выбора периода: 1-й щелчок — начало, 2-й — конец (раньше начала — меняются местами); «Применить»
+let PR_CAL=null;
+function prCalOpen(w){const P=PR_CACHE;const r=w==='a'?P.aRange:P.bRange;PR_CAL={w,s:r[0],e:r[1],pick:0};prCalDraw();}
+function prCalClose(){const o=document.getElementById('prCal');if(o)o.remove();PR_CAL=null;}
+function prCalPick(k){const c=PR_CAL;if(c.pick===0){c.s=k;c.e=k;c.pick=1;}else{if(k<c.s){c.e=c.s;c.s=k;}else c.e=k;c.pick=0;}prCalDraw();}
+function prCalApply(){const P=PR_CACHE,c=PR_CAL;if(c.w==='a')P.aRange=[c.s,c.e];else P.bRange=[c.s,c.e];prCalClose();prApplyCmp();}
+function prCalReset(){const P=PR_CACHE;P.aRange=[P.yKey,P.yKey];P.bRange=[P.pKeyDef,P.pKeyDef];prCalClose();prApplyCmp();}
+function prCalDraw(){
+  const P=PR_CACHE,c=PR_CAL,first=P.days[0],last=P.yKey,MN=['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
+  let ov=document.getElementById('prCal');
+  if(!ov){ov=document.createElement('div');ov.id='prCal';ov.className='pr-modal';ov.addEventListener('click',e=>{if(e.target===ov)prCalClose();});document.body.appendChild(ov);}
+  let html='';const m0=new Date(first+'T00:00'),m1=new Date(last+'T00:00');
+  for(let m=new Date(m0.getFullYear(),m0.getMonth(),1);m<=m1;m=new Date(m.getFullYear(),m.getMonth()+1,1)){
+    const y=m.getFullYear(),mo=m.getMonth(),n=new Date(y,mo+1,0).getDate(),pad=(new Date(y,mo,1).getDay()+6)%7;
+    let g='<div class="pr-cal-wd">пн</div><div class="pr-cal-wd">вт</div><div class="pr-cal-wd">ср</div><div class="pr-cal-wd">чт</div><div class="pr-cal-wd">пт</div><div class="pr-cal-wd we">сб</div><div class="pr-cal-wd we">вс</div>'+'<div></div>'.repeat(pad);
+    for(let d=1;d<=n;d++){const k=keyOfMonday(new Date(y,mo,d)),ok=k>=first&&k<=last,we=isWeekendD(new Date(y,mo,d)),inR=k>=c.s&&k<=c.e,edge=k===c.s||k===c.e;
+      g+=ok?`<button class="pr-cal-d${we?' we':''}${inR?' in':''}${edge?' edge':''}" onclick="prCalPick('${k}')">${d}</button>`:`<div class="pr-cal-d off">${d}</div>`;}
+    html+=`<div class="pr-cal-m"><div class="pr-cal-t">${MN[mo]} ${y}</div><div class="pr-cal-g">${g}</div></div>`;}
+  const nd=prIdx([c.s,c.e]).length;
+  ov.innerHTML=`<div class="pr-modal-card pr-cal-card"><div class="pr-modal-head"><b>📅 Период ${c.w==='a'?'А — проверяем':'Б — с чем сравниваем'}</b><button class="chip-glass" onclick="prCalClose()">✕</button></div>
+    <div class="pr-cal-ms">${html}</div>
+    <div class="dev-cap">Выбрано: <b>${prRangeLbl([c.s,c.e],P)}</b>${nd>1?` — ${nd} дн., сравнивается среднее в день`:''}. ${c.pick?'Щёлкните конец периода (или «Применить» — один день).':'Щёлкните начало периода.'}</div>
+    <div class="pr-cal-btns"><button class="chip-glass" onclick="prCalApply()">Применить</button><button class="chip-glass" onclick="prCalReset()">По умолчанию (вчера к ${P.pKeyDef.slice(8,10)}.${P.pKeyDef.slice(5,7)})</button></div></div>`;
+}
 const PR_HRANK={late:0,none:1,moved:2,hyp:3};
 // показатели позиции (товар или группа перчаток) — из сумм её рядов; у группы те же правила, что у товара
 function prEval(u,C){
@@ -1602,7 +1640,8 @@ async function loadProto(){
     // 3. поступления: ▲ (рост > 10% плана месяца) или снова в наличии после нуля в последние 7 дн
     u.rs=restock.map.get(String(pid))||null;
     const lastI=hasSnap.lastIndexOf(true);let z=-1;for(let i=0;i<lastI;i++)if(hasSnap[i]&&!(st[i]>0))z=i;   // последний день с нулём
-    u.afterZero=z>=0&&st[lastI]>0?cur7[z]:null;u.restock=!!(u.rs&&u.rs.up)||!!u.afterZero;
+    // «снова в наличии» — остаток последнего снимка дотягивает до нормы наличия (4 дня продаж по плану), а не просто > 0 (02.11.2026)
+    u.afterZero=z>=0&&st[lastI]>0&&st[lastI]>=u.need[lastI]?cur7[z]:null;u.restock=!!(u.rs&&u.rs.up)||!!u.afterZero;
     units.push(prEval(u,C));
   });
   // перчатки — одна позиция на производителя и цвет (gloveFamily, от 2 товаров с планом), как «Поиск отклонений»: ряды и план — суммы
@@ -1632,7 +1671,7 @@ async function loadProto(){
   // выручка юрлица вчера — все товары (и без плана), как график «Финансовой динамики»
   const revAllY=salesDays[C.iy].reduce((s,x)=>s+Number(x.revenue||0),0);
   const SKU_OF={};Object.entries(SKU_PID).forEach(([sku,pid])=>{SKU_OF[pid]=sku;});
-  PR_CACHE={pKeyDef:pKey,aKey:yKey,days,SKU_OF,doneOk:doneRes.ok,done:new Map((doneRes.rows||[]).map(x=>[x.pos_key,x])),yKey,pKey,yWe,todayKey,revAllY,rows:out,limKey,hypOk:hyp.ok,hypErr:hyp.err,restockOk:restock.ok};
+  PR_CACHE={pKeyDef:pKey,aRange:[yKey,yKey],bRange:[pKey,pKey],days,SKU_OF,doneOk:doneRes.ok,done:new Map((doneRes.rows||[]).map(x=>[x.pos_key,x])),yKey,pKey,yWe,todayKey,revAllY,rows:out,limKey,hypOk:hyp.ok,hypErr:hyp.err,restockOk:restock.ok};
   return PR_CACHE;
 }
 async function renderProto(){
@@ -1671,8 +1710,10 @@ async function renderProto(){
     // 2. просадка
     const b2=rows.filter(r=>r.drop).sort((a,b)=>(a.revC-a.revP)-(b.revC-b.revP));   // сверху — наибольшее падение выручки вчера к позавчера, ₽
     // отклонение: «−55% (154 / 341 / −187)» — факт / база / Δ; цвет по знаку
+    // шт за период — средние: с десятыми, если не целые
+    const fQ=v=>Math.abs(v-Math.round(v))<0.05?fmt0(v):fmt1(v),dvQ=(a,b)=>{const d=a-b,p=b>0?d/b*100:null,c=d<0?'dev-neg':(d>0?'dev-pos':'dev-neutral');return `<span class="${c}">${p==null?'—':sg(p)+'%'}</span> <span class="dev-neutral">(${fQ(a)} / ${fQ(b)} / ${d>0?'+':(d<0?'−':'')}${fQ(Math.abs(d))})</span>`;};
     const dv=(a,b)=>{const d=a-b,p=b>0?d/b*100:null,c=d<0?'dev-neg':(d>0?'dev-pos':'dev-neutral');return `<span class="${c}">${p==null?'—':sg(p)+'%'}</span> <span class="dev-neutral">(${fmt0(a)} / ${fmt0(b)} / ${sg(d)})</span>`;};
-    const H2=`<th title="заказы вчера ${dd(P.yKey)} к ${dd(P.pKey)}: факт / база / Δ">${P.aKey===P.yKey?'Вчера':dd(P.aKey)} к ${dd(P.pKey)}, % (шт / шт / Δ)</th><th title="выручка PNL вчера ${dd(P.yKey)} к ${dd(P.pKey)}">${P.aKey===P.yKey?'Вчера':dd(P.aKey)} к ${dd(P.pKey)}, % (₽ / ₽ / Δ)</th><th title="заказы вчера к плану дня: план месяца ÷ эфф. дни (выходной × 0,7)">Вчера к плану, % (шт / шт / Δ)</th><th title="выручка PNL вчера к плану дня (шт плана × плановая цена)">Вчера к плану, % (₽ / ₽ / Δ)</th><th title="ДРР вчера (реклама ÷ выручка PNL заказов) на шкале лимитов от цены дня, как «Рука на пульсе»: зелёный — до планового, жёлтый — до безубыточного (5%), красный — выше">ДРР вчера</th>`;
+    const H2=`<th title="заказы, шт: ${prRangeLbl(P.aRange,P)} к ${prRangeLbl(P.bRange,P)} — среднее в день; факт / база / Δ">${prRangeLbl(P.aRange,P)} к ${prRangeLbl(P.bRange,P)}, % (шт / шт / Δ)</th><th title="выручка PNL: ${prRangeLbl(P.aRange,P)} к ${prRangeLbl(P.bRange,P)} — среднее в день">${prRangeLbl(P.aRange,P)} к ${prRangeLbl(P.bRange,P)}, % (₽ / ₽ / Δ)</th><th title="заказы вчера к плану дня: план месяца ÷ эфф. дни (выходной × 0,7)">Вчера к плану, % (шт / шт / Δ)</th><th title="выручка PNL вчера к плану дня (шт плана × плановая цена)">Вчера к плану, % (₽ / ₽ / Δ)</th><th title="ДРР вчера (реклама ÷ выручка PNL заказов) на шкале лимитов от цены дня, как «Рука на пульсе»: зелёный — до планового, жёлтый — до безубыточного (5%), красный — выше">ДРР вчера</th>`;
     // полоса ДРР: зелёный 0…плановый, жёлтый …безубыточный, красный выше; точка — ДРР вчера
     const drrBar=r=>{const L=r.limY,d=r.drrY;
       if(!L)return '<span class="dev-neutral" title="нет лимитов (мало продаж для модели)">—</span>';
@@ -1683,9 +1724,9 @@ async function renderProto(){
     // потенциал позиции — недобор выручки вчера к плану дня, ₽ (= Δ колонки «вчера к плану, ₽»); cum — таблица «Потенциал есть»; 📉 — во всех таблицах блока
     const pot=r=>Math.max(0,r.planRY-r.revY),byPot=(a,b)=>(b.planRY-b.revY)-(a.planRY-a.revY);   // все списки блока — по потенциалу (план дня − факт), по убыванию
     const row2=cum=>line('d',r=>
-      `<td>${dv(r.cur,r.prev)}</td><td>${r.drop?'<span title="просадка заказов вчера к позавчера ≥ 15% и ≥ 5 шт">📉 </span>':''}${dv(r.revC,r.revP)}</td><td>${r.deep?`<span title="глубокая аналитика: за ${PR_DEEP_DAYS} дн цена и ДРР в норме, остаток есть, а заказы ниже плана на ${fmt0(-r.ordDev3)}% — карточка, конкуренты, спрос">🔍 </span>`:''}${dv(r.yest,r.planY)}</td><td>${r.hState!=='hyp'?`<span title="нужна гипотеза: ${{late:'срок прошёл',none:'нет ни гипотезы, ни даты',moved:'дата работы перенесена без гипотезы'}[r.hState]||'есть размеры без гипотезы'}">🧪 </span>`:''}${dv(r.revY,r.planRY)}</td><td class="pr-drr-c">${r.limY&&r.drrY!=null&&r.drrY>r.limY.be?'<span title="ДРР вчера выше безубыточного лимита — реклама в убыток">📣 </span>':''}${drrBar(r)}</td>`);
+      `<td>${dvQ(r.cur,r.prev)}</td><td>${r.drop?'<span title="просадка заказов вчера к позавчера ≥ 15% и ≥ 5 шт">📉 </span>':''}${dv(r.revC,r.revP)}</td><td>${r.deep?`<span title="глубокая аналитика: за ${PR_DEEP_DAYS} дн цена и ДРР в норме, остаток есть, а заказы ниже плана на ${fmt0(-r.ordDev3)}% — карточка, конкуренты, спрос">🔍 </span>`:''}${dv(r.yest,r.planY)}</td><td>${r.hState!=='hyp'?`<span title="нужна гипотеза: ${{late:'срок прошёл',none:'нет ни гипотезы, ни даты',moved:'дата работы перенесена без гипотезы'}[r.hState]||'есть размеры без гипотезы'}">🧪 </span>`:''}${dv(r.revY,r.planRY)}</td><td class="pr-drr-c">${r.limY&&r.drrY!=null&&r.drrY>r.limY.be?'<span title="ДРР вчера выше безубыточного лимита — реклама в убыток">📣 </span>':''}${drrBar(r)}</td>`);
     // итог — вчера к позавчера и вчера к плану дня (шт и ₽); 7 дн к плану — разного знака, не суммируем
-    const foot2=list=>(S=>`<td>${dv(S('cur'),S('prev'))}</td><td>${dv(S('revC'),S('revP'))}</td><td>${dv(S('yest'),S('planY'))}</td><td>${dv(S('revY'),S('planRY'))}</td><td></td>`)(f=>list.reduce((s,r)=>s+(r[f]||0),0));
+    const foot2=list=>(S=>`<td>${dvQ(S('cur'),S('prev'))}</td><td>${dv(S('revC'),S('revP'))}</td><td>${dv(S('yest'),S('planY'))}</td><td>${dv(S('revY'),S('planRY'))}</td><td></td>`)(f=>list.reduce((s,r)=>s+(r[f]||0),0));
     // таблица из частей [подзаголовок, список]: у каждой непустой части — подзаголовок на тёмном стекле (решение владельца 31.10.2026,
     // заменил жирные черты); «Итого» — после части с индексом tk, по частям 0…tk (решение владельца 31.10.2026: «Потенциал есть» —
     // по 📉 + 🎯, сумма до минимума; «Потенциал исчерпан» — по 📉), без товаров не в наличии; части ниже в итог не входят
@@ -1717,7 +1758,7 @@ async function renderProto(){
     // в наличии (список менеджера = список юрлица ∩ его позиции); пишется с отметкой «выполнено» для «Статистики»
     {const selS=new Set(gap>0?sel:[]),w=P.rows.filter(r=>!r.oos&&(r.drop||selS.has(r)||redY(r)||r.deep||r.hState!=='hyp'||r.restock));
      P.work={all:w.length,m1:w.filter(r=>r.mgr==='m1').length,m2:w.filter(r=>r.mgr==='m2').length};
-     if(P.pKey===P.pKeyDef&&P.aKey===P.yKey)P.workDef=P.work;}   // план для «Статистики» — всегда при сравнении по умолчанию
+     if(prIsDef(P))P.workDef=P.work;}   // план для «Статистики» — всегда при сравнении по умолчанию
     const shown=new Set([...g1,...g2,...b2]),rX=rows.filter(r=>redY(r)&&!shown.has(r));
     const gRN=rX.filter(below).sort((a,b)=>pot(b)-pot(a)),gRP=rX.filter(r=>!below(r)).sort(byPot);
     rX.forEach(r=>shown.add(r));
@@ -1734,9 +1775,8 @@ async function renderProto(){
       +`</details><details class="pr-pot" data-k="pi"${PR_OPEN.pi?' open':''}><summary class="pr-grp">🏁 Потенциал исчерпан</summary>${t2([['📉 Просадка заказов',b2p],['📣 Проблемы с ДРР',gRP],['🔍 Глубокая аналитика',gDP],['🧪 Нужна гипотеза',gHP],['<span class="dev-restock">▲</span> Поступления',b2rP]],false,0)}</details>`;
     // 4. блок «Убыток из-за рекламы» убран 31.10.2026 (решение владельца): красный ДРР вчера — часть «Просадки заказов»
     // 5. блок «Глубокая аналитика» убран 31.10.2026 (решение владельца): 🔍 и часть «Глубокая аналитика» — в общем списке
-    const WD=['вс','пн','вт','ср','чт','пт','сб'],lbl=k=>`${k.slice(8,10)}.${k.slice(5,7)} ${WD[new Date(k+'T00:00').getDay()]}`;
-    const aSel=`<select class="chip-glass dev-toggle" onchange="prSetCmpA(this.value)" title="Какой день проверяем на просадку заказов (по умолчанию вчера)">${P.days.slice().reverse().filter(k=>prDefB(k)).map(k=>`<option value="${k}"${k===P.aKey?' selected':''}>${lbl(k)}${k===P.yKey?' (вчера)':''}</option>`).join('')}</select>`;
-    const dB=prDefB(P.aKey),cmpSel=`<select class="chip-glass dev-toggle" onchange="prSetCmp(this.value)" title="С каким днём сравнивать — только дни того же типа (будни / выходные)">${P.days.filter(k=>k<P.aKey&&prSameType(k,P.aKey)).reverse().map(k=>`<option value="${k}"${k===P.pKey?' selected':''}>${lbl(k)}${k===dB?' (ближайший)':''}</option>`).join('')}</select>`;
+    const aSel=`<button class="chip-glass dev-toggle" onclick="prCalOpen('a')" title="Период А — что проверяем на просадку (по умолчанию вчера)">📅 ${prRangeLbl(P.aRange,P)}</button>`;
+    const cmpSel=`<button class="chip-glass dev-toggle" onclick="prCalOpen('b')" title="Период Б — с чем сравниваем (по умолчанию ближайший день того же типа)">📅 ${prRangeLbl(P.bRange,P)}</button>`;
     const mgrSel=`<select class="chip-glass dev-toggle" onchange="setProtoMgr(this.value)">${Object.entries(DEV_MANAGERS).map(([k,v])=>`<option value="${k}"${k===PR_MGR?' selected':''}>${v}</option>`).join('')}</select>`;
     box.innerHTML=`<div class="dev-cap">Менеджер ${mgrSel} <span style="margin-left:10px">Просадка: сравнить</span> ${aSel} <span>с</span> ${cmpSel} <span style="margin-left:10px">Данные за ${dd(P.yKey)} · позиций с планом: ${rows.length} (перчатки — группой)${P.limKey?` · лимиты ДРР на ${dd(P.limKey)}`:''}</span></div>`
       +head('📉','Просадка заказов',b2.length,h2,((n,k,h,u,x)=>`<span class="pr-sum2"><span class="dev-restock">▲</span> Пополнение <span class="pr-cnt${n?'':' z'}">${n}</span></span><span class="pr-sum2">📣 Высокий ДРР <span class="pr-cnt${k?'':' z'}">${k}</span></span><span class="pr-sum2">🔍 Глубокая аналитика <span class="pr-cnt${x?'':' z'}">${x}</span></span><span class="pr-sum2">🧪 Нужна гипотеза <span class="pr-cnt${h?'':' z'}">${h}</span></span>`)(rows.filter(r=>r.restock).length,rows.filter(redY).length,rows.filter(r=>r.hState!=='hyp').length,new Set([...g1,...(gap>0?g2:[]),...gRN,...gDN,...gHN,...g3,...b2p,...gRP,...gDP,...gHP,...b2rP].filter(r=>!r.oos)).size,rows.filter(r=>r.deep).length),(u=>`<span class="chip-glass pr-total-chip" title="уникальные позиции списка (группа перчаток — одна), без товаров не в наличии">Всего в работе <b>${u}</b></span><button class="chip-glass pr-total-chip pr-stat-btn" onclick="prStats()" title="план и факт отработки по дням">📊 Статистика</button>`)(new Set([...g1,...(gap>0?g2:[]),...gRN,...gDN,...gHN,...g3,...b2p,...gRP,...gDP,...gHP,...b2rP].filter(r=>!r.oos)).size))   // доп. заголовки — пополнения и высокий ДРР вчера (блоки «Поступления» и «Убыток из-за рекламы» убраны 31.10.2026)
