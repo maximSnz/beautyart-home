@@ -1516,10 +1516,16 @@ let PR_CAL=null;
 function prCalOpen(w){const P=PR_CACHE;const r=w==='a'?P.aRange:P.bRange;PR_CAL={w,s:r[0],e:r[1],pick:0};prCalDraw();}
 function prCalClose(){const o=document.getElementById('prCal');if(o)o.remove();PR_CAL=null;}
 function prCalPick(k){const c=PR_CAL;if(c.pick===0){c.s=k;c.e=k;c.pick=1;}else{if(k<c.s){c.e=c.s;c.s=k;}else c.e=k;c.pick=0;}prCalDraw();}
-function prCalApply(){const P=PR_CACHE,c=PR_CAL;if(c.w==='a')P.aRange=[c.s,c.e];else P.bRange=[c.s,c.e];prCalClose();prApplyCmp();}
-function prCalReset(){const P=PR_CACHE;P.aRange=[P.yKey,P.yKey];P.bRange=[P.pKeyDef,P.pKeyDef];prCalClose();prApplyCmp();}
+// Б — всегда раньше А (решение владельца 02.11.2026): в календаре Б доступны только дни до начала А; если новый А «наехал» на Б —
+// Б сбрасывается на ближайший день того же типа перед началом А
+function prBDefFor(a){const t=isWeekendD(new Date(a+'T00:00'));return PR_CACHE.days.filter(k=>k<a&&isWeekendD(new Date(k+'T00:00'))===t).pop()||PR_CACHE.days.filter(k=>k<a).pop();}
+function prCalApply(){const P=PR_CACHE,c=PR_CAL;P.bNote='';
+  if(c.w==='a'){P.aRange=[c.s,c.e];if(P.bRange[1]>=P.aRange[0]){const d=prBDefFor(P.aRange[0]);P.bRange=[d,d];P.bNote='Б заменён: должен быть раньше А';}}
+  else P.bRange=[c.s,c.e];
+  prCalClose();prApplyCmp();}
+function prCalReset(){const P=PR_CACHE;P.bNote='';P.aRange=[P.yKey,P.yKey];P.bRange=[P.pKeyDef,P.pKeyDef];prCalClose();prApplyCmp();}
 function prCalDraw(){
-  const P=PR_CACHE,c=PR_CAL,first=P.days[0],last=P.yKey,MN=['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
+  const P=PR_CACHE,c=PR_CAL,first=c.w==='a'?P.days[1]:P.days[0],last=c.w==='a'?P.yKey:keyOfMonday(addDays(new Date(P.aRange[0]+'T00:00'),-1)),MN=['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
   let ov=document.getElementById('prCal');
   if(!ov){ov=document.createElement('div');ov.id='prCal';ov.className='pr-modal';ov.addEventListener('click',e=>{if(e.target===ov)prCalClose();});document.body.appendChild(ov);}
   let html='';const m0=new Date(first+'T00:00'),m1=new Date(last+'T00:00');
@@ -1532,7 +1538,7 @@ function prCalDraw(){
   const nd=prIdx([c.s,c.e]).length;
   ov.innerHTML=`<div class="pr-modal-card pr-cal-card"><div class="pr-modal-head"><b>📅 Период ${c.w==='a'?'А — проверяем':'Б — с чем сравниваем'}</b><button class="chip-glass" onclick="prCalClose()">✕</button></div>
     <div class="pr-cal-ms">${html}</div>
-    <div class="dev-cap">Выбрано: <b>${prRangeLbl([c.s,c.e],P)}</b>${nd>1?` — ${nd} дн., сравнивается среднее в день`:''}. ${c.pick?'Щёлкните конец периода (или «Применить» — один день).':'Щёлкните начало периода.'}</div>
+    <div class="dev-cap">${c.w==='b'?`Доступны дни до начала периода А (${prRangeLbl(P.aRange,P)}). `:''}Выбрано: <b>${prRangeLbl([c.s,c.e],P)}</b>${nd>1?` — ${nd} дн., сравнивается среднее в день`:''}. ${c.pick?'Щёлкните конец периода (или «Применить» — один день).':'Щёлкните начало периода.'}</div>
     <div class="pr-cal-btns"><button class="chip-glass" onclick="prCalApply()">Применить</button><button class="chip-glass" onclick="prCalReset()">По умолчанию (вчера к ${P.pKeyDef.slice(8,10)}.${P.pKeyDef.slice(5,7)})</button></div></div>`;
 }
 const PR_HRANK={late:0,none:1,moved:2,hyp:3};
@@ -1778,7 +1784,7 @@ async function renderProto(){
     const aSel=`<button class="chip-glass dev-toggle" onclick="prCalOpen('a')" title="Период А — что проверяем на просадку (по умолчанию вчера)">📅 ${prRangeLbl(P.aRange,P)}</button>`;
     const cmpSel=`<button class="chip-glass dev-toggle" onclick="prCalOpen('b')" title="Период Б — с чем сравниваем (по умолчанию ближайший день того же типа)">📅 ${prRangeLbl(P.bRange,P)}</button>`;
     const mgrSel=`<select class="chip-glass dev-toggle" onchange="setProtoMgr(this.value)">${Object.entries(DEV_MANAGERS).map(([k,v])=>`<option value="${k}"${k===PR_MGR?' selected':''}>${v}</option>`).join('')}</select>`;
-    box.innerHTML=`<div class="dev-cap">Менеджер ${mgrSel} <span style="margin-left:10px">Просадка: сравнить</span> ${aSel} <span>с</span> ${cmpSel} <span style="margin-left:10px">Данные за ${dd(P.yKey)} · позиций с планом: ${rows.length} (перчатки — группой)${P.limKey?` · лимиты ДРР на ${dd(P.limKey)}`:''}</span></div>`
+    box.innerHTML=`<div class="dev-cap">Менеджер ${mgrSel} <span style="margin-left:10px">Просадка: сравнить</span> ${aSel} <span>с</span> ${cmpSel}${P.bNote?` <span class="dev-warn">${P.bNote}</span>`:''} <span style="margin-left:10px">Данные за ${dd(P.yKey)} · позиций с планом: ${rows.length} (перчатки — группой)${P.limKey?` · лимиты ДРР на ${dd(P.limKey)}`:''}</span></div>`
       +head('📉','Просадка заказов',b2.length,h2,((n,k,h,u,x)=>`<span class="pr-sum2"><span class="dev-restock">▲</span> Пополнение <span class="pr-cnt${n?'':' z'}">${n}</span></span><span class="pr-sum2">📣 Высокий ДРР <span class="pr-cnt${k?'':' z'}">${k}</span></span><span class="pr-sum2">🔍 Глубокая аналитика <span class="pr-cnt${x?'':' z'}">${x}</span></span><span class="pr-sum2">🧪 Нужна гипотеза <span class="pr-cnt${h?'':' z'}">${h}</span></span>`)(rows.filter(r=>r.restock).length,rows.filter(redY).length,rows.filter(r=>r.hState!=='hyp').length,new Set([...g1,...(gap>0?g2:[]),...gRN,...gDN,...gHN,...g3,...b2p,...gRP,...gDP,...gHP,...b2rP].filter(r=>!r.oos)).size,rows.filter(r=>r.deep).length),(u=>`<span class="chip-glass pr-total-chip" title="уникальные позиции списка (группа перчаток — одна), без товаров не в наличии">Всего в работе <b>${u}</b></span><button class="chip-glass pr-total-chip pr-stat-btn" onclick="prStats()" title="план и факт отработки по дням">📊 Статистика</button>`)(new Set([...g1,...(gap>0?g2:[]),...gRN,...gDN,...gHN,...g3,...b2p,...gRP,...gDP,...gHP,...b2rP].filter(r=>!r.oos)).size))   // доп. заголовки — пополнения и высокий ДРР вчера (блоки «Поступления» и «Убыток из-за рекламы» убраны 31.10.2026)
     box.querySelectorAll('details.pr-blk,details.pr-pot').forEach(d=>d.addEventListener('toggle',()=>{PR_OPEN[d.dataset.k]=d.open;}));
     // плавное раскрытие / сворачивание групп «Потенциал есть / исчерпан» — как меню главной (260 мс, без анимации при reduced motion)
