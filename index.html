@@ -1471,9 +1471,9 @@ const PR_DROP_PCT=15,PR_DROP_QTY=5;                // просадка: зака
 // глубокая аналитика (решения владельца 31.10.2026): окно 3 дня — заказы ниже плана ≥ 15%, цена в ±10% от плановой, остаток все дни,
 // ДРР окна в коридоре 70–130% планового лимита и не выше безубыточного (до 31.10: 7 дн, цена ±2%, ДРР 70–100%)
 const PR_DEEP_PCT=15,PR_PRICE_TOL=10,PR_DEEP_DAYS=3,PR_DEEP_LO=0.7,PR_DEEP_HI=1.3;
-// корпоративный минимум выручки в день, ₽ (решения владельца 31.10 и 02.11.2026): один на все дни — ИП 3 100 000, ООО 100 000
-// (выходные минимумы 2,5 млн / 70 тыс убраны 02.11.2026). Нет минимума — цель = план дня − факт вчера
-const PR_DAY_MIN={ip:3100000,ooo:100000};
+// корпоративный минимум выручки в день, ₽ (решения владельца 31.10 и 02.11.2026): будни — ИП 3 100 000, ООО 100 000; выходные — ИП 2 500 000,
+// ООО 70 000 (по типу вчерашнего дня: добор считается по вчера). Нет минимума — цель = план дня − факт вчера
+const PR_DAY_MIN={ip:{wd:3100000,we:2500000},ooo:{wd:100000,we:70000}};
 const PR_UNDER=0.7;
 const NET_FLOOR_PR=5;   // порог чистой прибыли, % (NET_FLOOR plan.html, MARGIN_FLOOR главной)
 // лимиты ДРР при цене P — копия unitPct из plan.html при ДРР 0: pre(P) = (r0 − комиссия(P)) − t − u ÷ (P × b);
@@ -1486,10 +1486,17 @@ async function prDays(keys,q){const out=new Array(keys.length);let i=0;await Pro
 // («дата работы» в будущем, действующей гипотезы нет) / просрочено (срок прошёл) / нет ни гипотезы, ни даты
 // просадка заказов к дню сравнения ip (индекс в P.days): по умолчанию — предыдущий день того же типа; селектор «Сравнить вчера с»
 // меняет только просадку (решение владельца 02.11.2026). % — округлённый до целого, как на экране (−14,6% = −15% проходит)
-function prDropAt(u,ip){u.prev=u.ord[ip]||0;u.revP=u.rev[ip]||0;u.dropQ=u.prev-u.yest;u.dropPct=u.prev>0?u.dropQ/u.prev*100:null;
+function prDropAt(u,ip,ia){if(ia==null)ia=u.ord.length-1;   // по умолчанию день А — вчера (последний день ряда)
+  u.cur=u.ord[ia]||0;u.revC=u.rev[ia]||0;u.prev=u.ord[ip]||0;u.revP=u.rev[ip]||0;u.dropQ=u.prev-u.cur;u.dropPct=u.prev>0?u.dropQ/u.prev*100:null;
   u.drop=u.dropQ>=PR_DROP_QTY&&Math.round(u.dropPct)>=PR_DROP_PCT;}
-function prSetCmp(k){const P=PR_CACHE;if(!P)return;P.pKey=k||P.pKeyDef;const ip=P.days.indexOf(P.pKey);
-  P.rows.forEach(r=>{(r.members||[]).forEach(m=>prDropAt(m,ip));prDropAt(r,ip);});renderProto();}
+// селекторы «Сравнить [день А] с [днём Б]» (решение владельца 02.11.2026): А — по умолчанию вчера; Б — дни того же типа, что А
+// (будни / выходные), по умолчанию ближайший перед А. Меняют только просадку (📉, колонки «А к Б»); остальное — по вчера
+const prSameType=(a,b)=>isWeekendD(new Date(a+'T00:00'))===isWeekendD(new Date(b+'T00:00'));
+function prDefB(a){return PR_CACHE.days.filter(k=>k<a&&prSameType(k,a)).pop()||null;}
+function prApplyCmp(){const P=PR_CACHE,ia=P.days.indexOf(P.aKey),ip=P.days.indexOf(P.pKey);
+  P.rows.forEach(r=>{(r.members||[]).forEach(m=>prDropAt(m,ip,ia));prDropAt(r,ip,ia);});renderProto();}
+function prSetCmpA(k){const P=PR_CACHE;if(!P)return;P.aKey=k||P.yKey;P.pKey=P.aKey===P.yKey?P.pKeyDef:prDefB(P.aKey);prApplyCmp();}
+function prSetCmp(k){const P=PR_CACHE;if(!P)return;P.pKey=k||prDefB(P.aKey);prApplyCmp();}
 const PR_HRANK={late:0,none:1,moved:2,hyp:3};
 // показатели позиции (товар или группа перчаток) — из сумм её рядов; у группы те же правила, что у товара
 function prEval(u,C){
@@ -1625,7 +1632,7 @@ async function loadProto(){
   // выручка юрлица вчера — все товары (и без плана), как график «Финансовой динамики»
   const revAllY=salesDays[C.iy].reduce((s,x)=>s+Number(x.revenue||0),0);
   const SKU_OF={};Object.entries(SKU_PID).forEach(([sku,pid])=>{SKU_OF[pid]=sku;});
-  PR_CACHE={pKeyDef:pKey,days,SKU_OF,doneOk:doneRes.ok,done:new Map((doneRes.rows||[]).map(x=>[x.pos_key,x])),yKey,pKey,yWe,todayKey,revAllY,rows:out,limKey,hypOk:hyp.ok,hypErr:hyp.err,restockOk:restock.ok};
+  PR_CACHE={pKeyDef:pKey,aKey:yKey,days,SKU_OF,doneOk:doneRes.ok,done:new Map((doneRes.rows||[]).map(x=>[x.pos_key,x])),yKey,pKey,yWe,todayKey,revAllY,rows:out,limKey,hypOk:hyp.ok,hypErr:hyp.err,restockOk:restock.ok};
   return PR_CACHE;
 }
 async function renderProto(){
@@ -1662,10 +1669,10 @@ async function renderProto(){
     const sub=(key,title,n,html)=>`<details class="pr-blk pr-sub" data-k="${key}"${PR_OPEN[key]?' open':''}><summary>${title} <span class="pr-cnt${n?'':' z'}">${n}</span></summary>${html}</details>`;
     // 1. блок «Гипотезы» убран 31.10.2026 (решение владельца): 🧪 и часть «Нужна гипотеза» — в «Просадке заказов»
     // 2. просадка
-    const b2=rows.filter(r=>r.drop).sort((a,b)=>(a.revY-a.revP)-(b.revY-b.revP));   // сверху — наибольшее падение выручки вчера к позавчера, ₽
+    const b2=rows.filter(r=>r.drop).sort((a,b)=>(a.revC-a.revP)-(b.revC-b.revP));   // сверху — наибольшее падение выручки вчера к позавчера, ₽
     // отклонение: «−55% (154 / 341 / −187)» — факт / база / Δ; цвет по знаку
     const dv=(a,b)=>{const d=a-b,p=b>0?d/b*100:null,c=d<0?'dev-neg':(d>0?'dev-pos':'dev-neutral');return `<span class="${c}">${p==null?'—':sg(p)+'%'}</span> <span class="dev-neutral">(${fmt0(a)} / ${fmt0(b)} / ${sg(d)})</span>`;};
-    const H2=`<th title="заказы вчера ${dd(P.yKey)} к ${dd(P.pKey)}: факт / база / Δ">Вчера к ${dd(P.pKey)}, % (шт / шт / Δ)</th><th title="выручка PNL вчера ${dd(P.yKey)} к ${dd(P.pKey)}">Вчера к ${dd(P.pKey)}, % (₽ / ₽ / Δ)</th><th title="заказы вчера к плану дня: план месяца ÷ эфф. дни (выходной × 0,7)">Вчера к плану, % (шт / шт / Δ)</th><th title="выручка PNL вчера к плану дня (шт плана × плановая цена)">Вчера к плану, % (₽ / ₽ / Δ)</th><th title="ДРР вчера (реклама ÷ выручка PNL заказов) на шкале лимитов от цены дня, как «Рука на пульсе»: зелёный — до планового, жёлтый — до безубыточного (5%), красный — выше">ДРР вчера</th>`;
+    const H2=`<th title="заказы вчера ${dd(P.yKey)} к ${dd(P.pKey)}: факт / база / Δ">${P.aKey===P.yKey?'Вчера':dd(P.aKey)} к ${dd(P.pKey)}, % (шт / шт / Δ)</th><th title="выручка PNL вчера ${dd(P.yKey)} к ${dd(P.pKey)}">${P.aKey===P.yKey?'Вчера':dd(P.aKey)} к ${dd(P.pKey)}, % (₽ / ₽ / Δ)</th><th title="заказы вчера к плану дня: план месяца ÷ эфф. дни (выходной × 0,7)">Вчера к плану, % (шт / шт / Δ)</th><th title="выручка PNL вчера к плану дня (шт плана × плановая цена)">Вчера к плану, % (₽ / ₽ / Δ)</th><th title="ДРР вчера (реклама ÷ выручка PNL заказов) на шкале лимитов от цены дня, как «Рука на пульсе»: зелёный — до планового, жёлтый — до безубыточного (5%), красный — выше">ДРР вчера</th>`;
     // полоса ДРР: зелёный 0…плановый, жёлтый …безубыточный, красный выше; точка — ДРР вчера
     const drrBar=r=>{const L=r.limY,d=r.drrY;
       if(!L)return '<span class="dev-neutral" title="нет лимитов (мало продаж для модели)">—</span>';
@@ -1676,9 +1683,9 @@ async function renderProto(){
     // потенциал позиции — недобор выручки вчера к плану дня, ₽ (= Δ колонки «вчера к плану, ₽»); cum — таблица «Потенциал есть»; 📉 — во всех таблицах блока
     const pot=r=>Math.max(0,r.planRY-r.revY),byPot=(a,b)=>(b.planRY-b.revY)-(a.planRY-a.revY);   // все списки блока — по потенциалу (план дня − факт), по убыванию
     const row2=cum=>line('d',r=>
-      `<td>${dv(r.yest,r.prev)}</td><td>${r.drop?'<span title="просадка заказов вчера к позавчера ≥ 15% и ≥ 5 шт">📉 </span>':''}${dv(r.revY,r.revP)}</td><td>${r.deep?`<span title="глубокая аналитика: за ${PR_DEEP_DAYS} дн цена и ДРР в норме, остаток есть, а заказы ниже плана на ${fmt0(-r.ordDev3)}% — карточка, конкуренты, спрос">🔍 </span>`:''}${dv(r.yest,r.planY)}</td><td>${r.hState!=='hyp'?`<span title="нужна гипотеза: ${{late:'срок прошёл',none:'нет ни гипотезы, ни даты',moved:'дата работы перенесена без гипотезы'}[r.hState]||'есть размеры без гипотезы'}">🧪 </span>`:''}${dv(r.revY,r.planRY)}</td><td class="pr-drr-c">${r.limY&&r.drrY!=null&&r.drrY>r.limY.be?'<span title="ДРР вчера выше безубыточного лимита — реклама в убыток">📣 </span>':''}${drrBar(r)}</td>`);
+      `<td>${dv(r.cur,r.prev)}</td><td>${r.drop?'<span title="просадка заказов вчера к позавчера ≥ 15% и ≥ 5 шт">📉 </span>':''}${dv(r.revC,r.revP)}</td><td>${r.deep?`<span title="глубокая аналитика: за ${PR_DEEP_DAYS} дн цена и ДРР в норме, остаток есть, а заказы ниже плана на ${fmt0(-r.ordDev3)}% — карточка, конкуренты, спрос">🔍 </span>`:''}${dv(r.yest,r.planY)}</td><td>${r.hState!=='hyp'?`<span title="нужна гипотеза: ${{late:'срок прошёл',none:'нет ни гипотезы, ни даты',moved:'дата работы перенесена без гипотезы'}[r.hState]||'есть размеры без гипотезы'}">🧪 </span>`:''}${dv(r.revY,r.planRY)}</td><td class="pr-drr-c">${r.limY&&r.drrY!=null&&r.drrY>r.limY.be?'<span title="ДРР вчера выше безубыточного лимита — реклама в убыток">📣 </span>':''}${drrBar(r)}</td>`);
     // итог — вчера к позавчера и вчера к плану дня (шт и ₽); 7 дн к плану — разного знака, не суммируем
-    const foot2=list=>(S=>`<td>${dv(S('yest'),S('prev'))}</td><td>${dv(S('revY'),S('revP'))}</td><td>${dv(S('yest'),S('planY'))}</td><td>${dv(S('revY'),S('planRY'))}</td><td></td>`)(f=>list.reduce((s,r)=>s+(r[f]||0),0));
+    const foot2=list=>(S=>`<td>${dv(S('cur'),S('prev'))}</td><td>${dv(S('revC'),S('revP'))}</td><td>${dv(S('yest'),S('planY'))}</td><td>${dv(S('revY'),S('planRY'))}</td><td></td>`)(f=>list.reduce((s,r)=>s+(r[f]||0),0));
     // таблица из частей [подзаголовок, список]: у каждой непустой части — подзаголовок на тёмном стекле (решение владельца 31.10.2026,
     // заменил жирные черты); «Итого» — после части с индексом tk, по частям 0…tk (решение владельца 31.10.2026: «Потенциал есть» —
     // по 📉 + 🎯, сумма до минимума; «Потенциал исчерпан» — по 📉), без товаров не в наличии; части ниже в итог не входят
@@ -1696,12 +1703,12 @@ async function renderProto(){
     //     не закроет разницу «корпоративный минимум − выручка юрлица вчера (все товары)» (нет минимума — план дня − факт);
     //  3) остальные пополнившиеся ▲ ниже плана дня — по потенциалу.
     // Отбор — по всему юрлицу, фильтр менеджера только скрывает чужие позиции; нет в наличии — на месте, блёкло, в суммы не входит
-    const dMin=PR_DAY_MIN[ENT]||null,gap=dMin?dMin-P.revAllY:P.rows.reduce((s,r)=>s+r.planRY-r.revY,0);
+    const dMin=PR_DAY_MIN[ENT]?PR_DAY_MIN[ENT][P.yWe?'we':'wd']:null,gap=dMin?dMin-P.revAllY:P.rows.reduce((s,r)=>s+r.planRY-r.revY,0);
     const below=r=>r.revY<r.planRY,mine=r=>PR_MGR==='all'||r.mgr===PR_MGR;
     const g1All=P.rows.filter(r=>r.drop&&below(r));
     let got=g1All.reduce((s,r)=>s+(r.oos?0:pot(r)),0);   // часть 1 засчитывается недобором к плану дня (решение владельца 31.10.2026, сужение списка)
     const sel=[];for(const r of P.rows.filter(r=>!r.drop&&below(r)).sort((a,b)=>pot(b)-pot(a))){if(got>=gap)break;sel.push(r);if(!r.oos)got+=pot(r);}
-    const g1=g1All.filter(mine).sort((a,b)=>(a.revY-a.revP)-(b.revY-b.revP)),g2=sel.filter(mine);
+    const g1=g1All.filter(mine).sort((a,b)=>(a.revC-a.revP)-(b.revC-b.revP)),g2=sel.filter(mine);
     // пополнившиеся (▲), которых нет в таблицах блока — по потенциалу: ниже плана дня — в «Потенциал есть», иначе — в «Потенциал исчерпан»
     // ДРР вчера в красной зоне (выше безубыточного лимита от цены дня, как РНП), которых нет в таблицах блока — отдельной частью перед
     // пополнениями, по потенциалу: ниже плана дня — в «Потенциал есть», иначе — в «Потенциал исчерпан» (решение владельца 31.10.2026)
@@ -1710,7 +1717,7 @@ async function renderProto(){
     // в наличии (список менеджера = список юрлица ∩ его позиции); пишется с отметкой «выполнено» для «Статистики»
     {const selS=new Set(gap>0?sel:[]),w=P.rows.filter(r=>!r.oos&&(r.drop||selS.has(r)||redY(r)||r.deep||r.hState!=='hyp'||r.restock));
      P.work={all:w.length,m1:w.filter(r=>r.mgr==='m1').length,m2:w.filter(r=>r.mgr==='m2').length};
-     if(P.pKey===P.pKeyDef)P.workDef=P.work;}   // план для «Статистики» — всегда при сравнении по умолчанию
+     if(P.pKey===P.pKeyDef&&P.aKey===P.yKey)P.workDef=P.work;}   // план для «Статистики» — всегда при сравнении по умолчанию
     const shown=new Set([...g1,...g2,...b2]),rX=rows.filter(r=>redY(r)&&!shown.has(r));
     const gRN=rX.filter(below).sort((a,b)=>pot(b)-pot(a)),gRP=rX.filter(r=>!below(r)).sort(byPot);
     rX.forEach(r=>shown.add(r));
@@ -1727,9 +1734,11 @@ async function renderProto(){
       +`</details><details class="pr-pot" data-k="pi"${PR_OPEN.pi?' open':''}><summary class="pr-grp">🏁 Потенциал исчерпан</summary>${t2([['📉 Просадка заказов',b2p],['📣 Проблемы с ДРР',gRP],['🔍 Глубокая аналитика',gDP],['🧪 Нужна гипотеза',gHP],['<span class="dev-restock">▲</span> Поступления',b2rP]],false,0)}</details>`;
     // 4. блок «Убыток из-за рекламы» убран 31.10.2026 (решение владельца): красный ДРР вчера — часть «Просадки заказов»
     // 5. блок «Глубокая аналитика» убран 31.10.2026 (решение владельца): 🔍 и часть «Глубокая аналитика» — в общем списке
-    const WD=['вс','пн','вт','ср','чт','пт','сб'],cmpSel=`<select class="chip-glass dev-toggle" onchange="prSetCmp(this.value)" title="С каким днём сравнивать заказы вчера — только для просадки заказов">${P.days.filter(k=>k<P.yKey).reverse().map(k=>`<option value="${k}"${k===P.pKey?' selected':''}>${k.slice(8,10)}.${k.slice(5,7)} ${WD[new Date(k+'T00:00').getDay()]}${k===P.pKeyDef?' (по умолчанию)':''}</option>`).join('')}</select>`;
+    const WD=['вс','пн','вт','ср','чт','пт','сб'],lbl=k=>`${k.slice(8,10)}.${k.slice(5,7)} ${WD[new Date(k+'T00:00').getDay()]}`;
+    const aSel=`<select class="chip-glass dev-toggle" onchange="prSetCmpA(this.value)" title="Какой день проверяем на просадку заказов (по умолчанию вчера)">${P.days.slice().reverse().filter(k=>prDefB(k)).map(k=>`<option value="${k}"${k===P.aKey?' selected':''}>${lbl(k)}${k===P.yKey?' (вчера)':''}</option>`).join('')}</select>`;
+    const dB=prDefB(P.aKey),cmpSel=`<select class="chip-glass dev-toggle" onchange="prSetCmp(this.value)" title="С каким днём сравнивать — только дни того же типа (будни / выходные)">${P.days.filter(k=>k<P.aKey&&prSameType(k,P.aKey)).reverse().map(k=>`<option value="${k}"${k===P.pKey?' selected':''}>${lbl(k)}${k===dB?' (ближайший)':''}</option>`).join('')}</select>`;
     const mgrSel=`<select class="chip-glass dev-toggle" onchange="setProtoMgr(this.value)">${Object.entries(DEV_MANAGERS).map(([k,v])=>`<option value="${k}"${k===PR_MGR?' selected':''}>${v}</option>`).join('')}</select>`;
-    box.innerHTML=`<div class="dev-cap">Менеджер ${mgrSel} <span style="margin-left:10px">Сравнить вчера (${dd(P.yKey)}) с</span> ${cmpSel} <span style="margin-left:10px">Данные за ${dd(P.yKey)} · позиций с планом: ${rows.length} (перчатки — группой)${P.limKey?` · лимиты ДРР на ${dd(P.limKey)}`:''}</span></div>`
+    box.innerHTML=`<div class="dev-cap">Менеджер ${mgrSel} <span style="margin-left:10px">Просадка: сравнить</span> ${aSel} <span>с</span> ${cmpSel} <span style="margin-left:10px">Данные за ${dd(P.yKey)} · позиций с планом: ${rows.length} (перчатки — группой)${P.limKey?` · лимиты ДРР на ${dd(P.limKey)}`:''}</span></div>`
       +head('📉','Просадка заказов',b2.length,h2,((n,k,h,u,x)=>`<span class="pr-sum2"><span class="dev-restock">▲</span> Пополнение <span class="pr-cnt${n?'':' z'}">${n}</span></span><span class="pr-sum2">📣 Высокий ДРР <span class="pr-cnt${k?'':' z'}">${k}</span></span><span class="pr-sum2">🔍 Глубокая аналитика <span class="pr-cnt${x?'':' z'}">${x}</span></span><span class="pr-sum2">🧪 Нужна гипотеза <span class="pr-cnt${h?'':' z'}">${h}</span></span>`)(rows.filter(r=>r.restock).length,rows.filter(redY).length,rows.filter(r=>r.hState!=='hyp').length,new Set([...g1,...(gap>0?g2:[]),...gRN,...gDN,...gHN,...g3,...b2p,...gRP,...gDP,...gHP,...b2rP].filter(r=>!r.oos)).size,rows.filter(r=>r.deep).length),(u=>`<span class="chip-glass pr-total-chip" title="уникальные позиции списка (группа перчаток — одна), без товаров не в наличии">Всего в работе <b>${u}</b></span><button class="chip-glass pr-total-chip pr-stat-btn" onclick="prStats()" title="план и факт отработки по дням">📊 Статистика</button>`)(new Set([...g1,...(gap>0?g2:[]),...gRN,...gDN,...gHN,...g3,...b2p,...gRP,...gDP,...gHP,...b2rP].filter(r=>!r.oos)).size))   // доп. заголовки — пополнения и высокий ДРР вчера (блоки «Поступления» и «Убыток из-за рекламы» убраны 31.10.2026)
     box.querySelectorAll('details.pr-blk,details.pr-pot').forEach(d=>d.addEventListener('toggle',()=>{PR_OPEN[d.dataset.k]=d.open;}));
     // плавное раскрытие / сворачивание групп «Потенциал есть / исчерпан» — как меню главной (260 мс, без анимации при reduced motion)
