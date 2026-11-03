@@ -1490,6 +1490,9 @@ const PR_DEEP_PCT=15,PR_PRICE_TOL=10,PR_DEEP_DAYS=3,PR_DEEP_LO=0.7,PR_DEEP_HI=1.
 // корпоративный минимум выручки в день, ₽ (решения владельца 31.10 и 02.11.2026): будни — ИП 3 100 000, ООО 100 000; выходные — ИП 2 500 000,
 // ООО 70 000 (по типу вчерашнего дня: добор считается по вчера). Нет минимума — цель = план дня − факт вчера
 const PR_DAY_MIN={ip:{wd:3100000,we:2500000},ooo:{wd:100000,we:70000}};
+// период Б по умолчанию — фиксированный день 15.10.2026 (решение владельца 03.11.2026): «вчера к 15.10»; день вне 35 дней страницы или
+// не раньше вчера — прежнее правило (ближайший день того же типа перед вчера)
+const PR_B_DEF='2026-10-15';
 const PR_UNDER=0.7;
 const NET_FLOOR_PR=5;   // порог чистой прибыли, % (NET_FLOOR plan.html, MARGIN_FLOOR главной)
 // лимиты ДРР при цене P — копия unitPct из plan.html при ДРР 0: pre(P) = (r0 − комиссия(P)) − t − u ÷ (P × b);
@@ -1626,7 +1629,7 @@ async function loadProto(){
   const hasSnap=cur7.map((k,i)=>stockDays[i].length>0),stock=new Map();
   stockDays.forEach((rows,i)=>rows.forEach(x=>{let a=stock.get(x.offer_id);if(!a){a=new Array(7).fill(0);stock.set(x.offer_id,a);}a[i]+=Number(x.stock||0);}));
   // предыдущий день того же типа, что вчера: будний — ближайший будний (пн → пт), выходной — ближайший выходной (вс → сб, сб → вс)
-  const yWe=isWeekendD(yD);let pD=addDays(yD,-1);while(isWeekendD(pD)!==yWe)pD=addDays(pD,-1);const pKey=keyOfMonday(pD);
+  const yWe=isWeekendD(yD);let pD=addDays(yD,-1);while(isWeekendD(pD)!==yWe)pD=addDays(pD,-1);const pKey=DI.has(PR_B_DEF)&&PR_B_DEF<yKey?PR_B_DEF:keyOfMonday(pD);
   const C={i7:cur7.map(k=>DI.get(k)),iy:DI.get(yKey),ip:DI.get(pKey),hasSnap,lastI:hasSnap.lastIndexOf(true)};
   const planDay=(pid,k)=>{const pl=PLAN[k.slice(0,7)+'|'+pid];if(!pl||!(Number(pl.plan_qty)>0))return 0;const [y,m,d]=k.split('-').map(Number);const e=effDaysOfMonth(y,m);return e>0?Number(pl.plan_qty)/e*(isWeekendD(new Date(y,m-1,d))?0.7:1):0;};
   const zeros=n=>new Array(n).fill(0);
