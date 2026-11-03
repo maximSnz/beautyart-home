@@ -864,7 +864,7 @@ function placeTag(v,c){
   return `<span class="pl-bad" title="${full}">&lt;LCL</span>`;
 }
 function renderProducts(...a){const prev=CTX;CTX='plan';try{renderProductsBody(...a);}finally{CTX=prev;}}
-// позиции: неархивные товары с планом на месяц или продажами в базе; перчатки от 2 товаров — группой
+// позиции: все неархивные товары юрлица (у новых без продаж медиана и цель — «—»); перчатки от 2 товаров — группой
 function buildItems(ents,plans,k,ra){
   const items=[];
   ents.forEach((b,bi)=>{
@@ -874,7 +874,7 @@ function buildItems(ents,plans,k,ra){
       const P=prodPoints(D,p.product_id),pl=plan.byPid.get(p.product_id)||null,raw=plan.raw.get(p.product_id);
       const price=raw&&raw.price>0?raw.price:plan.priceOf.get(p.product_id)||0;
       const it={b,pid:p.product_id,offer:p.offer_id,P,plan:pl,price,...itemCalc(P,pl,k,ra,price)};
-      if(pl||it.base>0)list.push(it);});
+      list.push(it);});   // все неархивные товары: новые без продаж и плана тоже — им можно задать первый план (решение владельца 03.11.2026)
     const fam=new Map();
     list.forEach(it=>{const f=gloveFamily(it.offer);if(!f){items.push(it);return;}if(!fam.has(f))fam.set(f,[]);fam.get(f).push(it);});
     fam.forEach((mem,f)=>{
