@@ -298,6 +298,20 @@
         .pr-art:hover { color: #fde047; }
         .pr-tog { cursor: pointer; padding: 0 3px; }
         .pr-item-card { width: min(900px, 100%); }
+        .pr-mx-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 14px 0 6px; font-size: 13px; }
+        .pr-mx-wrap { overflow: auto; max-height: 46vh; border: 1px solid rgba(255,255,255,.18); border-radius: 8px; }
+        table.pr-mx { border-collapse: separate; border-spacing: 0; font-size: 12px; }
+        table.pr-mx th, table.pr-mx td { padding: 3px 5px; text-align: center; white-space: nowrap; border-bottom: 1px solid rgba(255,255,255,.08); min-width: 40px; }
+        table.pr-mx thead th { position: sticky; top: 0; background: #3c1850; z-index: 1; font-weight: 400; color: rgba(255,255,255,.75); }
+        table.pr-mx thead th.we { color: #f9a8d4; }
+        table.pr-mx .pr-mx-art { position: sticky; left: 0; background: #3c1850; text-align: left; max-width: 190px; overflow: hidden; text-overflow: ellipsis; z-index: 2; }
+        table.pr-mx thead th.pr-mx-art { z-index: 3; }
+        .pr-mx-c, .pr-mx-out { cursor: pointer; } .pr-mx-c:hover, .pr-mx-out:hover { background: rgba(255,255,255,.14); }
+        .pr-mx-no { color: rgba(255,255,255,.3); } .pr-mx-out { color: rgba(255,255,255,.45); }
+        .pr-mx-done { background: rgba(74,222,128,.28); } .pr-mx-scr { outline: 1px dashed rgba(255,255,255,.35); outline-offset: -2px; }
+        .pr-modal-top { z-index: 1001; } .pr-mx-card { width: min(620px, 100%); }
+        .pr-mx-r { margin: 10px 0; padding: 8px 10px; border-radius: 8px; background: rgba(28,13,46,.45); font-size: 14px; line-height: 1.45; }
+        .pr-mx-rt { font-size: 15px; margin-bottom: 3px; } .pr-mx-dn { background: rgba(74,222,128,.18); }
         .pr-cal-card { width: min(640px, 100%); }
         .pr-cal-ms { display: flex; gap: 18px; flex-wrap: wrap; }
         .pr-cal-m { flex: 0 0 270px; }
@@ -1715,9 +1729,10 @@ async function prStats(){
   if(!P.doneOk){card.innerHTML=head+'<div class="dev-cap dev-warn">Нет таблицы отметок product_protocol_done (SQL).</div>';return;}
   try{
     const from=keyOfMonday(addDays(new Date(P.todayKey+'T00:00'),-29));
-    const q=c=>fetchPages(`product_protocol_done?day=gte.${from}&day=lte.${P.todayKey}&select=day,pos_key,offer_id,plan_all,plan_m1,plan_m2${c}&order=day,pos_key`);
+    const q=c=>fetchPages(`product_protocol_done?day=gte.${from}&day=lte.${P.todayKey}&select=day,pos_key,offer_id,plan_all,plan_m1,plan_m2,comment,user_email,updated_at${c}&order=day,pos_key`);
+    const qp=c=>fetchPages(`product_protocol_plan?day=gte.${from}&day=lte.${P.todayKey}&select=day,pos_key,mgr,offer_id,reasons,y_day,cmp_day,src${c}&order=day,pos_key`);
     const [rows,plan]=await Promise.all([q(',in_plan').catch(()=>q('')),   // нет колонки in_plan (SQL не запущен) — все отметки, как до 03.11.2026
-      fetchPages(`product_protocol_plan?day=gte.${from}&day=lte.${P.todayKey}&select=day,pos_key,mgr&order=day,pos_key`).catch(()=>[])]);
+      qp(',info').catch(()=>qp('')).catch(()=>[])]);   // нет колонки info — таблица без цифр причин; нет таблицы плана — пусто
     // дни с планом, зафиксированным ночной загрузкой (с 03.11.2026): план = позиции плана менеджера, факт = отметки на них — не больше плана
     const FIX=new Map();plan.forEach(x=>{if(PR_MGR!=='all'&&x.mgr!==PR_MGR)return;(FIX.get(x.day)||FIX.set(x.day,new Set()).get(x.day)).add(x.pos_key);});
     const fixDays=new Set(plan.map(x=>x.day));
@@ -1745,9 +1760,50 @@ async function prStats(){
     sp=withP.reduce((s,p)=>s+p.plan,0),sf=withP.reduce((s,p)=>s+p.fact,0);
     card.innerHTML=head+`<svg viewBox="0 0 ${W} ${H}" class="pr-stat-svg">${g}</svg>`
       +`<div class="dev-cap"><span style="color:#fde047">- - план</span> (всего в работе) · <span style="color:#4ade80">— факт</span> (отмечено выполненным по позициям плана)${withP.length?` · за прошедшие дни с планом: ${sf} из ${sp} (${Math.round(sf/sp*100)}%)`:''}. План дня фиксирует ночная загрузка (с 03.11.2026); раньше он записывался вместе с отметкой — дни без отметок без точки плана.</div>`;
+    // позиции × дни (03.11.2026, решение владельца): по каждой позиции плана — значки причин по дням, выполненные — зелёные; щелчок — разбор
+    {const pl=plan.slice();if(!plan.some(x=>x.day===P.todayKey)&&prIsDef(P))pl.push(...PROTO.planRows(P,PROTO.work(P,ENT),'screen'));   // сегодня без плана — с экрана
+     const d30=[];for(let d=new Date(from+'T00:00');keyOfMonday(d)<=P.todayKey;d=addDays(d,1))d30.push(keyOfMonday(d));
+     PR_MX={plan:pl,done:rows,days:d30,today:P.todayKey};}
+    card.insertAdjacentHTML('beforeend',`<div class="pr-mx-bar"><b>Позиции по дням</b> <select class="chip-glass dev-toggle" onchange="prMxDraw(this.value)">${Object.entries(DEV_MANAGERS).map(([k,v])=>`<option value="${k}"${k===PR_MGR?' selected':''}>${v}</option>`).join('')}</select>
+      <span class="dev-neutral">📉 просадка · 🎯 добор до минимума · 📣 ДРР · 🔍 глубокая аналитика · 🧪 гипотеза · ▲ пополнение · зелёная — выполнено · ✓ — отметка без позиции в плане дня</span></div><div id="prMx" class="pr-mx-wrap"></div>`);
+    prMxDraw(PR_MGR);
     prTips(card);
   }catch(e){card.innerHTML=head+`<div class="dev-cap dev-neg">Ошибка загрузки: ${escH(e.message)}</div>`;}
 }
+let PR_MX=null;
+const PR_RS={drop:'📉',gap:'🎯',drr:'📣',deep:'🔍',hyp:'🧪',restock:'▲'};
+function prMxDraw(mgr){const M=PR_MX,box=document.getElementById('prMx');if(!M||!box)return;
+  const mine=x=>mgr==='all'||x===mgr,dd=k=>k.slice(8,10)+'.'+k.slice(5,7),pos=new Map();
+  M.plan.forEach(x=>{if(!mine(x.mgr))return;let p=pos.get(x.pos_key);if(!p){p={k:x.pos_key,offer:x.offer_id,mgr:x.mgr,cells:new Map()};pos.set(x.pos_key,p);}p.cells.set(x.day,x);});
+  const DN=new Map();M.done.forEach(x=>DN.set(x.day+'|'+x.pos_key,x));const PD=new Set(M.plan.map(x=>x.day));
+  const list=[...pos.values()].sort((a,b)=>b.cells.size-a.cells.size||String(a.offer).localeCompare(String(b.offer)));
+  if(!list.length){box.innerHTML='<div class="dev-cap">Нет позиций: план дня фиксируется с 03.11.2026.</div>';return;}
+  const th=M.days.map(k=>`<th class="${isWeekendD(new Date(k+'T00:00'))?'we':''}">${dd(k)}</th>`).join('');
+  const tr=p=>`<tr><td class="pr-mx-art" title="${escH(p.offer)}">${escH(p.offer)}</td>${M.days.map(k=>{const c=p.cells.get(k),dn=DN.get(k+'|'+p.k);
+    if(!c)return dn?`<td class="pr-mx-out" onclick="prMxCell('${escH(p.k)}','${k}')" title="${PD.has(k)?'отмечено выполненным вне плана':'отмечено выполненным; план дня не зафиксирован (до 03.11.2026)'}">✓</td>`:'<td class="pr-mx-no">—</td>';
+    const ic=String(c.reasons||'').split(',').filter(Boolean).map(r=>PR_RS[r]||'').join('');
+    return `<td class="pr-mx-c${dn?' pr-mx-done':''}${c.src==='screen'?' pr-mx-scr':''}" onclick="prMxCell('${escH(p.k)}','${k}')">${ic}</td>`;}).join('')}</tr>`;
+  box.innerHTML=`<table class="pr-mx"><thead><tr><th class="pr-mx-art">Артикул <span class="dev-neutral">(${list.length})</span></th>${th}</tr></thead><tbody>${list.map(tr).join('')}</tbody></table>`;
+  box.scrollLeft=box.scrollWidth;}
+// разбор ячейки: почему позиция была в плане дня — по каждой причине цифры на момент фиксации (info), и отметка «выполнено»
+function prMxCell(k,day){const M=PR_MX;if(!M)return;const c=M.plan.find(x=>x.pos_key===k&&x.day===day),dn=M.done.find(x=>x.pos_key===k&&x.day===day);
+  const dd=x=>x?x.slice(8,10)+'.'+x.slice(5,7):'—',n0=v=>v==null?'—':fmt0(v),n1=v=>v==null?'—':(v==='inf'?'∞':fmt1(v)),I=(c&&c.info)||null;
+  const HS={late:'срок гипотезы прошёл',none:'нет ни гипотезы, ни даты работы',moved:'дата работы перенесена без гипотезы'};
+  const sec=(ic,t,body)=>`<div class="pr-mx-r"><div class="pr-mx-rt">${ic} ${t}</div><div>${body}</div></div>`;
+  const R={
+    drop:()=>sec('📉','Просадка заказов',I&&I.drop?`Заказы ${dd(c.y_day)}: <b>${n1(I.drop.cur)} шт</b> против ${n1(I.drop.prev)} шт ${dd(c.cmp_day)} (−${n1(I.drop.pct)}%${Math.abs(I.drop.pct-Math.round(I.drop.pct))>=0.05?`, округлённо −${Math.round(I.drop.pct)}%`:''}; порог — ≥ 15% и ≥ 5 шт). Выручка ${n0(I.drop.revC)} ₽ против ${n0(I.drop.revP)} ₽.`:`Заказы ${dd(c.y_day)} ниже ${dd(c.cmp_day)} на ≥ 15% и ≥ 5 шт.`),
+    gap:()=>sec('🎯','Потенциал до условной нормы',I&&I.gap?`Выручка ${n0(I.revY)} ₽ при плане дня ${n0(I.planRY)} ₽ — недобор <b>${n0(I.gap.pot)} ₽</b>. Юрлицу до минимума ${n0(I.gap.min)} ₽ не хватало ${n0(I.gap.gap)} ₽ (выручка всех товаров ${n0(I.gap.revAll)} ₽) — позиция взята в добор по потенциалу.`:'Ниже плана дня — взята в добор до корпоративного минимума выручки.'),
+    drr:()=>sec('📣','ДРР в красной зоне',I&&I.drr?`ДРР ${dd(c.y_day)}: <b>${n1(I.drr.drr)}%</b> (реклама ${n0(I.drr.ads)} ₽ / выручка ${n0(I.revY)} ₽) — выше безубыточного лимита ${n1(I.drr.be)}%${I.drr.plan!=null?` (плановый ${n1(I.drr.plan)}%)`:''}${I.drr.price?` при цене ${n0(I.drr.price)} ₽`:''}: реклама в убыток.`:'ДРР вчера выше безубыточного лимита от цены дня.'),
+    deep:()=>sec('🔍','Глубокая аналитика',I&&I.deep?`За ${I.deep.days} дн: заказы <b>${n1(I.deep.q3)} шт</b> при плане ${n1(I.deep.qPlan3)} (${n1(I.deep.dev)}%), цена ${n0(I.deep.price3)} ₽ при плановой ${n0(I.deep.planPrice)} ₽, ДРР ${n1(I.deep.drr3)}% при плановом лимите ${n1(I.deep.plan)}% (безубыточный ${n1(I.deep.be)}%) — цена и реклама в норме, остаток есть, а заказов нет: карточка, конкуренты, спрос.`:'Цена и реклама в норме, остаток есть, а заказы ниже плана.'),
+    hyp:()=>sec('🧪','Нужна гипотеза',I&&I.hyp?`${HS[I.hyp.state]||'есть размеры без гипотезы'}${I.hyp.due?` (срок ${dd(I.hyp.due)})`:''}.${I.hyp.action?` Последняя гипотеза: «${escH(I.hyp.action)}»${I.hyp.deadline?`, контроль ${dd(I.hyp.deadline)}`:''}.`:''}${I.hyp.sizes&&I.hyp.sizes.length?` Размеры без гипотезы: ${I.hyp.sizes.map(([o,st])=>escH(o)+' — '+(HS[st]||st)).join('; ')}.`:''}`:'Нет действующей гипотезы.'),
+    restock:()=>sec('▲','Пополнение',I&&I.restock?`${I.restock.before!=null&&I.restock.now!=null?`Остаток ${n0(I.restock.before)} → <b>${n0(I.restock.now)} шт</b>. `:''}${I.restock.afterZero?`Снова в наличии после нуля (${dd(I.restock.afterZero)}). `:''}${I.restock.days!=null?`Запас ${n1(I.restock.days)} дн. по плановому темпу.`:''}`:'Остатки пополнились.')};
+  const body=c?String(c.reasons||'').split(',').filter(Boolean).map(r=>R[r]?R[r]():'').join(''):`<div class="dev-cap">${M.plan.some(x=>x.day===day)?'Позиции не было в плане этого дня.':'План этого дня не зафиксирован (фиксация — с 03.11.2026): причин нет.'}</div>`;
+  const gen=I?`<div class="dev-cap">Данные за ${dd(c.y_day)}: заказы ${n1(I.yest)} шт при плане дня ${n1(I.planY)} · выручка ${n0(I.revY)} ₽ при плане ${n0(I.planRY)} ₽ · остаток ${n0(I.stock)} шт (норма наличия ${n0(I.need)})</div>`:(c?`<div class="dev-cap">Данные за ${dd(c.y_day)}, сравнение с ${dd(c.cmp_day)}${c.src==='screen'?' (план дня ещё не зафиксирован — с экрана)':''}; цифры причин не сохранены.</div>`:'');
+  const dnH=dn?`<div class="pr-mx-r pr-mx-dn"><div class="pr-mx-rt">✓ Выполнено${dn.updated_at?' '+new Date(dn.updated_at).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}).replace(',',''):''}</div><div>${escH(dn.comment||'')}${dn.user_email?' — '+escH(dn.user_email):''}</div></div>`:'<div class="dev-cap">Отметки «выполнено» нет.</div>';
+  const off=(c||dn||{}).offer_id||k,ov=document.createElement('div');ov.className='pr-modal pr-modal-top';
+  ov.innerHTML=`<div class="pr-modal-card pr-mx-card"><div class="pr-modal-head"><b>${escH(off)}</b> <span class="dev-neutral">${ENTITIES[ENT].name} · протокол ${dd(day)}${c&&c.src==='manual'?' · план правлен вручную':''}</span><button class="chip-glass" onclick="this.closest('.pr-modal').remove()">✕</button></div>${gen}${body}${dnH}</div>`;
+  const esc=e=>{if(e.key==='Escape'){e.stopImmediatePropagation();ov.remove();document.removeEventListener('keydown',esc,true);}};
+  ov.addEventListener('click',e=>{if(e.target===ov){ov.remove();document.removeEventListener('keydown',esc,true);}});document.addEventListener('keydown',esc,true);document.body.appendChild(ov);}
 // === окно динамики позиции (решения владельца 31.10.2026): 30 дней до вчера — выручка PNL по дням и план дня (пунктир), маржинальность
 // за день как «Рука на пульсе» (по дате заказа; созревшие дни — факт, свежие 7 дн — оценка модели при цене и ДРР дня), отметки ✓ и гипотезы 🧪.
 // Группа перчаток — суммы по размерам (маржинальность — Σ маржи ÷ Σ GMV, оценка — по размерам). Только чтение
