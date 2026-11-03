@@ -1397,8 +1397,9 @@ function hypoHtml(pid){
     line=m==='orders'?`Заказы, шт/день (будни): база ${fmt1(base.orders)} → цель ${fmt1(it.target_orders)}${fact?` → факт ${fmt1(fact.orders)}`:''}`
       :`Маржинальность: база ${p(base.pct)} → цель ${p(it.target_pct)}${fact?` → факт ${p(fact.pct)}`:''}`;
   }else line=`Отклонение маржи: от ${fmt(Number(it.baseline_dev||0))} ₽ к ${fmt(Number(it.target_dev||0))} ₽${it.fact_dev!=null?` → факт ${fmt(Number(it.fact_dev))} ₽`:''}`;
-  const kids=(H.kids.get(it.id)||[]).map(k=>`<div class="dev-hist"><span class="dev-neutral">${dm((k.created_at||'').slice(0,10))}</span> ${escH(k.action)}</div>`).join('');
-  return `<div class="dev-hypo"><b>Последняя гипотеза</b> <span class="dev-neutral">• создана ${dm((it.created_at||'').slice(0,10))} • контроль ${dm(it.deadline)} •</span> ${st}`
+  const dt=t=>{ const d=new Date(t); return t&&!isNaN(d)?d.toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}).replace(',',''):'—'; };  // дата и время постановки (03.11.2026)
+  const kids=(H.kids.get(it.id)||[]).map(k=>`<div class="dev-hist"><span class="dev-neutral">${dt(k.created_at)}</span> ${escH(k.action)}</div>`).join('');
+  return `<div class="dev-hypo"><b>Последняя гипотеза</b> <span class="dev-neutral">• создана ${dt(it.created_at)} • контроль ${dm(it.deadline)} •</span> ${st}`
     +`<div>${escH(it.action)}</div><div class="dev-neutral">${line}</div>${kids?`<div class="dev-neutral">Дополнения:</div>${kids}`:''}</div>`;
 }
 // заметки РОПа (product_watch): новая заметка и «Снять с контроля» — новой записью (история проверок сохраняется);
