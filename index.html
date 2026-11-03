@@ -310,13 +310,17 @@
         .pr-mx-no { color: rgba(255,255,255,.3); } .pr-mx-out { color: rgba(255,255,255,.45); }
         .pr-mx-done { background: rgba(74,222,128,.28); } .pr-mx-scr { outline: 1px dashed rgba(255,255,255,.35); outline-offset: -2px; }
         table.pr-mx-d .pr-mx-drow td { padding: 0 2px; font-size: 10.5px; line-height: 1.25; border-bottom: none; color: rgba(255,255,255,.55); }
-        table.pr-mx-d .pr-mx-drow.bot td { border-bottom: 1px solid rgba(255,255,255,.16); }
+        table.pr-mx-d .pr-mx-drow.bot td, table.pr-mx-d .pr-mx-drow td.pr-mx-art { border-bottom: 1px solid rgba(255,255,255,.16); }   /* разделитель позиций — и в столбце артикулов */
+        table.pr-mx-d .pr-mx-drow td.pr-mx-art { font-size: 12px; color: #fff; padding: 3px 5px; }
         table.pr-mx-d .pr-mx-main td { border-bottom: none; }
         .pr-mx-dv.pos { color: #4ade80 !important; } .pr-mx-dv.neg { color: #f87171 !important; } .pr-mx-dv.est { font-style: italic; opacity: .8; }
         .pr-mx-dv { box-shadow: inset 1px 0 rgba(255,255,255,.08), inset -1px 0 rgba(255,255,255,.08); }
         .pr-mx-dv.pr-mx-skip { background: repeating-linear-gradient(45deg, transparent 0 4px, rgba(255,255,255,.05) 4px 8px); }
         table.pr-mx-d .pr-mx-drow td.pr-mx-sum { font-size: 12px; font-weight: 700; min-width: 64px; color: #fff; border-bottom: 1px solid rgba(255,255,255,.16); }
         table.pr-mx-d .pr-mx-drow td.pr-mx-sum.pos { color: #4ade80; } table.pr-mx-d .pr-mx-drow td.pr-mx-sum.neg { color: #f87171; }
+        tbody.pr-mx-g tr.pr-mx-gh { cursor: pointer; background: rgba(28,13,46,.55); }
+        tbody.pr-mx-g tr.pr-mx-gh:hover { background: rgba(28,13,46,.75); }
+        table.pr-mx-d .pr-mx-drow td.pr-mx-gt { font-size: 13px; background: #2a1038; white-space: nowrap; }
         .pr-modal-top { z-index: 1001; } .pr-mx-card { width: min(620px, 100%); }
         .pr-mx-r { margin: 10px 0; padding: 8px 10px; border-radius: 8px; background: rgba(28,13,46,.45); font-size: 14px; line-height: 1.45; }
         .pr-mx-rt { font-size: 15px; margin-bottom: 3px; } .pr-mx-dn { background: rgba(74,222,128,.18); }
@@ -1795,28 +1799,46 @@ function prMxDraw(mgr){const M=PR_MX,box=document.getElementById('prMx');if(!M||
   if(!list.length){box.innerHTML='<div class="dev-cap">Нет позиций: план дня фиксируется с 03.11.2026.</div>';return;}
   const th=M.days.map(k=>`<th class="${isWeekendD(new Date(k+'T00:00'))?'we':''}">${dd(k)}</th>`).join('');
   const art=p=>`<td class="pr-mx-art" rowspan="${M.mar?3:1}" title="${escH(p.offer)}">${escH(p.offer)}</td>`;
-  const tr=p=>(M.mar?`<tr class="pr-mx-drow top">${art(p)}${prMxDelta(p,M,PIDS,'top')}${prMxSum(p,M,PIDS)}</tr>`:'')+`<tr class="pr-mx-main">${M.mar?'':art(p)}${M.days.map(k=>{const c=p.cells.get(k),dn=DN.get(k+'|'+p.k);
+  const pv=p=>i=>prMxPV(M,PIDS.get(p.k),i);
+  const tr=p=>(M.mar?`<tr class="pr-mx-drow top">${art(p)}${prMxDelta(M,pv(p),'top')}${prMxSumH(prMxTot(M,pv(p)))}</tr>`:'')+`<tr class="pr-mx-main">${M.mar?'':art(p)}${M.days.map(k=>{const c=p.cells.get(k),dn=DN.get(k+'|'+p.k);
     if(!c)return dn?`<td class="pr-mx-out" onclick="prMxCell('${escH(p.k)}','${k}')" title="${PD.has(k)?'отмечено выполненным вне плана':'отмечено выполненным; план дня не зафиксирован (до 03.11.2026)'}">✓</td>`:'<td class="pr-mx-no">—</td>';
     const ic=String(c.reasons||'').split(',').filter(Boolean).map(r=>PR_RS[r]||'').join('');
-    return `<td class="pr-mx-c${dn?' pr-mx-done':''}${c.src==='screen'?' pr-mx-scr':''}" onclick="prMxCell('${escH(p.k)}','${k}')">${ic}</td>`;}).join('')}</tr>`+(M.mar?`<tr class="pr-mx-drow bot">${prMxDelta(p,M,PIDS,'bot')}</tr>`:'');
-  box.innerHTML=`<table class="pr-mx${M.mar?' pr-mx-d':''}"><thead><tr><th class="pr-mx-art" title="сверху — чаще всего в плане дня; ниже — товары с планом продаж, ни разу не попадавшие в протокол">Артикул <span class="dev-neutral">(${list.length}, в плане ${list.filter(p=>p.cells.size).length})</span></th>${th}${M.mar?'<th class="pr-mx-sum" title="Σ разниц маржи соседних дней за видимый период; пары пт → сб и вс → пн не сравниваются (выходные системно ниже будней)">Σ Δ маржи</th>':''}</tr></thead><tbody>${list.map(tr).join('')}</tbody></table>`;
-  box.scrollLeft=box.scrollWidth;}
+    return `<td class="pr-mx-c${dn?' pr-mx-done':''}${c.src==='screen'?' pr-mx-scr':''}" onclick="prMxCell('${escH(p.k)}','${k}')">${ic}</td>`;}).join('')}</tr>`+(M.mar?`<tr class="pr-mx-drow bot">${prMxDelta(M,pv(p),'bot')}</tr>`:'');
+  // группы по знаку Σ Δ маржи (03.11.2026, решение владельца): отрицательное / положительное отклонение, по умолчанию свёрнуты;
+  // в шапке группы — Σ по товарам группы в каждой паре дней и итог; внутри — по Σ (отрицательные — худшие сверху, положительные — лучшие)
+  let body;
+  if(M.mar){const T=new Map(list.map(p=>[p.k,prMxTot(M,pv(p))]));
+    const G=[['neg','📉 Отрицательное',list.filter(p=>T.get(p.k).n&&T.get(p.k).s<0).sort((a,b)=>T.get(a.k).s-T.get(b.k).s)],
+      ['pos','📈 Положительное',list.filter(p=>T.get(p.k).n&&T.get(p.k).s>=0).sort((a,b)=>T.get(b.k).s-T.get(a.k).s)],
+      ['nd','Нет данных',list.filter(p=>!T.get(p.k).n)]].filter(g=>g[2].length);
+    body=G.map(([key,t,items])=>{const gv=i=>prMxGV(M,items,PIDS,i),open=!!PR_MX_OPEN[key];
+      return `<tbody class="pr-mx-g"><tr class="pr-mx-drow top pr-mx-gh" onclick="prMxToggle('${key}')"><td class="pr-mx-art pr-mx-gt" rowspan="3" title="${key==='neg'?'Σ Δ маржи товара за период ниже нуля':(key==='pos'?'Σ Δ маржи товара за период — ноль и выше':'нет маржи по дате заказа')}; щелчок — раскрыть / свернуть">${open?'▾':'▸'} ${t} <span class="dev-neutral">(${items.length})</span></td>${prMxDelta(M,gv,'top')}${prMxSumH(prMxTot(M,gv),`Σ Δ маржи ${items.length} товаров группы`)}</tr>
+        <tr class="pr-mx-main pr-mx-gh" onclick="prMxToggle('${key}')">${M.days.map(()=>'<td></td>').join('')}</tr><tr class="pr-mx-drow bot pr-mx-gh" onclick="prMxToggle('${key}')">${prMxDelta(M,gv,'bot')}</tr></tbody>`
+        +(open?`<tbody>${items.map(tr).join('')}</tbody>`:'');}).join('');}
+  else body=`<tbody>${list.map(tr).join('')}</tbody>`;
+  box.innerHTML=`<table class="pr-mx${M.mar?' pr-mx-d':''}"><thead><tr><th class="pr-mx-art" title="сверху — чаще всего в плане дня; ниже — товары с планом продаж, ни разу не попадавшие в протокол">Артикул <span class="dev-neutral">(${list.length}, в плане ${list.filter(p=>p.cells.size).length})</span></th>${th}${M.mar?'<th class="pr-mx-sum" title="Σ разниц маржи соседних дней за видимый период; пары пт → сб и вс → пн не сравниваются (выходные системно ниже будней)">Σ Δ маржи</th>':''}</tr></thead>${body}</table>`;
+  box.scrollLeft=PR_MX.sl!=null?PR_MX.sl:box.scrollWidth;PR_MX.mgr=mgr;}
+const PR_MX_OPEN={};   // раскрытые группы отклонений — на время просмотра
+function prMxToggle(k){const b=document.getElementById('prMx');PR_MX_OPEN[k]=!PR_MX_OPEN[k];PR_MX.sl=b?b.scrollLeft:null;prMxDraw(PR_MX.mgr||'all');PR_MX.sl=null;}
 // разница маржи соседних дней (03.11.2026, решение владельца): ряды над строкой (пары 1–2, 3–4…) и под ней (2–3, 4–5…) — в шахматном порядке,
 // каждая ячейка на два дня; маржа — по дате заказа (product_margin_daily), у группы перчаток — сумма размеров; пары пт → сб и вс → пн не сравниваются
 const prMxMar=(M,pids,k)=>{let s=0,n=0,est=false;for(const pid of pids||[]){const v=M.mar.get(pid+'|'+k);if(v&&v.mar!=null){s+=v.mar;n++;est=est||v.est;}}return n?{mar:s,est}:null;};
 const prMxSkip=(a,b)=>{const x=new Date(a+'T00:00').getDay(),y=new Date(b+'T00:00').getDay();return (x===5&&y===6)||(x===0&&y===1);};
-function prMxPair(p,M,PIDS,i){const a=M.days[i],b=M.days[i+1],dd=k=>k.slice(8,10)+'.'+k.slice(5,7);
-  if(prMxSkip(a,b))return {html:`<td colspan="2" class="pr-mx-dv pr-mx-skip" title="${dd(a)} → ${dd(b)}: стык будней и выходных — не сравнивается"></td>`,v:null};
-  const A=prMxMar(M,PIDS.get(p.k),a),B=prMxMar(M,PIDS.get(p.k),b);
-  if(!A||!B)return {html:'<td colspan="2" class="pr-mx-dv"></td>',v:null};
-  const v=B.mar-A.mar,est=A.est||B.est,c=v>0?'pos':(v<0?'neg':'');
-  return {html:`<td colspan="2" class="pr-mx-dv ${c}${est?' est':''}" title="маржа ${dd(a)} ${fmt0(A.mar)} ₽ → ${dd(b)} ${fmt0(B.mar)} ₽${est?' (≈ оценка модели: выкупы ещё приходят)':''}">${est?'≈':''}${v>0?'+':''}${fmt0(v)}</td>`,v};}
-function prMxDelta(p,M,PIDS,pos){if(!M.mar)return '';const n=M.days.length;let h='';
-  if(pos==='top'){for(let i=0;i<n;i+=2)h+=i+1<n?prMxPair(p,M,PIDS,i).html:'<td class="pr-mx-dv"></td>';}
-  else{h='<td class="pr-mx-dv"></td>';for(let i=1;i<n;i+=2)h+=i+1<n?prMxPair(p,M,PIDS,i).html:'<td class="pr-mx-dv"></td>';}
+// значение пары дней i, i+1: у товара — по его размерам (pids); у группы отклонений — Σ значений товаров группы
+function prMxPV(M,pids,i){const a=M.days[i],b=M.days[i+1];if(prMxSkip(a,b))return {skip:true};const A=prMxMar(M,pids,a),B=prMxMar(M,pids,b);return A&&B?{v:B.mar-A.mar,est:A.est||B.est,A:A.mar,B:B.mar}:{};}
+function prMxGV(M,items,PIDS,i){let v=0,n=0,est=false;for(const p of items){const r=prMxPV(M,PIDS.get(p.k),i);if(r.skip)return {skip:true};if(r.v!=null){v+=r.v;n++;est=est||r.est;}}return n?{v,est,n}:{};}
+function prMxPairH(M,r,i){const a=M.days[i],b=M.days[i+1],dd=k=>k.slice(8,10)+'.'+k.slice(5,7);
+  if(r.skip)return `<td colspan="2" class="pr-mx-dv pr-mx-skip" title="${dd(a)} → ${dd(b)}: стык будней и выходных — не сравнивается"></td>`;
+  if(r.v==null)return '<td colspan="2" class="pr-mx-dv"></td>';
+  const c=r.v>0?'pos':(r.v<0?'neg':''),t=r.A!=null?`маржа ${dd(a)} ${fmt0(r.A)} ₽ → ${dd(b)} ${fmt0(r.B)} ₽`:`${dd(a)} → ${dd(b)}: Σ разниц ${r.n} товаров`;
+  return `<td colspan="2" class="pr-mx-dv ${c}${r.est?' est':''}" title="${t}${r.est?' (≈ оценка модели: выкупы ещё приходят)':''}">${r.est?'≈':''}${r.v>0?'+':''}${fmt0(r.v)}</td>`;}
+// ряд разниц: top — пары 1–2, 3–4…; bot — 2–3, 4–5… (шахматный порядок); get(i) — значение пары
+function prMxDelta(M,get,pos){const n=M.days.length;let h='';
+  if(pos==='top'){for(let i=0;i<n;i+=2)h+=i+1<n?prMxPairH(M,get(i),i):'<td class="pr-mx-dv"></td>';}
+  else{h='<td class="pr-mx-dv"></td>';for(let i=1;i<n;i+=2)h+=i+1<n?prMxPairH(M,get(i),i):'<td class="pr-mx-dv"></td>';}
   return h;}
-function prMxSum(p,M,PIDS){let s=0,n=0,est=false;for(let i=0;i+1<M.days.length;i++){const r=prMxPair(p,M,PIDS,i);if(r.v!=null){s+=r.v;n++;if(/ est/.test(r.html))est=true;}}
-  return n?`<td class="pr-mx-sum ${s>0?'pos':(s<0?'neg':'')}" rowspan="3" title="сумма ${n} разниц соседних дней${est?'; часть — оценка модели (≈)':''}">${s>0?'+':''}${fmt0(s)}</td>`:'<td class="pr-mx-sum" rowspan="3">—</td>';}
+function prMxTot(M,get){let s=0,n=0,est=false;for(let i=0;i+1<M.days.length;i++){const r=get(i);if(r.v!=null){s+=r.v;n++;est=est||r.est;}}return {s,n,est};}
+function prMxSumH(T,title){return T.n?`<td class="pr-mx-sum ${T.s>0?'pos':(T.s<0?'neg':'')}" rowspan="3" title="${title||`сумма ${T.n} разниц соседних дней`}${T.est?'; часть — оценка модели (≈)':''}">${T.s>0?'+':''}${fmt0(T.s)}</td>`:'<td class="pr-mx-sum" rowspan="3">—</td>';}
 // разбор ячейки: почему позиция была в плане дня — по каждой причине цифры на момент фиксации (info), и отметка «выполнено»
 function prMxCell(k,day){const M=PR_MX;if(!M)return;const c=M.plan.find(x=>x.pos_key===k&&x.day===day),dn=M.done.find(x=>x.pos_key===k&&x.day===day);
   const dd=x=>x?x.slice(8,10)+'.'+x.slice(5,7):'—',n0=v=>v==null?'—':fmt0(v),n1=v=>v==null?'—':(v==='inf'?'∞':fmt1(v)),I=(c&&c.info)||null;
