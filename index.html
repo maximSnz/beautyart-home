@@ -321,6 +321,11 @@
         tbody.pr-mx-g tr.pr-mx-gh { cursor: pointer; background: rgba(28,13,46,.55); }
         tbody.pr-mx-g tr.pr-mx-gh:hover { background: rgba(28,13,46,.75); }
         table.pr-mx-d .pr-mx-drow td.pr-mx-gt { font-size: 13px; background: #2a1038; white-space: nowrap; }
+        .pr-modal-head .pr-full-btn + .chip-glass { margin-left: 6px; }
+        .pr-modal-card.pr-anim { transition: width .35s ease, height .35s ease; }
+        .pr-modal-card.pr-full { max-width: none; max-height: none; display: flex; flex-direction: column; }
+        .pr-modal-card.pr-full .pr-stat-svg { max-height: 30vh; flex: 0 0 auto; }
+        .pr-modal-card.pr-full #prMx { flex: 1 1 auto; max-height: none; min-height: 0; }
         .pr-modal-top { z-index: 1001; } .pr-mx-card { width: min(620px, 100%); }
         .pr-mx-r { margin: 10px 0; padding: 8px 10px; border-radius: 8px; background: rgba(28,13,46,.45); font-size: 14px; line-height: 1.45; }
         .pr-mx-rt { font-size: 15px; margin-bottom: 3px; } .pr-mx-dn { background: rgba(74,222,128,.18); }
@@ -1734,10 +1739,10 @@ async function prDoneDel(k){
 async function prStats(){
   const P=PR_CACHE;if(!P)return;
   const ov=document.createElement('div');ov.className='pr-modal';ov.innerHTML='<div class="pr-modal-card"><div class="dev-cap">Загрузка…</div></div>';
-  const close=()=>{ov.remove();document.removeEventListener('keydown',esc);},esc=e=>{if(e.key==='Escape')close();};
+  const close=()=>{ov.remove();document.removeEventListener('keydown',esc);},esc=e=>{if(e.key!=='Escape')return;const c=ov.querySelector('.pr-modal-card.pr-full');if(c)prStatsFull(c.querySelector('.pr-full-btn'));else close();};   // Esc: сначала свернуть разворот
   ov.addEventListener('click',e=>{if(e.target===ov)close();});document.addEventListener('keydown',esc);document.body.appendChild(ov);
   const card=ov.querySelector('.pr-modal-card'),pk=PR_MGR==='all'?'plan_all':'plan_'+PR_MGR;
-  const head=`<div class="pr-modal-head"><b>📊 Статистика отработки</b> <span class="dev-neutral">${ENTITIES[ENT].name} · ${DEV_MANAGERS[PR_MGR]} · последние 30 дней</span><button class="chip-glass" onclick="this.closest('.pr-modal').remove()">✕</button></div>`;
+  const head=`<div class="pr-modal-head"><b>📊 Статистика отработки</b> <span class="dev-neutral">${ENTITIES[ENT].name} · ${DEV_MANAGERS[PR_MGR]} · последние 30 дней</span><button class="chip-glass pr-full-btn" onclick="prStatsFull(this)" title="Развернуть на весь экран (Esc — свернуть)">⤢</button><button class="chip-glass" onclick="this.closest('.pr-modal').remove()">✕</button></div>`;
   if(!P.doneOk){card.innerHTML=head+'<div class="dev-cap dev-warn">Нет таблицы отметок product_protocol_done (SQL).</div>';return;}
   try{
     const from=keyOfMonday(addDays(new Date(P.todayKey+'T00:00'),-29));
@@ -1786,6 +1791,15 @@ async function prStats(){
   }catch(e){card.innerHTML=head+`<div class="dev-cap dev-neg">Ошибка загрузки: ${escH(e.message)}</div>`;}
 }
 let PR_MX=null;
+// разворот окна «Статистики» на весь экран и обратно (03.11.2026, решение владельца; как ⤢ рабочего пространства): плавно, 350 мс;
+// в развороте таблица «Позиции по дням» занимает всю оставшуюся высоту, график — не выше 30% экрана
+function prStatsFull(btn){const c=btn.closest('.pr-modal-card'),on=!c.classList.contains('pr-full'),r=c.getBoundingClientRect(),red=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  c.classList.remove('pr-anim');c.style.width=r.width+'px';c.style.height=r.height+'px';
+  if(on){c.dataset.w=r.width;c.dataset.h=r.height;c.classList.add('pr-full');}
+  void c.offsetWidth;if(!red)c.classList.add('pr-anim');   // зафиксировать исходный размер, затем — переход
+  if(on){c.style.width=(innerWidth-24)+'px';c.style.height=(innerHeight-24)+'px';}else{c.style.width=c.dataset.w+'px';c.style.height=c.dataset.h+'px';}
+  setTimeout(()=>{if(!on){c.classList.remove('pr-full');c.style.width='';c.style.height='';}c.classList.remove('pr-anim');},red?0:360);
+  btn.textContent=on?'⤡':'⤢';btn.title=on?'Свернуть (Esc)':'Развернуть на весь экран (Esc — свернуть)';}
 const PR_RS={drop:'📉',gap:'🎯',drr:'📣',deep:'🔍',hyp:'🧪',restock:'▲'};
 function prMxDraw(mgr){const M=PR_MX,box=document.getElementById('prMx');if(!M||!box)return;
   const mine=x=>mgr==='all'||x===mgr,dd=k=>k.slice(8,10)+'.'+k.slice(5,7),pos=new Map();
