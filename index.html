@@ -1769,8 +1769,8 @@ async function renderProto(){
     // план отработки дня («Всего в работе») по юрлицу и менеджерам — независимо от фильтра: позиция в списке хотя бы по одной причине,
     // в наличии (список менеджера = список юрлица ∩ его позиции); пишется с отметкой «выполнено» для «Статистики»
     {const selS=new Set(gap>0?sel:[]),w=P.rows.filter(r=>!r.oos&&(r.drop||selS.has(r)||redY(r)||r.deep||r.hState!=='hyp'||r.restock));
-     P.work={all:w.length,m1:w.filter(r=>r.mgr==='m1').length,m2:w.filter(r=>r.mgr==='m2').length};
-     if(prIsDef(P))P.workDef=P.work;}   // план для «Статистики» — всегда при сравнении по умолчанию
+     P.work={all:w.length,m1:w.filter(r=>r.mgr==='m1').length,m2:w.filter(r=>r.mgr==='m2').length};P.workKeys=new Set(w.map(prKey));
+     if(prIsDef(P)){P.workDef=P.work;P.workDefKeys=P.workKeys;}}   // план для «Статистики» — всегда при сравнении по умолчанию
     const shown=new Set([...g1,...g2,...b2]),rX=rows.filter(r=>redY(r)&&!shown.has(r));
     const gRN=rX.filter(below).sort((a,b)=>pot(b)-pot(a)),gRP=rX.filter(r=>!below(r)).sort(byPot);
     rX.forEach(r=>shown.add(r));
@@ -1817,11 +1817,14 @@ async function prDoneSave(k){
   const t=document.getElementById('prDoneText'),msg=document.getElementById('prDoneMsg'),txt=(t&&t.value||'').trim();
   if(!txt){msg.textContent='Комментарий обязателен';t.focus();return;}
   const r=PR_CACHE.rows.find(x=>prKey(x)===k);if(!r)return;
-  const W=PR_CACHE.workDef||PR_CACHE.work||{};
-  const row={plan_all:W.all??null,plan_m1:W.m1??null,plan_m2:W.m2??null,day:PR_CACHE.todayKey,pos_key:k,product_id:r.fam?null:r.pid,offer_id:r.offer,comment:txt,user_email:(window.BA_AUTH&&BA_AUTH.email())||null,updated_at:new Date().toISOString()};
+  const W=PR_CACHE.workDef||PR_CACHE.work||{},WK=PR_CACHE.workDefKeys||PR_CACHE.workKeys;
+  // in_plan — позиция в плане «в работе» в момент отметки (03.11.2026): «Статистика» считает факт только по таким отметкам
+  const row={in_plan:WK?WK.has(k):null,plan_all:W.all??null,plan_m1:W.m1??null,plan_m2:W.m2??null,day:PR_CACHE.todayKey,pos_key:k,product_id:r.fam?null:r.pid,offer_id:r.offer,comment:txt,user_email:(window.BA_AUTH&&BA_AUTH.email())||null,updated_at:new Date().toISOString()};
   msg.textContent='Сохранение…';
   try{
-    const res=await fetch(SUPABASE_URL+'/rest/v1/product_protocol_done?on_conflict=day,pos_key',{method:'POST',headers:{...HD,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(row)});
+    const post=b=>fetch(SUPABASE_URL+'/rest/v1/product_protocol_done?on_conflict=day,pos_key',{method:'POST',headers:{...HD,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(b)});
+    let res=await post(row);
+    if(res.status===400){const t=await res.text();if(/in_plan/.test(t)){console.warn('product_protocol_done: нет колонки in_plan — нужен SQL 2026-11-03');const {in_plan,...b}=row;res=await post(b);}}   // до SQL — без признака
     if(!res.ok)throw new Error('HTTP '+res.status);
     PR_CACHE.done.set(k,row);PR_EDIT=null;renderProto();
   }catch(e){msg.textContent='Ошибка: '+e.message;}
@@ -1846,26 +1849,31 @@ async function prStats(){
   if(!P.doneOk){card.innerHTML=head+'<div class="dev-cap dev-warn">Нет таблицы отметок product_protocol_done (SQL).</div>';return;}
   try{
     const from=keyOfMonday(addDays(new Date(P.todayKey+'T00:00'),-29));
-    const rows=await fetchPages(`product_protocol_done?day=gte.${from}&day=lte.${P.todayKey}&select=day,pos_key,offer_id,plan_all,plan_m1,plan_m2&order=day,pos_key`);
-    const by=new Map();rows.forEach(x=>{if(PR_MGR!=='all'&&matrixOf(x.offer_id||'')!==PR_MGR)return;const d=by.get(x.day)||{fact:0,plan:null};d.fact++;const v=x[pk];if(v!=null)d.plan=Math.max(d.plan??0,v);by.set(x.day,d);});
+    const q=c=>fetchPages(`product_protocol_done?day=gte.${from}&day=lte.${P.todayKey}&select=day,pos_key,offer_id,plan_all,plan_m1,plan_m2${c}&order=day,pos_key`);
+    const rows=await q(',in_plan').catch(()=>q(''));   // нет колонки in_plan (SQL не запущен) — все отметки, как до 03.11.2026
+    // факт — отметки на позициях плана (in_plan; 03.11.2026); вне плана — отдельно (out); пусто (до 03.11) — в факт, как раньше
+    const by=new Map();rows.forEach(x=>{if(PR_MGR!=='all'&&matrixOf(x.offer_id||'')!==PR_MGR)return;const d=by.get(x.day)||{fact:0,out:0,plan:null};if(x.in_plan===false)d.out++;else d.fact++;const v=x[pk];if(v!=null)d.plan=Math.max(d.plan??0,v);by.set(x.day,d);});
     // план дня по всем отметкам дня (у менеджера — его план), а не только его отметкам
-    rows.forEach(x=>{const v=x[pk];if(v==null)return;const d=by.get(x.day)||{fact:0,plan:null};d.plan=Math.max(d.plan??0,v);by.set(x.day,d);});
-    const today=by.get(P.todayKey)||{fact:0,plan:null};today.plan=(P.workDef||P.work||{})[PR_MGR==='all'?'all':PR_MGR]??today.plan;by.set(P.todayKey,today);
+    rows.forEach(x=>{const v=x[pk];if(v==null)return;const d=by.get(x.day)||{fact:0,out:0,plan:null};d.plan=Math.max(d.plan??0,v);by.set(x.day,d);});
+    const today=by.get(P.todayKey)||{fact:0,out:0,plan:null};today.plan=(P.workDef||P.work||{})[PR_MGR==='all'?'all':PR_MGR]??today.plan;
+    {const WK=P.workDefKeys||P.workKeys;if(WK){const mine=P.rows.filter(r=>P.done.has(prKey(r))&&(PR_MGR==='all'||r.mgr===PR_MGR));   // сегодня — с экрана, как чип
+      today.fact=mine.filter(r=>WK.has(prKey(r))).length;today.out=mine.length-today.fact;}}
+    by.set(P.todayKey,today);
     const first=[...by.keys()].sort()[0]||P.todayKey,days=[];for(let d=new Date(first+'T00:00');keyOfMonday(d)<=P.todayKey;d=addDays(d,1))days.push(keyOfMonday(d));
-    const pts=days.map(k=>({k,...(by.get(k)||{fact:0,plan:null})}));
+    const pts=days.map(k=>({k,...(by.get(k)||{fact:0,out:0,plan:null})}));
     const W=780,H=300,L=40,R=16,T=16,B=36,mx=Math.max(1,...pts.map(p=>Math.max(p.fact,p.plan||0)))*1.15;
     const x=i=>L+(pts.length>1?i*(W-L-R)/(pts.length-1):(W-L-R)/2),y=v=>T+(H-T-B)*(1-v/mx),dd=k=>k.slice(8,10)+'.'+k.slice(5,7);
     let g='';for(let i=0;i<=4;i++){const v=mx/1.15*i/4,yy=y(v);g+=`<line x1="${L}" x2="${W-R}" y1="${yy}" y2="${yy}" stroke="rgba(255,255,255,.12)"/><text x="${L-6}" y="${yy+4}" text-anchor="end" font-size="11" fill="rgba(255,255,255,.6)">${Math.round(v)}</text>`;}
     const step=Math.ceil(pts.length/15);pts.forEach((p,i)=>{if(i%step===0||i===pts.length-1)g+=`<text x="${x(i)}" y="${H-12}" text-anchor="middle" font-size="11" fill="rgba(255,255,255,.6)">${dd(p.k)}</text>`;});
     const path=(f)=>{let d='',on=false;pts.forEach((p,i)=>{const v=f(p);if(v==null){on=false;return;}d+=(on?'L':'M')+x(i)+' '+y(v);on=true;});return d;};
     g+=`<path d="${path(p=>p.plan)}" fill="none" stroke="#fde047" stroke-width="2" stroke-dasharray="6 4"/><path d="${path(p=>p.fact)}" fill="none" stroke="#4ade80" stroke-width="2"/>`;
-    pts.forEach((p,i)=>{const tip=`${dd(p.k)}: план ${p.plan??'— (не записан)'}, факт ${p.fact}${p.plan?` (${Math.round(p.fact/p.plan*100)}%)`:''}`;
+    pts.forEach((p,i)=>{const tip=`${dd(p.k)}: план ${p.plan??'— (не записан)'}, факт ${p.fact}${p.plan?` (${Math.round(p.fact/p.plan*100)}%)`:''}${p.out?`; ещё ${p.out} отм. вне плана (не в наличии или не в списке) — в факт не входят`:''}`;
       if(p.plan!=null)g+=`<circle cx="${x(i)}" cy="${y(p.plan)}" r="4" fill="#1C0D2E" stroke="#fde047" stroke-width="2"><title>${tip}</title></circle>`;
       g+=`<circle cx="${x(i)}" cy="${y(p.fact)}" r="4" fill="#4ade80"><title>${tip}</title></circle>`;});
     const withP=pts.filter(p=>p.plan&&p.k!==P.todayKey),   // сегодня день не закончен — в сводный % не входит
     sp=withP.reduce((s,p)=>s+p.plan,0),sf=withP.reduce((s,p)=>s+p.fact,0);
     card.innerHTML=head+`<svg viewBox="0 0 ${W} ${H}" class="pr-stat-svg">${g}</svg>`
-      +`<div class="dev-cap"><span style="color:#fde047">- - план</span> (всего в работе) · <span style="color:#4ade80">— факт</span> (отмечено выполненным)${withP.length?` · за прошедшие дни с планом: ${sf} из ${sp} (${Math.round(sf/sp*100)}%)`:''}. Дни без отметок — без точки плана: план записывается вместе с отметкой.</div>`;
+      +`<div class="dev-cap"><span style="color:#fde047">- - план</span> (всего в работе) · <span style="color:#4ade80">— факт</span> (отмечено выполненным по позициям плана; отметки до 03.11 — все)${withP.length?` · за прошедшие дни с планом: ${sf} из ${sp} (${Math.round(sf/sp*100)}%)`:''}. Дни без отметок — без точки плана: план записывается вместе с отметкой.</div>`;
     prTips(card);
   }catch(e){card.innerHTML=head+`<div class="dev-cap dev-neg">Ошибка загрузки: ${escH(e.message)}</div>`;}
 }
