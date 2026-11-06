@@ -1897,13 +1897,15 @@ function prTips(root){root.querySelectorAll('svg title').forEach(t=>{t.parentEle
 function prFindUnit(k){for(const r of PR_CACHE.rows){if(prKey(r)===k)return r;if(r.members)for(const m of r.members)if(prKey(m)===k)return m;}return null;}
 // вид окна товара (06.11.2026, решение владельца): «Диаграмма» — графики главной; «РНП» — «Рука на пульсе» из plan.html юрлица
 // (plan.html?embed=1&pulse=<артикул>: та же таблица и расчёт, одна копия; грузится 10–20 с); выбор помнится (localStorage)
+// метка версии встроенной РНП: после каждой правки plan.html (режим ?embed=1) менять — иначе браузер показывает plan.html из кэша (06.11.2026)
+const PR_RNP_V='20261106c';
 let PR_ITEM_VIEW=(()=>{try{return localStorage.getItem('ba_item_view')||'dia';}catch(e){return 'dia';}})();
 function prItemView(btn,v,init){const card=btn.closest('.pr-modal-card');if(!init){PR_ITEM_VIEW=v;try{localStorage.setItem('ba_item_view',v);}catch(e){}}
   card.querySelectorAll('.pr-view button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));card.classList.toggle('pr-item-wide',v==='rnp');
   const dia=card.querySelector('.pr-item-dia'),rnp=card.querySelector('.pr-item-rnp');if(!dia||!rnp)return;
   dia.classList.toggle('hide',v!=='dia');rnp.classList.toggle('hide',v!=='rnp');
   if(v==='rnp'&&!rnp.dataset.on){rnp.dataset.on='1';const key=card.dataset.key;
-    rnp.innerHTML=`<iframe class="pr-rnp-frame" data-key="${escH(key)}" src="../${ENT==='ooo'?'beautyart-ooo':'beautyart'}/plan.html?embed=1&pulse=${encodeURIComponent(key)}" title="Рука на пульсе"></iframe>`;}}
+    rnp.innerHTML=`<iframe class="pr-rnp-frame" data-key="${escH(key)}" src="../${ENT==='ooo'?'beautyart-ooo':'beautyart'}/plan.html?embed=1&v=${PR_RNP_V}&pulse=${encodeURIComponent(key)}" title="Рука на пульсе"></iframe>`;}}
 window.addEventListener('message',e=>{if(e.origin!==location.origin||!e.data||e.data.type!=='ba-pulse-h')return;
   document.querySelectorAll('iframe.pr-rnp-frame').forEach(f=>{if(f.dataset.key===e.data.key)f.style.height=(e.data.h+12)+'px';});});
 async function prItem(k){
