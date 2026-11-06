@@ -1905,7 +1905,7 @@ function prItemView(btn,v,init){const card=btn.closest('.pr-modal-card');if(!ini
   if(v==='rnp'&&!rnp.dataset.on){rnp.dataset.on='1';const key=card.dataset.key;
     rnp.innerHTML=`<iframe class="pr-rnp-frame" data-key="${escH(key)}" src="../${ENT==='ooo'?'beautyart-ooo':'beautyart'}/plan.html?embed=1&pulse=${encodeURIComponent(key)}" title="Рука на пульсе"></iframe>`;}}
 window.addEventListener('message',e=>{if(e.origin!==location.origin||!e.data||e.data.type!=='ba-pulse-h')return;
-  document.querySelectorAll('iframe.pr-rnp-frame').forEach(f=>{if(f.dataset.key===e.data.key)f.style.height=Math.min(e.data.h+12,innerHeight*0.8)+'px';});});
+  document.querySelectorAll('iframe.pr-rnp-frame').forEach(f=>{if(f.dataset.key===e.data.key)f.style.height=(e.data.h+12)+'px';});});
 async function prItem(k){
   const P=PR_CACHE,u=prFindUnit(k);if(!u)return;
   const ov=document.createElement('div');ov.className='pr-modal';ov.innerHTML='<div class="pr-modal-card pr-item-card"><div class="dev-cap">Загрузка…</div></div>';
