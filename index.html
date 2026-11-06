@@ -1787,7 +1787,7 @@ async function prStats(){
      // маржа по дате заказа по дням (product_margin_daily — ночная загрузка, шаг 10); нет таблицы — без рядов разниц
      const md=await fetchPages(`product_margin_daily?day=gte.${from}&day=lte.${P.todayKey}&select=product_id,day,mar,est&order=product_id,day`).catch(()=>null);
      const MAR=new Map();(md||[]).forEach(x=>MAR.set(x.product_id+'|'+x.day,{mar:x.mar==null?null:Number(x.mar),est:!!x.est}));
-     PR_MX={plan:pl,done:rows,days:d30,today:P.todayKey,mar:md?MAR:null,all:P.rows.map(r=>({k:prKey(r),offer:r.offer,mgr:r.mgr,pids:r.members?r.members.map(m=>m.pid):[r.pid]}))};}
+     PR_MX={plan:pl,done:rows,days:d30,today:P.todayKey,mar:md?MAR:null,all:P.rows.map(r=>({k:prKey(r),offer:r.offer,mgr:r.mgr,name:r.name||'',n:r.members?r.members.length:0,pids:r.members?r.members.map(m=>m.pid):[r.pid]}))};}
     card.insertAdjacentHTML('beforeend',`<div class="pr-mx-bar"><b>Позиции по дням</b> <select class="chip-glass dev-toggle" onchange="prMxDraw(this.value)">${Object.entries(DEV_MANAGERS).map(([k,v])=>`<option value="${k}"${k===PR_MGR?' selected':''}>${v}</option>`).join('')}</select>
       <span class="dev-neutral">📉 просадка · 🎯 добор до минимума · 📣 ДРР · 🧪 гипотеза · ▲ пополнение · 🔍 глубокая аналитика (до 06.11) · зелёная — выполнено · ✓ — отметка без позиции в плане дня</span></div><div id="prMx" class="pr-mx-wrap"></div>`);
     prMxDraw(PR_MGR);
@@ -1816,7 +1816,9 @@ function prMxDraw(mgr){const M=PR_MX,box=document.getElementById('prMx');if(!M||
   const list=[...pos.values()].sort((a,b)=>b.cells.size-a.cells.size||String(a.offer).localeCompare(String(b.offer)));
   if(!list.length){box.innerHTML='<div class="dev-cap">Нет позиций: план дня фиксируется с 03.11.2026.</div>';return;}
   const th=M.days.map(k=>`<th class="${isWeekendD(new Date(k+'T00:00'))?'we':''}">${dd(k)}</th>`).join('');
-  const art=p=>`<td class="pr-mx-art" rowspan="${M.mar?3:1}" title="${escH(p.offer)}">${escH(p.offer)}</td>`;
+  // артикул — как на главном экране протокола (06.11.2026): подсказка — наименование, щелчок — окно динамики товара (если позиция в списке)
+  const NM=new Map(M.all.map(x=>[x.k,x])),tipA=p=>{const x=NM.get(p.k);return (x&&x.name?(x.n?`${x.name} — группа: ${x.n} разм.`:x.name)+'\n':'')+(x?'Щелчок — динамика за 30 дней':p.offer);};
+  const art=p=>`<td class="pr-mx-art" rowspan="${M.mar?3:1}">${NM.has(p.k)?`<span class="pr-art" onclick="event.stopPropagation();prItem('${escH(p.k)}')" title="${escH(tipA(p))}">${escH(p.offer)}</span>`:`<span title="${escH(p.offer)}">${escH(p.offer)}</span>`}</td>`;
   const pv=p=>i=>prMxPV(M,PIDS.get(p.k),i);
   const tr=p=>(M.mar?`<tr class="pr-mx-drow top">${art(p)}${prMxDelta(M,pv(p),'top')}${prMxSumH(prMxTot(M,pv(p)))}</tr>`:'')+`<tr class="pr-mx-main">${M.mar?'':art(p)}${M.days.map(k=>{const c=p.cells.get(k),dn=DN.get(k+'|'+p.k);
     if(!c)return dn?`<td class="pr-mx-out" onclick="prMxCell('${escH(p.k)}','${k}')" title="${PD.has(k)?'отмечено выполненным вне плана':'отмечено выполненным; план дня не зафиксирован (до 03.11.2026)'}">✓</td>`:'<td class="pr-mx-no">—</td>';
@@ -1893,8 +1895,9 @@ function prFindUnit(k){for(const r of PR_CACHE.rows){if(prKey(r)===k)return r;if
 async function prItem(k){
   const P=PR_CACHE,u=prFindUnit(k);if(!u)return;
   const ov=document.createElement('div');ov.className='pr-modal';ov.innerHTML='<div class="pr-modal-card pr-item-card"><div class="dev-cap">Загрузка…</div></div>';
-  const close=()=>{ov.remove();document.removeEventListener('keydown',esc);},esc=e=>{if(e.key==='Escape')close();};
-  ov.addEventListener('click',e=>{if(e.target===ov)close();});document.addEventListener('keydown',esc);document.body.appendChild(ov);
+  // Esc закрывает только это окно (поверх «Статистики» — не трогая её; 06.11.2026)
+  const close=()=>{ov.remove();document.removeEventListener('keydown',esc,true);},esc=e=>{if(e.key==='Escape'){e.stopImmediatePropagation();close();}};
+  ov.addEventListener('click',e=>{if(e.target===ov)close();});document.addEventListener('keydown',esc,true);document.body.appendChild(ov);
   const card=ov.querySelector('.pr-modal-card'),ms=u.members||[u];
   const head=`<div class="pr-modal-head"><b>📈 ${escH(u.offer)}</b> <span class="dev-neutral">${ENTITIES[ENT].name} · ${u.fam?`группа: ${ms.length} разм. · `:''}30 дней до ${P.yKey.slice(8,10)}.${P.yKey.slice(5,7)}</span><button class="chip-glass" onclick="this.closest('.pr-modal').remove()">✕</button></div>`;
   try{
