@@ -1531,7 +1531,7 @@ const prDropAt=PROTO.dropAt;
 const prIdx=r=>{const P=PR_CACHE,out=[];P.days.forEach((k,i)=>{if(k>=r[0]&&k<=r[1])out.push(i);});return out;};
 function prApplyCmp(){const P=PR_CACHE,ia=prIdx(P.aRange),ib=prIdx(P.bRange);
   P.rows.forEach(r=>{(r.members||[]).forEach(m=>prDropAt(m,ib,ia));prDropAt(r,ib,ia);});renderProto();}
-const prIsDef=P=>P.aRange[0]===P.yKey&&P.aRange[1]===P.yKey&&P.bRange[0]===P.pKeyDef&&P.bRange[1]===P.pKeyDef;
+const prIsDef=P=>P.aRange[0]===P.aDef[0]&&P.aRange[1]===P.aDef[1]&&P.bRange[0]===P.bDef[0]&&P.bRange[1]===P.bDef[1];
 // подпись периода: «Вчера» / «ДД.ММ» / «ДД.ММ–ДД.ММ (ср.)»
 const prRangeLbl=(r,P)=>{const d=k=>k.slice(8,10)+'.'+k.slice(5,7);return r[0]===r[1]?(r[0]===P.yKey?'Вчера':d(r[0])):`${d(r[0])}–${d(r[1])} (ср.)`;};
 // календарь выбора периода: 1-й щелчок — начало, 2-й — конец (раньше начала — меняются местами); «Применить»
@@ -1546,7 +1546,7 @@ function prCalApply(){const P=PR_CACHE,c=PR_CAL;P.bNote='';
   if(c.w==='a'){P.aRange=[c.s,c.e];if(P.bRange[1]>=P.aRange[0]){const d=prBDefFor(P.aRange[0]);P.bRange=[d,d];P.bNote='Б заменён: должен быть раньше А';}}
   else P.bRange=[c.s,c.e];
   prCalClose();prApplyCmp();}
-function prCalReset(){const P=PR_CACHE;P.bNote='';P.aRange=[P.yKey,P.yKey];P.bRange=[P.pKeyDef,P.pKeyDef];prCalClose();prApplyCmp();}
+function prCalReset(){const P=PR_CACHE;P.bNote='';P.aRange=P.aDef.slice();P.bRange=P.bDef.slice();prCalClose();prApplyCmp();}
 function prCalDraw(){
   const P=PR_CACHE,c=PR_CAL,first=c.w==='a'?P.days[1]:P.days[0],last=c.w==='a'?P.yKey:keyOfMonday(addDays(new Date(P.aRange[0]+'T00:00'),-1)),MN=['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
   let ov=document.getElementById('prCal');
@@ -1562,7 +1562,7 @@ function prCalDraw(){
   ov.innerHTML=`<div class="pr-modal-card pr-cal-card"><div class="pr-modal-head"><b>📅 Период ${c.w==='a'?'А — проверяем':'Б — с чем сравниваем'}</b><button class="chip-glass" onclick="prCalClose()">✕</button></div>
     <div class="pr-cal-ms">${html}</div>
     <div class="dev-cap">${c.w==='b'?`Доступны дни до начала периода А (${prRangeLbl(P.aRange,P)}). `:''}Выбрано: <b>${prRangeLbl([c.s,c.e],P)}</b>${nd>1?` — ${nd} дн., сравнивается среднее в день`:''}. ${c.pick?'Щёлкните конец периода (или «Применить» — один день).':'Щёлкните начало периода.'}</div>
-    <div class="pr-cal-btns"><button class="chip-glass" onclick="prCalApply()">Применить</button><button class="chip-glass" onclick="prCalReset()">По умолчанию (вчера к ${P.pKeyDef.slice(8,10)}.${P.pKeyDef.slice(5,7)})</button></div></div>`;
+    <div class="pr-cal-btns"><button class="chip-glass" onclick="prCalApply()">Применить</button><button class="chip-glass" onclick="prCalReset()">По умолчанию (${prRangeLbl(P.aDef,P)} к ${prRangeLbl(P.bDef,P)})</button></div></div>`;
 }
 // загрузка: план дня, зафиксированный ночной загрузкой (product_protocol_plan; его день сравнения — умолчание периода Б, ручная правка дня
 // владельцем меняет и его), затем расчёт позиций общим модулем PROTO.load; нет плана — сравнение по умолчанию (вчера к позавчера того же типа)
@@ -1572,13 +1572,16 @@ async function loadProto(){
   if(PR_CACHE&&PR_CACHE.yKey===yKey)return PR_CACHE;
   const api={all:fetchPages,one:async q=>{const r=await fetch(SUPABASE_URL+'/rest/v1/'+q,{headers:HD});if(!r.ok)throw new Error(`HTTP ${r.status} ${q.split('?')[0]}`);return r.json();}};
   const [planRes,doneRes]=await Promise.all([
-    api.one(`product_protocol_plan?day=eq.${todayKey}&select=pos_key,mgr,reasons,cmp_day,y_day&order=pos_key`).then(r=>({ok:true,rows:r})).catch(()=>({ok:false,rows:[]})),
+    // периоды просадки плана дня (a_from / a_to / cmp_to, 06.11.2026); нет колонок (SQL не запущен) — без них
+    api.one(`product_protocol_plan?day=eq.${todayKey}&select=pos_key,mgr,reasons,cmp_day,y_day,a_from,a_to,cmp_to&order=pos_key`).catch(()=>api.one(`product_protocol_plan?day=eq.${todayKey}&select=pos_key,mgr,reasons,cmp_day,y_day&order=pos_key`)).then(r=>({ok:true,rows:r})).catch(()=>({ok:false,rows:[]})),
     // отметки «выполнено» на сегодня; нет таблицы (SQL не запущен) — чек-боксы с подсказкой
     fetch(SUPABASE_URL+`/rest/v1/product_protocol_done?day=eq.${todayKey}&select=pos_key,comment,user_email,updated_at`,{headers:HD}).then(async r=>r.ok?{ok:true,rows:await r.json()}:{ok:false,status:r.status}).catch(e=>({ok:false,status:e.message}))
   ]);
   const fixed=planRes.rows.length&&planRes.rows[0].y_day===yKey?planRes.rows:null;
-  const P=await PROTO.load(api,{today:todayKey,m1:ENTITIES[ENT].m1,bKey:fixed?fixed[0].cmp_day:null});
-  PR_CACHE={...P,pKeyDef:P.pKey,aRange:[P.yKey,P.yKey],bRange:[P.pKey,P.pKey],doneOk:doneRes.ok,done:new Map((doneRes.rows||[]).map(x=>[x.pos_key,x])),
+  const f0=fixed&&fixed[0],aRange=f0&&f0.a_from?[f0.a_from,f0.a_to]:null,bRange=f0&&f0.cmp_to?[f0.cmp_day,f0.cmp_to]:null;
+  const P=await PROTO.load(api,{today:todayKey,m1:ENTITIES[ENT].m1,bKey:fixed?f0.cmp_day:null,aRange,bRange});
+  // периоды по умолчанию — из плана дня (ручная правка владельца), иначе вчера к ближайшему дню того же типа
+  PR_CACHE={...P,pKeyDef:P.pKey,aDef:P.aR,bDef:P.bR,aRange:P.aR.slice(),bRange:P.bR.slice(),doneOk:doneRes.ok,done:new Map((doneRes.rows||[]).map(x=>[x.pos_key,x])),
     planOk:planRes.ok,fixed:fixed?{keys:new Set(fixed.map(x=>x.pos_key)),rows:fixed,cmp:fixed[0].cmp_day}:null};
   return PR_CACHE;
 }
@@ -1749,7 +1752,7 @@ async function prStats(){
     const q=c=>fetchPages(`product_protocol_done?day=gte.${from}&day=lte.${P.todayKey}&select=day,pos_key,offer_id,plan_all,plan_m1,plan_m2,comment,user_email,updated_at${c}&order=day,pos_key`);
     const qp=c=>fetchPages(`product_protocol_plan?day=gte.${from}&day=lte.${P.todayKey}&select=day,pos_key,mgr,offer_id,reasons,y_day,cmp_day,src${c}&order=day,pos_key`);
     const [rows,plan]=await Promise.all([q(',in_plan').catch(()=>q('')),   // нет колонки in_plan (SQL не запущен) — все отметки, как до 03.11.2026
-      qp(',info').catch(()=>qp('')).catch(()=>[])]);   // нет колонки info — таблица без цифр причин; нет таблицы плана — пусто
+      qp(',info,a_from,a_to,cmp_to').catch(()=>qp(',info')).catch(()=>qp('')).catch(()=>[])]);   // нет колонки info — таблица без цифр причин; нет таблицы плана — пусто
     // дни с планом, зафиксированным ночной загрузкой (с 03.11.2026): план = позиции плана менеджера, факт = отметки на них — не больше плана
     const FIX=new Map();plan.forEach(x=>{if(PR_MGR!=='all'&&x.mgr!==PR_MGR)return;(FIX.get(x.day)||FIX.set(x.day,new Set()).get(x.day)).add(x.pos_key);});
     const fixDays=new Set(plan.map(x=>x.day));
@@ -1859,7 +1862,7 @@ function prMxCell(k,day){const M=PR_MX;if(!M)return;const c=M.plan.find(x=>x.pos
   const HS={late:'срок гипотезы прошёл',none:'нет ни гипотезы, ни даты работы',moved:'дата работы перенесена без гипотезы'};
   const sec=(ic,t,body)=>`<div class="pr-mx-r"><div class="pr-mx-rt">${ic} ${t}</div><div>${body}</div></div>`;
   const R={
-    drop:()=>sec('📉','Просадка заказов',I&&I.drop?`Заказы ${dd(c.y_day)}: <b>${n1(I.drop.cur)} шт</b> против ${n1(I.drop.prev)} шт ${dd(c.cmp_day)} (−${n1(I.drop.pct)}%${Math.abs(I.drop.pct-Math.round(I.drop.pct))>=0.05?`, округлённо −${Math.round(I.drop.pct)}%`:''}; порог — ≥ 15% и ≥ 5 шт). Выручка ${n0(I.drop.revC)} ₽ против ${n0(I.drop.revP)} ₽.`:`Заказы ${dd(c.y_day)} ниже ${dd(c.cmp_day)} на ≥ 15% и ≥ 5 шт.`),
+    drop:()=>sec('📉','Просадка заказов',I&&I.drop?`Заказы ${c.a_from?`${dd(c.a_from)}–${dd(c.a_to)} (в день)`:dd(c.y_day)}: <b>${n1(I.drop.cur)} шт</b> против ${n1(I.drop.prev)} шт ${c.cmp_to&&c.cmp_to!==c.cmp_day?`${dd(c.cmp_day)}–${dd(c.cmp_to)} (в день)`:dd(c.cmp_day)} (−${n1(I.drop.pct)}%${Math.abs(I.drop.pct-Math.round(I.drop.pct))>=0.05?`, округлённо −${Math.round(I.drop.pct)}%`:''}; порог — ≥ 15% и ≥ 5 шт). Выручка ${n0(I.drop.revC)} ₽ против ${n0(I.drop.revP)} ₽.`:`Заказы ${dd(c.y_day)} ниже ${dd(c.cmp_day)} на ≥ 15% и ≥ 5 шт.`),
     gap:()=>sec('🎯','Потенциал до условной нормы',I&&I.gap?`Выручка ${n0(I.revY)} ₽ при плане дня ${n0(I.planRY)} ₽ — недобор <b>${n0(I.gap.pot)} ₽</b>. Юрлицу до минимума ${n0(I.gap.min)} ₽ не хватало ${n0(I.gap.gap)} ₽ (выручка всех товаров ${n0(I.gap.revAll)} ₽) — позиция взята в добор по потенциалу.`:'Ниже плана дня — взята в добор до корпоративного минимума выручки.'),
     drr:()=>sec('📣','ДРР в красной зоне',I&&I.drr?`ДРР ${dd(c.y_day)}: <b>${n1(I.drr.drr)}%</b> (реклама ${n0(I.drr.ads)} ₽ / выручка ${n0(I.revY)} ₽) — выше безубыточного лимита ${n1(I.drr.be)}%${I.drr.plan!=null?` (плановый ${n1(I.drr.plan)}%)`:''}${I.drr.price?` при цене ${n0(I.drr.price)} ₽`:''}: реклама в убыток.`:'ДРР вчера выше безубыточного лимита от цены дня.'),
     deep:()=>sec('🔍','Глубокая аналитика',I&&I.deep?`За ${I.deep.days} дн: заказы <b>${n1(I.deep.q3)} шт</b> при плане ${n1(I.deep.qPlan3)} (${n1(I.deep.dev)}%), цена ${n0(I.deep.price3)} ₽ при плановой ${n0(I.deep.planPrice)} ₽, ДРР ${n1(I.deep.drr3)}% при плановом лимите ${n1(I.deep.plan)}% (безубыточный ${n1(I.deep.be)}%) — цена и реклама в норме, остаток есть, а заказов нет: карточка, конкуренты, спрос.`:'Цена и реклама в норме, остаток есть, а заказы ниже плана.'),
