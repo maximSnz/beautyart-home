@@ -278,6 +278,8 @@
         .pr-cnt { display: inline-block; min-width: 22px; padding: 0 7px; margin-left: 6px; border-radius: 10px; background: #E33D78; color: #fff; font-size: .85em; text-align: center; }
         .pr-sum2 { margin-left: 14px; white-space: nowrap; }   /* значок, подпись и счётчик не разрываются переносом */
         #protoBox .dev-table thead th, #protoBox .dev-table thead th:first-child { text-align: center; vertical-align: middle; }   /* заголовки колонок протокола — по центру */
+        #protoBox .dev-table thead th:not(:first-child) { max-width: 150px; }   /* длинные заголовки — с переносом, место — артикулам (06.11.2026) */
+        #protoBox .dev-table td.dev-art { max-width: none; overflow: visible; white-space: nowrap; }   /* артикул — целиком, наименование — в подсказке */
         .pr-total-chip { margin-right: 16px; height: 30px; font-size: 1.02em; vertical-align: middle; }
         .pr-total-chip b { font-weight: 700; margin-left: 4px; }
         .pr-pot > summary { cursor: pointer; }   /* «Потенциал есть / исчерпан» — свёрнуты по умолчанию */
@@ -1607,7 +1609,8 @@ async function renderProto(){
       const dc=dn?' pr-done':'';
       const ed=isEd?`<tr class="pr-edit"><td colspan="${nc}"><div class="pr-edit-box"><textarea id="prDoneText" placeholder="Что сделано (обязательно)">${escH(dn?dn.comment:'')}</textarea><button class="chip-glass" onclick="prDoneSave('${escH(pk)}')">✓ Выполнено</button>${dn?`<button class="chip-glass" onclick="prDoneDel('${escH(pk)}')">Снять отметку</button>`:''}<button class="chip-glass" onclick="prDoneOpen(null)">Отмена</button><span id="prDoneMsg" class="dev-neutral"></span></div></td></tr>`:'';
       // щелчок по артикулу — окно динамики товара (prItem); группа перчаток раскрывается только по треугольнику (решение владельца 31.10.2026)
-      const art=x=>`<span class="pr-art" onclick="event.stopPropagation();prItem('${escH(prKey(x))}')" title="Динамика за 30 дней">${escH(x.offer)}</span>`;
+      // подсказка артикула — наименование товара (у группы перчаток — первого размера и число размеров), 06.11.2026
+      const art=x=>`<span class="pr-art" onclick="event.stopPropagation();prItem('${escH(prKey(x))}')" title="${escH((x.name?(x.members?`${x.name} — группа: ${x.members.length} разм.`:x.name)+'\n':'')+'Щелчок — динамика за 30 дней')}">${escH(x.offer)}</span>`;
       const head=r.fam?`<tr class="dev-row dev-fam${oos(r)}${up(r)}${dc}"${oT(r)}><td class="dev-art" title="${escH(r.offer)} — группа: ${r.members.length} разм.">${cb}<span class="pr-tog" onclick="event.stopPropagation();toggleProtoFam('${blk}','${escH(r.offer)}')" title="Раскрыть размеры">${open?'▾':'▸'}</span> ${tri(r)}${art(r)} <span class="dev-neutral">(${r.members.length})</span></td>${mgc(r)}${cells(r)}</tr>`
         :`<tr class="${(oos(r)+up(r)+dc).trim()}"${oT(r)}><td class="dev-art" title="${escH(r.offer)}">${cb}${tri(r)}${art(r)}</td>${mgc(r)}${cells(r)}</tr>`;
       return head+ed+(r.fam&&open?(members?members(r):r.members).map(m=>`<tr class="dev-member${oos(m)}${up(m)}"${oT(m)}><td class="dev-art" title="${escH(m.offer)}">${tri(m)}${art(m)}</td>${mgc(m)}${cells(m)}</tr>`).join(''):'');
