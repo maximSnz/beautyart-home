@@ -1789,7 +1789,7 @@ async function prStats(){
      const MAR=new Map();(md||[]).forEach(x=>MAR.set(x.product_id+'|'+x.day,{mar:x.mar==null?null:Number(x.mar),est:!!x.est}));
      PR_MX={plan:pl,done:rows,days:d30,today:P.todayKey,mar:md?MAR:null,all:P.rows.map(r=>({k:prKey(r),offer:r.offer,mgr:r.mgr,name:r.name||'',n:r.members?r.members.length:0,pids:r.members?r.members.map(m=>m.pid):[r.pid]}))};}
     card.insertAdjacentHTML('beforeend',`<div class="pr-mx-bar"><b>Позиции по дням</b> <select class="chip-glass dev-toggle" onchange="prMxDraw(this.value)">${Object.entries(DEV_MANAGERS).map(([k,v])=>`<option value="${k}"${k===PR_MGR?' selected':''}>${v}</option>`).join('')}</select>
-      <span class="dev-neutral">📉 просадка · 🎯 добор до минимума · 📣 ДРР · 🧪 гипотеза · ▲ пополнение · 🔍 глубокая аналитика (до 06.11) · зелёная — выполнено · ✓ — отметка без позиции в плане дня</span></div><div id="prMx" class="pr-mx-wrap"></div>`);
+      <span class="dev-neutral">📉 просадка · 🎯 добор до минимума · 📣 ДРР · 🧪 гипотеза · ▲ пополнение · зелёная — выполнено · ✓ — отметка без позиции в плане дня</span></div><div id="prMx" class="pr-mx-wrap"></div>`);
     prMxDraw(PR_MGR);
     prTips(card);
   }catch(e){card.innerHTML=head+`<div class="dev-cap dev-neg">Ошибка загрузки: ${escH(e.message)}</div>`;}
@@ -1804,7 +1804,7 @@ function prStatsFull(btn){const c=btn.closest('.pr-modal-card'),on=!c.classList.
   if(on){c.style.width=(innerWidth-24)+'px';c.style.height=(innerHeight-24)+'px';}else{c.style.width=c.dataset.w+'px';c.style.height=c.dataset.h+'px';}
   setTimeout(()=>{if(!on){c.classList.remove('pr-full');c.style.width='';c.style.height='';}c.classList.remove('pr-anim');},red?0:360);
   btn.textContent=on?'⤡':'⤢';btn.title=on?'Свернуть (Esc)':'Развернуть на весь экран (Esc — свернуть)';}
-const PR_RS={drop:'📉',gap:'🎯',drr:'📣',deep:'🔍',hyp:'🧪',restock:'▲'};
+const PR_RS={drop:'📉',gap:'🎯',drr:'📣',hyp:'🧪',restock:'▲'};   // глубокая аналитика (deep) не показывается и в прошлых днях (решение владельца 06.11.2026; в базе осталась)
 function prMxDraw(mgr){const M=PR_MX,box=document.getElementById('prMx');if(!M||!box)return;
   const mine=x=>mgr==='all'||x===mgr,dd=k=>k.slice(8,10)+'.'+k.slice(5,7),pos=new Map();
   M.plan.forEach(x=>{if(!mine(x.mgr))return;let p=pos.get(x.pos_key);if(!p){p={k:x.pos_key,offer:x.offer_id,mgr:x.mgr,cells:new Map()};pos.set(x.pos_key,p);}p.cells.set(x.day,x);});
@@ -1823,7 +1823,7 @@ function prMxDraw(mgr){const M=PR_MX,box=document.getElementById('prMx');if(!M||
   const tr=p=>(M.mar?`<tr class="pr-mx-drow top">${art(p)}${prMxDelta(M,pv(p),'top')}${prMxSumH(prMxTot(M,pv(p)))}</tr>`:'')+`<tr class="pr-mx-main">${M.mar?'':art(p)}${M.days.map(k=>{const c=p.cells.get(k),dn=DN.get(k+'|'+p.k);
     if(!c)return dn?`<td class="pr-mx-out" onclick="prMxCell('${escH(p.k)}','${k}')" title="${PD.has(k)?'отмечено выполненным вне плана':'отмечено выполненным; план дня не зафиксирован (до 03.11.2026)'}">✓</td>`:'<td class="pr-mx-no">—</td>';
     const ic=String(c.reasons||'').split(',').filter(Boolean).map(r=>PR_RS[r]||'').join('');
-    return `<td class="pr-mx-c${dn?' pr-mx-done':''}${c.src==='screen'?' pr-mx-scr':''}" onclick="prMxCell('${escH(p.k)}','${k}')">${ic}</td>`;}).join('')}</tr>`+(M.mar?`<tr class="pr-mx-drow bot">${prMxDelta(M,pv(p),'bot')}</tr>`:'');
+    return `<td class="pr-mx-c${dn?' pr-mx-done':''}${c.src==='screen'?' pr-mx-scr':''}" onclick="prMxCell('${escH(p.k)}','${k}')">${ic||'·'}</td>`;}).join('')}</tr>`+(M.mar?`<tr class="pr-mx-drow bot">${prMxDelta(M,pv(p),'bot')}</tr>`:'');
   // группы по знаку Σ Δ маржи (03.11.2026, решение владельца): отрицательное / положительное отклонение, по умолчанию свёрнуты;
   // в шапке группы — Σ по товарам группы в каждой паре дней и итог; внутри — по Σ (отрицательные — худшие сверху, положительные — лучшие)
   let body;
@@ -1868,7 +1868,6 @@ function prMxCell(k,day){const M=PR_MX;if(!M)return;const c=M.plan.find(x=>x.pos
     drop:()=>sec('📉','Просадка заказов',I&&I.drop?`Заказы ${c.a_from?`${dd(c.a_from)}–${dd(c.a_to)} (в день)`:dd(c.y_day)}: <b>${n1(I.drop.cur)} шт</b> против ${n1(I.drop.prev)} шт ${c.cmp_to&&c.cmp_to!==c.cmp_day?`${dd(c.cmp_day)}–${dd(c.cmp_to)} (в день)`:dd(c.cmp_day)} (−${n1(I.drop.pct)}%${Math.abs(I.drop.pct-Math.round(I.drop.pct))>=0.05?`, округлённо −${Math.round(I.drop.pct)}%`:''}; порог — ≥ 15% и ≥ 5 шт). Выручка ${n0(I.drop.revC)} ₽ против ${n0(I.drop.revP)} ₽.`:`Заказы ${dd(c.y_day)} ниже ${dd(c.cmp_day)} на ≥ 15% и ≥ 5 шт.`),
     gap:()=>sec('🎯','Потенциал до условной нормы',I&&I.gap?`Выручка ${n0(I.revY)} ₽ при плане дня ${n0(I.planRY)} ₽ — недобор <b>${n0(I.gap.pot)} ₽</b>. Юрлицу до минимума ${n0(I.gap.min)} ₽ не хватало ${n0(I.gap.gap)} ₽ (выручка всех товаров ${n0(I.gap.revAll)} ₽) — позиция взята в добор по потенциалу.`:'Ниже плана дня — взята в добор до корпоративного минимума выручки.'),
     drr:()=>sec('📣','ДРР в красной зоне',I&&I.drr?`ДРР ${dd(c.y_day)}: <b>${n1(I.drr.drr)}%</b> (реклама ${n0(I.drr.ads)} ₽ / выручка ${n0(I.revY)} ₽) — выше безубыточного лимита ${n1(I.drr.be)}%${I.drr.plan!=null?` (плановый ${n1(I.drr.plan)}%)`:''}${I.drr.price?` при цене ${n0(I.drr.price)} ₽`:''}: реклама в убыток.`:'ДРР вчера выше безубыточного лимита от цены дня.'),
-    deep:()=>sec('🔍','Глубокая аналитика',I&&I.deep?`За ${I.deep.days} дн: заказы <b>${n1(I.deep.q3)} шт</b> при плане ${n1(I.deep.qPlan3)} (${n1(I.deep.dev)}%), цена ${n0(I.deep.price3)} ₽ при плановой ${n0(I.deep.planPrice)} ₽, ДРР ${n1(I.deep.drr3)}% при плановом лимите ${n1(I.deep.plan)}% (безубыточный ${n1(I.deep.be)}%) — цена и реклама в норме, остаток есть, а заказов нет: карточка, конкуренты, спрос.`:'Цена и реклама в норме, остаток есть, а заказы ниже плана.'),
     hyp:()=>sec('🧪','Нужна гипотеза',I&&I.hyp?`${HS[I.hyp.state]||'есть размеры без гипотезы'}${I.hyp.due?` (срок ${dd(I.hyp.due)})`:''}.${I.hyp.action?` Последняя гипотеза: «${escH(I.hyp.action)}»${I.hyp.deadline?`, контроль ${dd(I.hyp.deadline)}`:''}.`:''}${I.hyp.sizes&&I.hyp.sizes.length?` Размеры без гипотезы: ${I.hyp.sizes.map(([o,st])=>escH(o)+' — '+(HS[st]||st)).join('; ')}.`:''}`:'Нет действующей гипотезы.'),
     restock:()=>sec('▲','Пополнение',I&&I.restock?`${I.restock.before!=null&&I.restock.now!=null?`Остаток ${n0(I.restock.before)} → <b>${n0(I.restock.now)} шт</b>. `:''}${I.restock.afterZero?`Снова в наличии после нуля (${dd(I.restock.afterZero)}). `:''}${I.restock.days!=null?`Запас ${n1(I.restock.days)} дн. по плановому темпу.`:''}`:'Остатки пополнились.')};
   const body=c?String(c.reasons||'').split(',').filter(Boolean).map(r=>R[r]?R[r]():'').join(''):`<div class="dev-cap">${M.plan.some(x=>x.day===day)?'Позиции не было в плане этого дня.':'План этого дня не зафиксирован (фиксация — с 03.11.2026): причин нет.'}</div>`;
