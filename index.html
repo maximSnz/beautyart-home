@@ -2118,17 +2118,17 @@ async function loadSum(from,to){
   prods.forEach(p=>{OFFER_PID[p.offer_id]=p.product_id;if(p.sku)SKU_PID[String(p.sku)]=p.product_id;
     BY.set(p.product_id,{pid:p.product_id,offer:p.offer_id,name:p.name||'',archived:!!p.archived,
       grp:p.type_id?(CAT.get(String(p.type_id))||'Категория '+p.type_id):'Без категории',
-      q:0,r:0,m:0,revn:0,cogs:0,ads:0,views:0,pdp:0,ret:0,dlv:0,st:0,sr:0,q14:0,noCost:false,fun:false});});
+      q:0,r:0,m:0,revn:0,cogs:0,ads:0,views:0,pdp:0,rtn:0,dlv:0,st:0,sr:0,q14:0,noCost:false,fun:false});});   // rtn — возвраты, шт (ret — уже %)
   const T={r:0,m:0};
   salesDays.forEach((rows,i)=>{const k=days[i],inP=k>=from,in14=k>=t14;rows.forEach(x=>{const o=BY.get(OFFER_PID[x.offer_id]),q=Number(x.qty||0),r=Number(x.revenue||0);
     if(inP){T.r+=r;if(o){o.q+=q;o.r+=r;}}if(in14&&o)o.q14+=q;});});
   cf.forEach(x=>{T.m+=Number(x.mar||0);const o=BY.get(x.product_id);if(!o)return;o.m+=Number(x.mar||0);o.revn+=Number(x.revn||0);o.cogs+=Number(x.cogs||0);});
   ads.forEach(x=>{const o=BY.get(SKU_PID[x.offer_id]||OFFER_PID[x.offer_id]);if(o)o.ads+=Number(x.amount||0);});
-  (fun||[]).forEach(x=>{const o=BY.get(SKU_PID[String(x.sku)]);if(!o)return;o.fun=true;o.views+=Number(x.hits_view||0);o.pdp+=Number(x.hits_view_pdp||0);o.ret+=Number(x.returns||0);o.dlv+=Number(x.delivered_units||0);});
+  (fun||[]).forEach(x=>{const o=BY.get(SKU_PID[String(x.sku)]);if(!o)return;o.fun=true;o.views+=Number(x.hits_view||0);o.pdp+=Number(x.hits_view_pdp||0);o.rtn+=Number(x.returns||0);o.dlv+=Number(x.delivered_units||0);});
   stk.forEach(x=>{const o=BY.get(OFFER_PID[x.offer_id]);if(o)o.st+=Number(x.stock||0);});
   BY.forEach(o=>{if(!o.st)return;const c=costAt(o.pid,stDay);if(c==null){o.noCost=true;return;}o.sr=o.st*c;});
-  // в отчёте — неархивные товары и архивные, у которых в периоде было движение
-  const rows=[...BY.values()].filter(o=>!o.archived||o.q||o.r||o.m||o.st||o.ads);
+  // в отчёте — только неархивные товары (архивные скрыты — решение владельца 09.11.2026); доли — от итога юрлица, архивные в нём остаются
+  const rows=[...BY.values()].filter(o=>!o.archived);
   const out={from,to,stDay,T,rows,funOk:fun!=null};
   SUM_CACHE[key]=out;return out;
 }
@@ -2136,9 +2136,9 @@ async function loadSum(from,to){
 function sumVals(o,T){return {...o,
   rs:T.r>0?o.r/T.r*100:null, ms:T.m>0&&o.m>=0?o.m/T.m*100:null, mp:sumDiv(o.m,o.revn,100), drr:sumDiv(o.ads,o.r,100),
   ctr:o.fun===false?null:sumDiv(o.pdp,o.views,100), turn:o.st>0?sumDiv(o.st,o.q14/SUM_TURN_DAYS):(o.q14>0?0:null),
-  ret:o.fun===false?null:sumDiv(o.ret,o.dlv,100), roi:sumDiv(o.m,o.cogs,100), sr:o.noCost?null:o.sr};}
-function sumTotal(list,T){const s={q:0,r:0,m:0,revn:0,cogs:0,ads:0,views:0,pdp:0,ret:0,dlv:0,st:0,sr:0,q14:0,noCost:false,fun:list.some(o=>o.fun)};
-  list.forEach(o=>{['q','r','m','revn','cogs','ads','views','pdp','ret','dlv','st','q14'].forEach(k=>s[k]+=o[k]);if(o.sr!=null)s.sr+=o.sr;});
+  ret:o.fun===false?null:sumDiv(o.rtn,o.dlv,100), roi:sumDiv(o.m,o.cogs,100), sr:o.noCost?null:o.sr};}
+function sumTotal(list,T){const s={q:0,r:0,m:0,revn:0,cogs:0,ads:0,views:0,pdp:0,rtn:0,dlv:0,st:0,sr:0,q14:0,noCost:false,fun:list.some(o=>o.fun)};
+  list.forEach(o=>{['q','r','m','revn','cogs','ads','views','pdp','rtn','dlv','st','q14'].forEach(k=>s[k]+=o[k]);if(o.sr!=null)s.sr+=o.sr;});
   return sumVals(s,T);}
 const sumTxt=(v,d)=>v==null?'—':(v===Infinity?'∞':v.toLocaleString('ru-RU',{minimumFractionDigits:d,maximumFractionDigits:d}));
 // фильтр столбца: текст — часть строки; число — «>100», «<=5», «10..50», «=0» или часть показанного значения
@@ -2179,18 +2179,23 @@ async function renderSum(keepMenu){
   }catch(e){box.innerHTML=head+`<div class="dev-cap dev-neg">Ошибка загрузки: ${escH(e.message)}</div>`;}
 }
 let SUM_D=null;
-// перчатки — группой, как в «Протоколе работ» и plan.html (gloveFamily, от 2 товаров; 09.11.2026, решение владельца): строка группы — суммы
-// размеров, проценты — из сумм; фильтры и сортировка — по позициям (группа — одна позиция), фильтр артикула находит группу и по размеру; ▸ — размеры
+// группы (09.11.2026, решения владельца): перчатки — по модели и цвету, как в «Протоколе работ» и plan.html (gloveFamily); остальные товары —
+// вся категория Ozon (столбец «Группа») одной строкой; группа — от 2 товаров. Строка группы — суммы, проценты — из сумм; фильтры и сортировка —
+// по позициям (группа — одна позиция), фильтр артикула находит группу и по артикулу внутри; ▸ — артикулы группы
 const SUM_FAM_OPEN=new Set();   // раскрытые группы — на время просмотра
-function sumFamToggle(k){SUM_FAM_OPEN.has(k)?SUM_FAM_OPEN.delete(k):SUM_FAM_OPEN.add(k);sumBody();}
+let SUM_KEYS=[];                // ключи групп текущей отрисовки — в onclick передаётся номер (название категории может содержать кавычки)
+const sumGroupKey=o=>{const f=gloveFamily(o.offer);return f?'f:'+f:(o.grp==='Без категории'?null:'c:'+o.grp);};
+function sumFamToggle(i){const k=SUM_KEYS[i];if(k==null)return;SUM_FAM_OPEN.has(k)?SUM_FAM_OPEN.delete(k):SUM_FAM_OPEN.add(k);sumBody();}
 function sumBody(){
   const D=SUM_D,tb=document.getElementById('sumBody'),tf=document.getElementById('sumFoot');if(!D||!tb)return;
   const cols=SUM_COLS.filter(c=>!SUM_HIDE.has(c.k));
   const base=D.rows.filter(o=>SUM_MGR==='all'||matrixOf(o.offer)===SUM_MGR),fam=new Map(),pos=[];
-  base.forEach(o=>{const k=gloveFamily(o.offer);if(!k){pos.push(sumVals(o,D.T));return;}if(!fam.has(k))fam.set(k,[]);fam.get(k).push(o);});
+  base.forEach(o=>{const k=sumGroupKey(o);if(!k){pos.push(sumVals(o,D.T));return;}if(!fam.has(k))fam.set(k,[]);fam.get(k).push(o);});
+  SUM_KEYS=[];
   fam.forEach((m,k)=>{if(m.length<2){pos.push(sumVals(m[0],D.T));return;}
-    const g=sumTotal(m,D.T);m.sort((a,b)=>String(a.offer).localeCompare(String(b.offer),'ru'));
-    pos.push({...g,fam:k,members:m.map(o=>sumVals(o,D.T)),grp:m[0].grp,offer:k,name:`${m[0].name||''} — ${m.length} разм.`,archived:false,noCost:false});});
+    const g=sumTotal(m,D.T),glv=k.startsWith('f:');m.sort((a,b)=>String(a.offer).localeCompare(String(b.offer),'ru'));SUM_KEYS.push(k);
+    pos.push({...g,fam:k,fi:SUM_KEYS.length-1,glv,members:m.map(o=>sumVals(o,D.T)),grp:m[0].grp,offer:glv?k.slice(2):'Вся категория',
+      name:glv?`${m[0].name||''} — ${m.length} разм.`:`${m[0].grp}: ${m.length} арт.`,archived:false,noCost:false});});
   const ok=v=>cols.every(c=>c.k==='offer'&&v.members?(!String(SUM_F.offer||'').trim()||[v.offer,...v.members.map(x=>x.offer)].some(t=>sumMatch(c,t,SUM_F.offer))):sumMatch(c,v[c.k],SUM_F[c.k]));
   let list=pos.filter(ok);
   const cmpT=(a,b)=>String(a).localeCompare(String(b),'ru');
@@ -2198,7 +2203,7 @@ function sumBody(){
       if(c.txt)return cmpT(x,y)*SUM_SORT.dir;const nx=x==null?-Infinity:x,ny=y==null?-Infinity:y;if(nx!==ny)return (nx<ny?-1:1)*SUM_SORT.dir;}
     return cmpT(a.grp,b.grp)||cmpT(a.offer,b.offer);});
   const cell=(c,v,o)=>{
-    if(c.k==='offer'&&o.members){const on=SUM_FAM_OPEN.has(o.fam);return `<td class="sum-t" style="cursor:pointer" onclick="sumFamToggle('${escH(o.fam)}')" title="${escH(o.name)}; щелчок — размеры">${on?'▾':'▸'} ${escH(v)}-* <span class="dev-neutral">(${o.members.length})</span></td>`;}
+    if(c.k==='offer'&&o.members){const on=SUM_FAM_OPEN.has(o.fam);return `<td class="sum-t" style="cursor:pointer" onclick="sumFamToggle(${o.fi})" title="${escH(o.name)}; щелчок — ${o.glv?'размеры':'артикулы'}">${on?'▾':'▸'} ${escH(v)}${o.glv?'-*':''} <span class="dev-neutral">(${o.members.length})</span></td>`;}
     if(c.k==='offer')return `<td class="sum-t" title="${escH(o.name)}${o.archived?' (архивный)':''}">${escH(v)}${o.archived?' <span class="dev-neutral">арх.</span>':''}</td>`;
     if(c.txt)return `<td class="sum-t">${escH(v)}</td>`;
     let cl=(c.k==='m'||c.k==='mp'||c.k==='roi')&&v!=null&&v<0?' class="dev-neg"':'';
