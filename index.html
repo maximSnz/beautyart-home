@@ -2179,41 +2179,51 @@ async function renderSum(keepMenu){
   }catch(e){box.innerHTML=head+`<div class="dev-cap dev-neg">Ошибка загрузки: ${escH(e.message)}</div>`;}
 }
 let SUM_D=null;
-// группы (09.11.2026, решения владельца): перчатки — по модели и цвету, как в «Протоколе работ» и plan.html (gloveFamily); остальные товары —
-// вся категория Ozon (столбец «Группа») одной строкой; группа — от 2 товаров. Строка группы — суммы, проценты — из сумм; фильтры и сортировка —
-// по позициям (группа — одна позиция), фильтр артикула находит группу и по артикулу внутри; ▸ — артикулы группы
-const SUM_FAM_OPEN=new Set();   // раскрытые группы — на время просмотра
+// группы (09.11.2026, решения владельца): каждая категория Ozon (столбец «Группа») от 2 артикулов — одна строка «Вся категория»; внутри
+// перчаток — второй уровень: группы по модели и цвету, как в «Протоколе работ» и plan.html (gloveFamily, от 2 размеров), в них — размеры.
+// Строка группы — суммы, проценты — из сумм; фильтры и сортировка — по позициям верхнего уровня, фильтр артикула находит группу и по
+// артикулу внутри; ▸ раскрывает (на время просмотра)
+const SUM_FAM_OPEN=new Set();
 let SUM_KEYS=[];                // ключи групп текущей отрисовки — в onclick передаётся номер (название категории может содержать кавычки)
-const sumGroupKey=o=>{const f=gloveFamily(o.offer);return f?'f:'+f:(o.grp==='Без категории'?null:'c:'+o.grp);};
 function sumFamToggle(i){const k=SUM_KEYS[i];if(k==null)return;SUM_FAM_OPEN.has(k)?SUM_FAM_OPEN.delete(k):SUM_FAM_OPEN.add(k);sumBody();}
+const sumLeaves=o=>o.members?o.members.flatMap(sumLeaves):[o];
+function sumGroup(key,items,raw,T,label,name){   // items — строки уровня ниже (артикулы или группы), raw — исходные артикулы для сумм
+  SUM_KEYS.push(key);const g=sumTotal(raw,T);
+  return {...g,fam:key,fi:SUM_KEYS.length-1,members:items,grp:raw[0].grp,offer:label,name,archived:false,noCost:false};}
 function sumBody(){
   const D=SUM_D,tb=document.getElementById('sumBody'),tf=document.getElementById('sumFoot');if(!D||!tb)return;
-  const cols=SUM_COLS.filter(c=>!SUM_HIDE.has(c.k));
-  const base=D.rows.filter(o=>SUM_MGR==='all'||matrixOf(o.offer)===SUM_MGR),fam=new Map(),pos=[];
-  base.forEach(o=>{const k=sumGroupKey(o);if(!k){pos.push(sumVals(o,D.T));return;}if(!fam.has(k))fam.set(k,[]);fam.get(k).push(o);});
+  const cols=SUM_COLS.filter(c=>!SUM_HIDE.has(c.k)),cmpT=(a,b)=>String(a).localeCompare(String(b),'ru'),byOffer=(a,b)=>cmpT(a.offer,b.offer);
+  const base=D.rows.filter(o=>SUM_MGR==='all'||matrixOf(o.offer)===SUM_MGR),cats=new Map(),pos=[];
   SUM_KEYS=[];
-  fam.forEach((m,k)=>{if(m.length<2){pos.push(sumVals(m[0],D.T));return;}
-    const g=sumTotal(m,D.T),glv=k.startsWith('f:');m.sort((a,b)=>String(a.offer).localeCompare(String(b.offer),'ru'));SUM_KEYS.push(k);
-    pos.push({...g,fam:k,fi:SUM_KEYS.length-1,glv,members:m.map(o=>sumVals(o,D.T)),grp:m[0].grp,offer:glv?k.slice(2):'Вся категория',
-      name:glv?`${m[0].name||''} — ${m.length} разм.`:`${m[0].grp}: ${m.length} арт.`,archived:false,noCost:false});});
-  const ok=v=>cols.every(c=>c.k==='offer'&&v.members?(!String(SUM_F.offer||'').trim()||[v.offer,...v.members.map(x=>x.offer)].some(t=>sumMatch(c,t,SUM_F.offer))):sumMatch(c,v[c.k],SUM_F[c.k]));
+  base.forEach(o=>{if(o.grp==='Без категории'){pos.push(sumVals(o,D.T));return;}if(!cats.has(o.grp))cats.set(o.grp,[]);cats.get(o.grp).push(o);});
+  cats.forEach((m,cat)=>{if(m.length<2){pos.push(sumVals(m[0],D.T));return;}
+    // внутри категории: перчатки — группами по модели и цвету (от 2 размеров), остальное — артикулами
+    const fam=new Map(),items=[];
+    m.forEach(o=>{const f=gloveFamily(o.offer);if(!f){items.push(o);return;}if(!fam.has(f))fam.set(f,[]);fam.get(f).push(o);});
+    const lvl=[];
+    items.forEach(o=>lvl.push(sumVals(o,D.T)));
+    fam.forEach((fm,f)=>{if(fm.length<2){lvl.push(sumVals(fm[0],D.T));return;}fm.sort(byOffer);
+      lvl.push(sumGroup('f:'+f,fm.map(o=>sumVals(o,D.T)),fm,D.T,f+'-*',`${fm[0].name||''} — ${fm.length} разм.`));});
+    lvl.sort(byOffer);
+    pos.push(sumGroup('c:'+cat,lvl,m,D.T,'Вся категория',`${cat}: ${m.length} арт.`));});
+  const ok=v=>cols.every(c=>c.k==='offer'&&v.members?(!String(SUM_F.offer||'').trim()||[v.offer,...sumLeaves(v).map(x=>x.offer)].some(t=>sumMatch(c,t,SUM_F.offer))):sumMatch(c,v[c.k],SUM_F[c.k]));
   let list=pos.filter(ok);
-  const cmpT=(a,b)=>String(a).localeCompare(String(b),'ru');
   list.sort((a,b)=>{if(SUM_SORT){const c=SUM_COLS.find(x=>x.k===SUM_SORT.k),x=a[c.k],y=b[c.k];
       if(c.txt)return cmpT(x,y)*SUM_SORT.dir;const nx=x==null?-Infinity:x,ny=y==null?-Infinity:y;if(nx!==ny)return (nx<ny?-1:1)*SUM_SORT.dir;}
     return cmpT(a.grp,b.grp)||cmpT(a.offer,b.offer);});
-  const cell=(c,v,o)=>{
-    if(c.k==='offer'&&o.members){const on=SUM_FAM_OPEN.has(o.fam);return `<td class="sum-t" style="cursor:pointer" onclick="sumFamToggle(${o.fi})" title="${escH(o.name)}; щелчок — ${o.glv?'размеры':'артикулы'}">${on?'▾':'▸'} ${escH(v)}${o.glv?'-*':''} <span class="dev-neutral">(${o.members.length})</span></td>`;}
-    if(c.k==='offer')return `<td class="sum-t" title="${escH(o.name)}${o.archived?' (архивный)':''}">${escH(v)}${o.archived?' <span class="dev-neutral">арх.</span>':''}</td>`;
+  const cell=(c,v,o,dp)=>{const pad=dp?` style="padding-left:${3+dp*16}px${o.members?';cursor:pointer':''}"`:(o.members?' style="cursor:pointer"':'');
+    if(c.k==='offer'&&o.members){const on=SUM_FAM_OPEN.has(o.fam),n=sumLeaves(o).length;return `<td class="sum-t"${pad} onclick="sumFamToggle(${o.fi})" title="${escH(o.name)}; щелчок — раскрыть">${on?'▾':'▸'} ${escH(v)} <span class="dev-neutral">(${n})</span></td>`;}
+    if(c.k==='offer')return `<td class="sum-t"${pad} title="${escH(o.name)}">${escH(v)}</td>`;
     if(c.txt)return `<td class="sum-t">${escH(v)}</td>`;
     let cl=(c.k==='m'||c.k==='mp'||c.k==='roi')&&v!=null&&v<0?' class="dev-neg"':'';
     if(c.k==='sr'&&o.noCost)return `<td class="dev-neutral" title="нет себестоимости в «Базе товаров»">—</td>`;
-    if(c.k==='sr'&&o.members&&o.members.some(x=>x.noCost))return `<td title="без размеров, у которых нет себестоимости">${sumTxt(v,c.d)}*</td>`;
+    if(c.k==='sr'&&o.members&&sumLeaves(o).some(x=>x.noCost))return `<td title="без артикулов, у которых нет себестоимости">${sumTxt(v,c.d)}*</td>`;
     return `<td${cl}>${sumTxt(v,c.d)}</td>`;};
-  const row=(o,cls)=>`<tr${cls?` class="${cls}"`:''}>${cols.map(c=>cell(c,o[c.k],o)).join('')}</tr>`;
-  tb.innerHTML=list.map(o=>o.members?row(o,'dev-fam')+(SUM_FAM_OPEN.has(o.fam)?o.members.map(x=>row(x,'dev-member')).join(''):''):row(o)).join('')||`<tr><td colspan="${cols.length}" class="sum-t dev-neutral">Нет строк по фильтрам</td></tr>`;
-  const t=sumTotal(list,D.T),nArt=list.reduce((s,o)=>s+(o.members?o.members.length:1),0);
-  tf.innerHTML=`<tr>${cols.map((c,i)=>c.txt?(i===0?`<td class="sum-t" title="позиций (группа перчаток — одна) / артикулов">Итого: ${list.length} поз. / ${nArt} арт.</td>`:'<td></td>'):`<td${(c.k==='m'||c.k==='mp'||c.k==='roi')&&t[c.k]<0?' class="dev-neg"':''}>${sumTxt(t[c.k],c.d)}</td>`).join('')}</tr>`;
+  const rows=(o,dp)=>`<tr${o.members?' class="dev-fam"':(dp?' class="dev-member"':'')}>${cols.map(c=>cell(c,o[c.k],o,dp)).join('')}</tr>`+
+    (o.members&&SUM_FAM_OPEN.has(o.fam)?o.members.map(x=>rows(x,dp+1)).join(''):'');
+  tb.innerHTML=list.map(o=>rows(o,0)).join('')||`<tr><td colspan="${cols.length}" class="sum-t dev-neutral">Нет строк по фильтрам</td></tr>`;
+  const t=sumTotal(list,D.T),nArt=list.reduce((s,o)=>s+sumLeaves(o).length,0);
+  tf.innerHTML=`<tr>${cols.map((c,i)=>c.txt?(i===0?`<td class="sum-t" title="позиций верхнего уровня / артикулов">Итого: ${list.length} поз. / ${nArt} арт.</td>`:'<td></td>'):`<td${(c.k==='m'||c.k==='mp'||c.k==='roi')&&t[c.k]<0?' class="dev-neg"':''}>${sumTxt(t[c.k],c.d)}</td>`).join('')}</tr>`;
 }
 function setHomeTab(tab){
   HOME_TAB=tab;
