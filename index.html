@@ -288,6 +288,7 @@
         .sum-table thead tr:nth-child(2) th { padding: 2px; }
         .sum-table th.sum-f input { width: 100%; min-width: 44px; box-sizing: border-box; height: 20px; padding: 0 4px; font-family: inherit; font-size: .95em; color: #fff; }
         .sum-table th.sum-f input::placeholder { color: rgba(255,255,255,.45); }
+        .sum-table tr.dev-member td:first-child { padding-left: 3px; }   /* размеры группы перчаток — выделены фоном, отступ не нужен */
         .sum-table tfoot td { position: sticky; bottom: 0; background: rgba(28,13,46,.95); font-weight: 600; border-top: 1px solid rgba(255,255,255,.4); }
         /* «Протокол работ» (31.10.2026): 5 блоков задач менеджера */
         .pr-blk { margin: 0 0 10px; border: 1px solid rgba(255,255,255,.22); border-radius: 10px; background: rgba(28,13,46,.18); padding: 4px 8px 8px; }
@@ -2051,13 +2052,11 @@ async function prItem(k){
 }
 function setProtoMgr(v){PR_MGR=v;try{localStorage.setItem('ba_proto_mgr',v);}catch(e){}renderProto();}
 // === вкладка «Сводный отчёт» (09.11.2026, ТЗ собственника «ТЗ 10.08.2026-2»; определения — решения владельца 09.11.2026, CLAUDE.md 5.14) ===
-// строка = артикул; Группа — категория Ozon 3 уровня (products.raw.type_id), Подгруппа — артикул без размера; период с … по …; только чтение
-const SUM_SIZE=/-(XXXS|XXS|XS|S|M|L|XL|XXL|XXXL)$/;   // размер в конце артикула (перчатки): GLV-NIT-BNV-BLU-100-L → GLV-NIT-BNV-BLU-100
+// строка = артикул (перчатки — группой); Группа — категория Ozon 3 уровня (products.raw.type_id); столбец «Подгруппа» убран 09.11.2026 (дублировал артикул); период с … по …; только чтение
 const SUM_TURN_DAYS=14;                              // оборачиваемость — по заказам последних 14 дней до конца периода (решение владельца)
 const sumDiv=(a,b,k=1)=>b>0?a/b*k:(a>0&&b===0?Infinity:null);
 const SUM_COLS=[
   {k:'grp',t:'Группа',txt:1,tip:'категория Ozon 3 уровня (products.raw.type_id); название — из кабинета «Аналитика конкурентов» или отчётов «Аналитика рынка»'},
-  {k:'sub',t:'Подгруппа',txt:1,tip:'артикул без размера (перчатки: размеры одной упаковки вместе)'},
   {k:'offer',t:'Артикул товара',txt:1},
   {k:'q',t:'Заказы, шт',d:0,tip:'Σ product_sales.qty за период (PNL, день заказа — по UTC, как отчёт «Заказы»)'},
   {k:'r',t:'Заказы, ₽',d:0,tip:'Σ product_sales.revenue за период (PNL)'},
@@ -2118,7 +2117,7 @@ async function loadSum(from,to){
   const BY=new Map(),SKU_PID={},OFFER_PID={};
   prods.forEach(p=>{OFFER_PID[p.offer_id]=p.product_id;if(p.sku)SKU_PID[String(p.sku)]=p.product_id;
     BY.set(p.product_id,{pid:p.product_id,offer:p.offer_id,name:p.name||'',archived:!!p.archived,
-      grp:p.type_id?(CAT.get(String(p.type_id))||'Категория '+p.type_id):'Без категории',sub:String(p.offer_id).replace(SUM_SIZE,''),
+      grp:p.type_id?(CAT.get(String(p.type_id))||'Категория '+p.type_id):'Без категории',
       q:0,r:0,m:0,revn:0,cogs:0,ads:0,views:0,pdp:0,ret:0,dlv:0,st:0,sr:0,q14:0,noCost:false,fun:false});});
   const T={r:0,m:0};
   salesDays.forEach((rows,i)=>{const k=days[i],inP=k>=from,in14=k>=t14;rows.forEach(x=>{const o=BY.get(OFFER_PID[x.offer_id]),q=Number(x.qty||0),r=Number(x.revenue||0);
@@ -2167,7 +2166,7 @@ async function renderSum(keepMenu){
     <span>—</span><input type="date" class="chip-glass sum-date" id="sumTo" value="${to}" max="${yKey}" onchange="sumGo(document.getElementById('sumFrom').value,this.value)">
     <select class="chip-glass dev-toggle" onchange="sumSetMgr(this.value)" title="Менеджер (по артикулу, как в plan.html юрлица)">${Object.entries(DEV_MANAGERS).map(([k,t])=>`<option value="${k}"${k===SUM_MGR?' selected':''}>${t}</option>`).join('')}</select>
     <details class="sum-cols"${menuOpen}><summary class="chip-glass dev-toggle">Столбцы${SUM_HIDE.size?` (скрыто ${SUM_HIDE.size})`:''}</summary><div class="sum-menu">${SUM_COLS.map(c=>`<label><input type="checkbox"${SUM_HIDE.has(c.k)?'':' checked'} onchange="sumToggleCol('${c.k}',this.checked)"> ${c.t.replace(/&shy;/g,'')}</label>`).join('')}</div></details>
-  </div><div class="dev-cap" id="sumCap"></div>`;
+  </div>`;   // подпись под фильтрами убрана 09.11.2026 (решение владельца) — как считается, видно в подсказках заголовков
   box.innerHTML=head+'<div class="dev-cap">Загрузка…</div>';
   try{
     const D=await loadSum(from,to);
@@ -2180,23 +2179,36 @@ async function renderSum(keepMenu){
   }catch(e){box.innerHTML=head+`<div class="dev-cap dev-neg">Ошибка загрузки: ${escH(e.message)}</div>`;}
 }
 let SUM_D=null;
+// перчатки — группой, как в «Протоколе работ» и plan.html (gloveFamily, от 2 товаров; 09.11.2026, решение владельца): строка группы — суммы
+// размеров, проценты — из сумм; фильтры и сортировка — по позициям (группа — одна позиция), фильтр артикула находит группу и по размеру; ▸ — размеры
+const SUM_FAM_OPEN=new Set();   // раскрытые группы — на время просмотра
+function sumFamToggle(k){SUM_FAM_OPEN.has(k)?SUM_FAM_OPEN.delete(k):SUM_FAM_OPEN.add(k);sumBody();}
 function sumBody(){
-  const D=SUM_D,tb=document.getElementById('sumBody'),tf=document.getElementById('sumFoot'),cap=document.getElementById('sumCap');if(!D||!tb)return;
-  const cols=SUM_COLS.filter(c=>!SUM_HIDE.has(c.k)),dd=k=>k.slice(8,10)+'.'+k.slice(5,7);
-  let list=D.rows.filter(o=>SUM_MGR==='all'||matrixOf(o.offer)===SUM_MGR).map(o=>sumVals(o,D.T)).filter(v=>cols.every(c=>sumMatch(c,v[c.k],SUM_F[c.k])));
+  const D=SUM_D,tb=document.getElementById('sumBody'),tf=document.getElementById('sumFoot');if(!D||!tb)return;
+  const cols=SUM_COLS.filter(c=>!SUM_HIDE.has(c.k));
+  const base=D.rows.filter(o=>SUM_MGR==='all'||matrixOf(o.offer)===SUM_MGR),fam=new Map(),pos=[];
+  base.forEach(o=>{const k=gloveFamily(o.offer);if(!k){pos.push(sumVals(o,D.T));return;}if(!fam.has(k))fam.set(k,[]);fam.get(k).push(o);});
+  fam.forEach((m,k)=>{if(m.length<2){pos.push(sumVals(m[0],D.T));return;}
+    const g=sumTotal(m,D.T);m.sort((a,b)=>String(a.offer).localeCompare(String(b.offer),'ru'));
+    pos.push({...g,fam:k,members:m.map(o=>sumVals(o,D.T)),grp:m[0].grp,offer:k,name:`${m[0].name||''} — ${m.length} разм.`,archived:false,noCost:false});});
+  const ok=v=>cols.every(c=>c.k==='offer'&&v.members?(!String(SUM_F.offer||'').trim()||[v.offer,...v.members.map(x=>x.offer)].some(t=>sumMatch(c,t,SUM_F.offer))):sumMatch(c,v[c.k],SUM_F[c.k]));
+  let list=pos.filter(ok);
   const cmpT=(a,b)=>String(a).localeCompare(String(b),'ru');
   list.sort((a,b)=>{if(SUM_SORT){const c=SUM_COLS.find(x=>x.k===SUM_SORT.k),x=a[c.k],y=b[c.k];
       if(c.txt)return cmpT(x,y)*SUM_SORT.dir;const nx=x==null?-Infinity:x,ny=y==null?-Infinity:y;if(nx!==ny)return (nx<ny?-1:1)*SUM_SORT.dir;}
-    return cmpT(a.grp,b.grp)||cmpT(a.sub,b.sub)||cmpT(a.offer,b.offer);});
-  const cell=(c,v,o)=>{if(c.k==='offer')return `<td class="sum-t" title="${escH(o.name)}${o.archived?' (архивный)':''}">${escH(v)}${o.archived?' <span class="dev-neutral">арх.</span>':''}</td>`;
+    return cmpT(a.grp,b.grp)||cmpT(a.offer,b.offer);});
+  const cell=(c,v,o)=>{
+    if(c.k==='offer'&&o.members){const on=SUM_FAM_OPEN.has(o.fam);return `<td class="sum-t" style="cursor:pointer" onclick="sumFamToggle('${escH(o.fam)}')" title="${escH(o.name)}; щелчок — размеры">${on?'▾':'▸'} ${escH(v)}-* <span class="dev-neutral">(${o.members.length})</span></td>`;}
+    if(c.k==='offer')return `<td class="sum-t" title="${escH(o.name)}${o.archived?' (архивный)':''}">${escH(v)}${o.archived?' <span class="dev-neutral">арх.</span>':''}</td>`;
     if(c.txt)return `<td class="sum-t">${escH(v)}</td>`;
     let cl=(c.k==='m'||c.k==='mp'||c.k==='roi')&&v!=null&&v<0?' class="dev-neg"':'';
     if(c.k==='sr'&&o.noCost)return `<td class="dev-neutral" title="нет себестоимости в «Базе товаров»">—</td>`;
+    if(c.k==='sr'&&o.members&&o.members.some(x=>x.noCost))return `<td title="без размеров, у которых нет себестоимости">${sumTxt(v,c.d)}*</td>`;
     return `<td${cl}>${sumTxt(v,c.d)}</td>`;};
-  tb.innerHTML=list.map(o=>`<tr>${cols.map(c=>cell(c,o[c.k],o)).join('')}</tr>`).join('')||`<tr><td colspan="${cols.length}" class="sum-t dev-neutral">Нет строк по фильтрам</td></tr>`;
-  const t=sumTotal(list,D.T);
-  tf.innerHTML=`<tr>${cols.map((c,i)=>c.txt?(i===0?`<td class="sum-t">Итого: ${list.length} арт.</td>`:'<td></td>'):`<td${(c.k==='m'||c.k==='mp'||c.k==='roi')&&t[c.k]<0?' class="dev-neg"':''}>${sumTxt(t[c.k],c.d)}</td>`).join('')}</tr>`;
-  if(cap)cap.innerHTML=`${D.from===D.to?dd(D.from):dd(D.from)+'–'+dd(D.to)}: заказы — PNL, маржа — CF по дате начисления; остатки — ${D.stDay?'на '+dd(D.stDay)+(D.stDay<D.to?' (последний снимок)':''):'нет снимков'}; оборачиваемость — по заказам ${SUM_TURN_DAYS} дн до ${dd(D.to)}. Юрлицо за период: заказы ${fmt0(D.T.r)} ₽, маржа ${fmt0(D.T.m)} ₽.${D.funOk?'':' Воронки (CTR, возвраты) в базе нет.'} Подсказки заголовков — как считается.`;
+  const row=(o,cls)=>`<tr${cls?` class="${cls}"`:''}>${cols.map(c=>cell(c,o[c.k],o)).join('')}</tr>`;
+  tb.innerHTML=list.map(o=>o.members?row(o,'dev-fam')+(SUM_FAM_OPEN.has(o.fam)?o.members.map(x=>row(x,'dev-member')).join(''):''):row(o)).join('')||`<tr><td colspan="${cols.length}" class="sum-t dev-neutral">Нет строк по фильтрам</td></tr>`;
+  const t=sumTotal(list,D.T),nArt=list.reduce((s,o)=>s+(o.members?o.members.length:1),0);
+  tf.innerHTML=`<tr>${cols.map((c,i)=>c.txt?(i===0?`<td class="sum-t" title="позиций (группа перчаток — одна) / артикулов">Итого: ${list.length} поз. / ${nArt} арт.</td>`:'<td></td>'):`<td${(c.k==='m'||c.k==='mp'||c.k==='roi')&&t[c.k]<0?' class="dev-neg"':''}>${sumTxt(t[c.k],c.d)}</td>`).join('')}</tr>`;
 }
 function setHomeTab(tab){
   HOME_TAB=tab;
