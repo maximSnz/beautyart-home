@@ -300,6 +300,18 @@
         .sum-cfg-cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px 14px; font-size: .9em; }
         .sum-cfg-cols label { cursor: pointer; white-space: nowrap; }
         .sum-cal-nav { display: flex; gap: 6px; justify-content: flex-end; margin-bottom: 4px; } .sum-cal-nav .chip-glass { cursor: pointer; height: 26px; padding: 0 10px; }
+        .sum-table td[data-ti] { cursor: default; transition: background .12s; }
+        .sum-table td.sum-hl { background: rgba(255,255,255,.24) !important; box-shadow: inset 0 0 0 1px rgba(255,255,255,.7); }
+        .sum-tip { position: fixed; z-index: 2000; display: none; pointer-events: none; min-width: 230px; max-width: 340px; padding: 9px 12px 8px;
+            background: rgba(24,9,40,.96); border: 1px solid rgba(255,255,255,.3); border-radius: 10px; box-shadow: 0 8px 28px rgba(0,0,0,.45);
+            font-family: 'Forum', serif; font-size: 13px; color: #fff; }
+        .sum-tip-h { font-size: .8em; text-transform: uppercase; letter-spacing: .04em; color: rgba(255,255,255,.6); }
+        .sum-tip-r { margin: 1px 0 6px; font-weight: 600; }
+        .sum-tip-l { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 2px 0; }
+        .sum-tip-l b { text-align: right; } .sum-tip-l i, .sum-tip-s { font-style: normal; font-size: .82em; color: rgba(255,255,255,.55); }
+        .sum-tip-l b .sum-tip-s { display: block; font-weight: 400; }
+        .sum-tip-d { border-top: 1px solid rgba(255,255,255,.2); margin-top: 3px; padding-top: 5px; }
+        .sum-tip-n { margin-top: 5px; font-size: .82em; color: #fbbf24; }
         .sum-table tfoot td { position: sticky; bottom: 0; background: rgba(28,13,46,.95); font-weight: 600; border-top: 1px solid rgba(255,255,255,.4); }
         /* «Протокол работ» (31.10.2026): 5 блоков задач менеджера */
         .pr-blk { margin: 0 0 10px; border: 1px solid rgba(255,255,255,.22); border-radius: 10px; background: rgba(28,13,46,.18); padding: 4px 8px 8px; }
@@ -2235,7 +2247,7 @@ async function renderSum(){
     const th=cols.map(c=>`<th class="${c.txt?'sum-t':''}" title="${escH(c.tip||'')}" onclick="sumSort('${c.k}')" style="cursor:pointer">${c.t}${SUM_SORT&&SUM_SORT.k===c.k?(SUM_SORT.dir>0?' ▲':' ▼'):''}</th>`).join('');
     const tf=cols.map(c=>`<th class="sum-f"><input class="chip-glass" value="${escH(SUM_F[c.k]||'')}" placeholder="${c.txt?'фильтр':'>0'}" title="${c.txt?'часть текста':'число: >100, <=5, 10..50, =0 или часть значения'} (по периоду А)" oninput="sumSetF('${c.k}',this.value)"></th>`).join('');
     box.innerHTML=head+`<table class="dev-table sum-table"><thead><tr>${th}</tr><tr>${tf}</tr></thead><tbody id="sumBody"></tbody><tfoot id="sumFoot"></tfoot></table>`;
-    sumSummary();sumBody();
+    sumSummary();sumBody();sumTipBind();
   }catch(e){box.innerHTML=head+`<div class="dev-cap dev-neg">Ошибка загрузки: ${escH(e.message)}</div>`;sumSummary();}
 }
 let SUM_D=null,SUM_DB=null;
@@ -2287,21 +2299,42 @@ function sumBody(){
   const bOf=o=>{if(!BP)return null;const raws=sumLeaves(o).map(x=>BP.get(x.pid)).filter(Boolean);if(!raws.length)return null;return o.members?sumTotal(raws,DB.T):sumVals(raws[0],DB.T);};
   const dl=(c,v,vb)=>{if(!DB)return '';const x=vb?sumDelta(c.k,v,vb[c.k],nA,nB):null;if(!x)return '<div class="sum-d">·</div>';
     const cl=x.up==null||x.d===0?'':((x.d>0)===x.up?' dev-pos':' dev-neg');return `<div class="sum-d${cl}">${x.txt}</div>`;};
-  const tipB=(c,vb)=>DB?` title="Б (${sumRangeLbl([DB.from,DB.to])}): ${vb?sumTxt(vb[c.k],c.d):'нет данных'}${SUM_CMP[c.k]&&SUM_CMP[c.k].t==='flow'&&nA!==nB?' · сравнение — в среднем за день':''}"`:'';
+  // подсказка ячейки — своя карточка (sumTipBind): сейчас / было / отклонение; данные ячейки — в SUM_TIPS по номеру data-ti
+  SUM_TIPS=[];SUM_TIPCTX={a:[D.from,D.to],b:DB?[DB.from,DB.to]:null,nA,nB};const st=document.getElementById('sumTip');if(st)st.style.display='none';
+  const ti=(c,v,o,vb,note)=>{SUM_TIPS.push({c,v,vb:vb?vb[c.k]:null,row:o.offer,name:o.members?'':(o.name||''),note});return ` data-ti="${SUM_TIPS.length-1}"`;};
   const cell=(c,v,o,dp,vb)=>{const pad=dp?` style="padding-left:${3+dp*16}px${o.members?';cursor:pointer':''}"`:(o.members?' style="cursor:pointer"':'');
     if(c.k==='offer'&&o.members){const on=SUM_FAM_OPEN.has(o.fam),n=sumLeaves(o).length;return `<td class="sum-t"${pad} onclick="sumFamToggle(${o.fi})" title="${escH(o.name)}; щелчок — раскрыть">${on?'▾':'▸'} ${escH(v)} <span class="dev-neutral">(${n})</span></td>`;}
     if(c.k==='offer')return `<td class="sum-t"${pad} title="${escH(o.name)}">${escH(v)}</td>`;
     if(c.txt)return `<td class="sum-t">${escH(v)}</td>`;
     let cl=(c.k==='m'||c.k==='mp'||c.k==='roi')&&v!=null&&v<0?' class="dev-neg"':'';
-    if(c.k==='sr'&&o.noCost)return `<td class="dev-neutral" title="нет себестоимости в «Базе товаров»">—${dl(c,null,vb)}</td>`;
-    if(c.k==='sr'&&o.members&&sumLeaves(o).some(x=>x.noCost))return `<td title="без артикулов, у которых нет себестоимости">${sumTxt(v,c.d)}*${dl(c,v,vb)}</td>`;
-    return `<td${tipB(c,vb)}><span${cl}>${sumTxt(v,c.d)}</span>${dl(c,v,vb)}</td>`;};
+    if(c.k==='sr'&&o.noCost)return `<td class="dev-neutral"${ti(c,null,o,vb,'нет себестоимости в «Базе товаров»')}>—${dl(c,null,vb)}</td>`;
+    if(c.k==='sr'&&o.members&&sumLeaves(o).some(x=>x.noCost))return `<td${ti(c,v,o,vb,'* без артикулов, у которых нет себестоимости')}>${sumTxt(v,c.d)}*${dl(c,v,vb)}</td>`;
+    return `<td${ti(c,v,o,vb)}><span${cl}>${sumTxt(v,c.d)}</span>${dl(c,v,vb)}</td>`;};
   const rows=(o,dp)=>{const vb=bOf(o);return `<tr${o.members?' class="dev-fam"':(dp?' class="dev-member"':'')}>${cols.map(c=>cell(c,o[c.k],o,dp,vb)).join('')}</tr>`;}
   const tree=(o,dp)=>rows(o,dp)+(o.members&&SUM_FAM_OPEN.has(o.fam)?o.members.map(x=>tree(x,dp+1)).join(''):'');
   tb.innerHTML=list.map(o=>tree(o,0)).join('')||`<tr><td colspan="${cols.length}" class="sum-t dev-neutral">Нет строк по фильтрам</td></tr>`;
   const t=sumTotal(list,D.T),nArt=list.reduce((s,o)=>s+sumLeaves(o).length,0),tB=bOf({members:list});
-  tf.innerHTML=`<tr>${cols.map((c,i)=>c.txt?(i===0?`<td class="sum-t" title="${SUM_VIEW==='item'?'артикулов':'групп / артикулов'}">Итого: ${SUM_VIEW==='item'?nArt+' арт.':`${list.length} гр. / ${nArt} арт.`}</td>`:'<td></td>'):`<td${tipB(c,tB)}><span${(c.k==='m'||c.k==='mp'||c.k==='roi')&&t[c.k]<0?' class="dev-neg"':''}>${sumTxt(t[c.k],c.d)}</span>${dl(c,t[c.k],tB)}</td>`).join('')}</tr>`;
+  tf.innerHTML=`<tr>${cols.map((c,i)=>c.txt?(i===0?`<td class="sum-t" title="${SUM_VIEW==='item'?'артикулов':'групп / артикулов'}">Итого: ${SUM_VIEW==='item'?nArt+' арт.':`${list.length} гр. / ${nArt} арт.`}</td>`:'<td></td>'):`<td${ti(c,t[c.k],{offer:'Итого',members:1},tB)}><span${(c.k==='m'||c.k==='mp'||c.k==='roi')&&t[c.k]<0?' class="dev-neg"':''}>${sumTxt(t[c.k],c.d)}</span>${dl(c,t[c.k],tB)}</td>`).join('')}</tr>`;
 }
+let SUM_TIPS=[],SUM_TIPCTX=null;
+function sumTipHtml(t){const X=SUM_TIPCTX,c=t.c,cmp=SUM_CMP[c.k],flow=cmp&&cmp.t==='flow',v=x=>sumTxt(x,c.d);
+  const pd=(x,n)=>flow&&X.b&&x!=null&&isFinite(x)?`<span class="sum-tip-s">${sumTxt(x/n,c.d)} в день</span>`:'';
+  let h=`<div class="sum-tip-h">${c.t.replace(/&shy;/g,'')}</div><div class="sum-tip-r">${escH(t.row)}${t.name?`<span class="sum-tip-s"> — ${escH(t.name)}</span>`:''}</div>`;
+  h+=`<div class="sum-tip-l"><span>Сейчас <i>${sumRangeLbl(X.a)}</i></span><b>${v(t.v)}${pd(t.v,X.nA)}</b></div>`;
+  if(X.b){const x=sumDelta(c.k,t.v,t.vb,X.nA,X.nB),cl=!x||x.up==null||x.d===0?'':((x.d>0)===x.up?'dev-pos':'dev-neg');
+    h+=`<div class="sum-tip-l"><span>Было <i>${sumRangeLbl(X.b)}</i></span><b>${v(t.vb)}${pd(t.vb,X.nB)}</b></div>`;
+    h+=`<div class="sum-tip-l sum-tip-d"><span>Отклонение${flow?' <i>в среднем за день</i>':''}</span><b class="${cl}">${x?x.txt:'—'}</b></div>`;}
+  if(t.note)h+=`<div class="sum-tip-n">${escH(t.note)}</div>`;
+  return h;}
+// карточка над ячейкой (под ней — если сверху нет места), ячейка подсвечивается; при прокрутке и уходе мыши — скрыть
+function sumTipBind(){const box=document.getElementById('sumBox');if(!box||box._tip)return;box._tip=1;
+  let tip=document.getElementById('sumTip');if(!tip){tip=document.createElement('div');tip.id='sumTip';tip.className='sum-tip';document.body.appendChild(tip);}
+  let cur=null;const off=()=>{if(cur)cur.classList.remove('sum-hl');cur=null;tip.style.display='none';};
+  box.addEventListener('mouseover',e=>{const td=e.target.closest('td[data-ti]');if(td===cur)return;off();if(!td)return;
+    const t=SUM_TIPS[+td.dataset.ti];if(!t||!SUM_TIPCTX)return;cur=td;td.classList.add('sum-hl');tip.innerHTML=sumTipHtml(t);tip.style.display='block';
+    const r=td.getBoundingClientRect(),w=tip.offsetWidth,h=tip.offsetHeight;let x=r.left+r.width/2-w/2,y=r.top-h-8;if(y<8)y=r.bottom+8;
+    tip.style.left=Math.max(8,Math.min(innerWidth-w-8,x))+'px';tip.style.top=y+'px';});
+  box.addEventListener('mouseleave',off);box.addEventListener('scroll',off,true);}
 function setHomeTab(tab){
   HOME_TAB=tab;
   document.getElementById('tabProto').classList.toggle('on',tab==='proto');
