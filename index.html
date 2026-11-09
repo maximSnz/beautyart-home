@@ -2063,7 +2063,7 @@ const SUM_COLS=[
   {k:'r',t:'Заказы, ₽',d:0,tip:'Σ product_sales.revenue за период (PNL)'},
   {k:'rs',t:'Доля заказов, %',d:1,tip:'заказы ₽ ÷ заказы ₽ всего юрлица за период (все товары, включая архивные)'},
   {k:'m',t:'Маржа, ₽',d:0,tip:'Σ cf_daily.mar за период — маржа CF по дате начисления'},
-  {k:'ms',t:'Доля маржи, %',d:1,tip:'маржа ÷ маржа всего юрлица за период (CF); при маржe юрлица ≤ 0 — не считается'},
+  {k:'ms',t:'Доля маржи, %',d:1,tip:'маржа ÷ маржа всего юрлица за период (CF); у убыточных (маржа < 0) и при марже юрлица ≤ 0 — не считается'},
   {k:'mp',t:'Маржина&shy;льность, %',d:1,tip:'Σ маржи ÷ Σ GMV (cf_daily.revn) — CF, как Σmar ÷ Σrevn'},
   {k:'drr',t:'ДРР, %',d:1,tip:'реклама (ozon_ad_spend, по SKU) ÷ заказы ₽ (PNL) за период'},
   {k:'ctr',t:'CTR, %',d:1,tip:'просмотры карточки ÷ показы (воронка Ozon, product_funnel_daily)'},
@@ -2076,9 +2076,9 @@ const SUM_COLS=[
 let SUM_HIDE=new Set((()=>{try{return JSON.parse(localStorage.getItem('ba_sum_hide')||'[]');}catch(e){return [];}})());
 let SUM_F={},SUM_SORT=null,SUM_MGR=(()=>{try{return localStorage.getItem('ba_sum_mgr')||'all';}catch(e){return 'all';}})(),SUM_CACHE={},SUM_P=null;
 function sumYest(){const t=new Date();t.setHours(0,0,0,0);return addDays(t,-1);}
+// период по умолчанию (быстрые кнопки периода убраны 09.11.2026 — решение владельца)
 function sumPreset(k){const y=sumYest();let a,b=y;
-  if(k==='y')a=y;else if(k==='d7')a=addDays(y,-6);else if(k==='d30')a=addDays(y,-29);
-  else if(k==='m')a=new Date(y.getFullYear(),y.getMonth(),1);
+  if(k==='m')a=new Date(y.getFullYear(),y.getMonth(),1);
   else if(k==='pm'){a=new Date(y.getFullYear(),y.getMonth()-1,1);b=new Date(y.getFullYear(),y.getMonth(),0);}
   return [keyOfMonday(a),keyOfMonday(b)];}
 async function sumPool(tasks,n){const out=new Array(tasks.length);let i=0;await Promise.all(Array.from({length:Math.min(n,tasks.length)},async()=>{while(i<tasks.length){const j=i++;out[j]=await tasks[j]();}}));return out;}
@@ -2135,7 +2135,7 @@ async function loadSum(from,to){
 }
 // показатели строки (и итогов) из сумм
 function sumVals(o,T){return {...o,
-  rs:T.r>0?o.r/T.r*100:null, ms:T.m>0?o.m/T.m*100:null, mp:sumDiv(o.m,o.revn,100), drr:sumDiv(o.ads,o.r,100),
+  rs:T.r>0?o.r/T.r*100:null, ms:T.m>0&&o.m>=0?o.m/T.m*100:null, mp:sumDiv(o.m,o.revn,100), drr:sumDiv(o.ads,o.r,100),
   ctr:o.fun===false?null:sumDiv(o.pdp,o.views,100), turn:o.st>0?sumDiv(o.st,o.q14/SUM_TURN_DAYS):(o.q14>0?0:null),
   ret:o.fun===false?null:sumDiv(o.ret,o.dlv,100), roi:sumDiv(o.m,o.cogs,100), sr:o.noCost?null:o.sr};}
 function sumTotal(list,T){const s={q:0,r:0,m:0,revn:0,cogs:0,ads:0,views:0,pdp:0,ret:0,dlv:0,st:0,sr:0,q14:0,noCost:false,fun:list.some(o=>o.fun)};
@@ -2156,18 +2156,15 @@ function sumSetF(k,v){SUM_F[k]=v;sumBody();}
 function sumSort(k){SUM_SORT=SUM_SORT&&SUM_SORT.k===k?(SUM_SORT.dir<0?null:{k,dir:-1}):{k,dir:1};renderSum();}
 function sumToggleCol(k,on){on?SUM_HIDE.delete(k):SUM_HIDE.add(k);try{localStorage.setItem('ba_sum_hide',JSON.stringify([...SUM_HIDE]));}catch(e){}renderSum(true);}
 function sumGo(a,b){if(!a||!b)return;if(a>b)[a,b]=[b,a];SUM_P=[a,b];renderSum();}
-function sumGoPreset(k){const [a,b]=sumPreset(k);sumGo(a,b);}
 async function renderSum(keepMenu){
   const box=document.getElementById('sumBox');if(!box)return;
   if(!SUM_P)SUM_P=sumPreset(sumYest().getDate()===1?'pm':'m');   // по умолчанию — с 1-го числа по вчера (1-го числа — прошлый месяц)
   const [from,to]=SUM_P,yKey=keyOfMonday(sumYest()),dd=k=>k.slice(8,10)+'.'+k.slice(5,7)+'.'+k.slice(0,4);
   const cols=SUM_COLS.filter(c=>!SUM_HIDE.has(c.k));
-  const pres=[['y','Вчера'],['d7','7 дней'],['d30','30 дней'],['m','С 1-го числа'],['pm','Прошлый месяц']].map(([k,t])=>{const [a,b]=sumPreset(k);return `<button class="chip-glass dev-toggle${a===from&&b===to?' on':''}" onclick="sumGoPreset('${k}')">${t}</button>`;}).join('');
   const menuOpen=keepMenu&&box.querySelector('.sum-cols[open]')?' open':'';
   const head=`<div class="sum-ctl"><span>Период</span>
     <input type="date" class="chip-glass sum-date" id="sumFrom" value="${from}" max="${yKey}" onchange="sumGo(this.value,document.getElementById('sumTo').value)">
     <span>—</span><input type="date" class="chip-glass sum-date" id="sumTo" value="${to}" max="${yKey}" onchange="sumGo(document.getElementById('sumFrom').value,this.value)">
-    ${pres}
     <select class="chip-glass dev-toggle" onchange="sumSetMgr(this.value)" title="Менеджер (по артикулу, как в plan.html юрлица)">${Object.entries(DEV_MANAGERS).map(([k,t])=>`<option value="${k}"${k===SUM_MGR?' selected':''}>${t}</option>`).join('')}</select>
     <details class="sum-cols"${menuOpen}><summary class="chip-glass dev-toggle">Столбцы${SUM_HIDE.size?` (скрыто ${SUM_HIDE.size})`:''}</summary><div class="sum-menu">${SUM_COLS.map(c=>`<label><input type="checkbox"${SUM_HIDE.has(c.k)?'':' checked'} onchange="sumToggleCol('${c.k}',this.checked)"> ${c.t.replace(/&shy;/g,'')}</label>`).join('')}</div></details>
   </div><div class="dev-cap" id="sumCap"></div>`;
