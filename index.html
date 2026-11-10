@@ -2303,8 +2303,13 @@ function sumBody(){
   SUM_TIPS=[];SUM_TIPCTX={a:[D.from,D.to],b:DB?[DB.from,DB.to]:null,nA,nB};const st=document.getElementById('sumTip');if(st)st.style.display='none';
   const ti=(c,v,o,vb,note)=>{SUM_TIPS.push({c,v,vb:vb?vb[c.k]:null,row:o.offer,name:o.members?'':(o.name||''),note});return ` data-ti="${SUM_TIPS.length-1}"`;};
   const cell=(c,v,o,dp,vb)=>{const pad=dp?` style="padding-left:${3+dp*16}px${o.members?';cursor:pointer':''}"`:(o.members?' style="cursor:pointer"':'');
-    if(c.k==='offer'&&o.members){const on=SUM_FAM_OPEN.has(o.fam),n=sumLeaves(o).length;return `<td class="sum-t"${pad} onclick="sumFamToggle(${o.fi})" title="${escH(o.name)}; щелчок — раскрыть">${on?'▾':'▸'} ${escH(v)} <span class="dev-neutral">(${n})</span></td>`;}
-    if(c.k==='offer')return `<td class="sum-t"${pad} title="${escH(o.name)}">${escH(v)}</td>`;
+    // группа перчаток «модель + цвет» и артикул — щелчок по названию открывает окно товара (sumItem); ▸ / щелчок по строке — раскрыть
+    if(c.k==='offer'&&o.members){const on=SUM_FAM_OPEN.has(o.fam),n=sumLeaves(o).length,f=String(o.fam).startsWith('f:');
+      const nm=f?`<span class="pr-art" onclick="event.stopPropagation();sumItem('${escH(o.fam)}','${escH(o.fam.slice(2))}')" title="${escH(o.name)}
+Щелчок — окно товара (РНП)">${escH(v)}</span>`:escH(v);
+      return `<td class="sum-t"${pad} onclick="sumFamToggle(${o.fi})" title="${escH(o.name)}; щелчок — раскрыть">${on?'▾':'▸'} ${nm} <span class="dev-neutral">(${n})</span></td>`;}
+    if(c.k==='offer')return `<td class="sum-t"${pad}><span class="pr-art" onclick="sumItem('${escH(String(o.pid))}','${escH(o.offer)}')" title="${escH(o.name)}
+Щелчок — окно товара (РНП)">${escH(v)}</span></td>`;
     if(c.txt)return `<td class="sum-t">${escH(v)}</td>`;
     let cl=(c.k==='m'||c.k==='mp'||c.k==='roi')&&v!=null&&v<0?' class="dev-neg"':'';
     if(c.k==='sr'&&o.noCost)return `<td class="dev-neutral"${ti(c,null,o,vb,'нет себестоимости в «Базе товаров»')}>—${dl(c,null,vb)}</td>`;
@@ -2316,6 +2321,21 @@ function sumBody(){
   const t=sumTotal(list,D.T),nArt=list.reduce((s,o)=>s+sumLeaves(o).length,0),tB=bOf({members:list});
   tf.innerHTML=`<tr>${cols.map((c,i)=>c.txt?(i===0?`<td class="sum-t" title="${SUM_VIEW==='item'?'артикулов':'групп / артикулов'}">Итого: ${SUM_VIEW==='item'?nArt+' арт.':`${list.length} гр. / ${nArt} арт.`}</td>`:'<td></td>'):`<td${ti(c,t[c.k],{offer:'Итого',members:1},tB)}><span${(c.k==='m'||c.k==='mp'||c.k==='roi')&&t[c.k]<0?' class="dev-neg"':''}>${sumTxt(t[c.k],c.d)}</span>${dl(c,t[c.k],tB)}</td>`).join('')}</tr>`;
 }
+// окно товара по щелчку на артикул (10.11.2026, решение владельца): то же, что в «Протоколе работ» (prItem — «Диаграмма | РНП»); данные
+// протокола подгружаются при первом щелчке; товара нет в протоколе (нет плана на месяц) — окно только с РНП (plan.html?embed=1, как вид «РНП»)
+let SUM_ITEM_BUSY=false;
+async function sumItem(key,offer){if(SUM_ITEM_BUSY)return;SUM_ITEM_BUSY=true;
+  const wait=document.createElement('div');wait.className='pr-modal';wait.innerHTML='<div class="pr-modal-card pr-item-card"><div class="dev-cap">Открываю окно товара…</div></div>';document.body.appendChild(wait);
+  let ok=false;try{await loadProto();ok=!!prFindUnit(key);}catch(e){}
+  wait.remove();SUM_ITEM_BUSY=false;
+  if(ok)return prItem(key);
+  sumRnpOnly(offer);}
+function sumRnpOnly(offer){const ov=document.createElement('div');ov.className='pr-modal';
+  const close=()=>{ov.remove();document.removeEventListener('keydown',esc,true);},esc=e=>{if(e.key==='Escape'){e.stopImmediatePropagation();close();}};
+  ov.addEventListener('click',e=>{if(e.target===ov)close();});document.addEventListener('keydown',esc,true);
+  ov.innerHTML=`<div class="pr-modal-card pr-item-card pr-item-wide"><div class="pr-modal-head"><b>🩺 ${escH(offer)}</b> <span class="dev-neutral">${ENTITIES[ENT].name} · Рука на пульсе (нет плана на месяц — без диаграммы)</span><button class="chip-glass">✕</button></div>
+    <div class="pr-item-rnp"><iframe class="pr-rnp-frame" data-key="${escH(offer)}" src="../${ENT==='ooo'?'beautyart-ooo':'beautyart'}/plan.html?embed=1&v=${PR_RNP_V}&pulse=${encodeURIComponent(offer)}" title="Рука на пульсе"></iframe></div></div>`;
+  ov.querySelector('.pr-modal-head .chip-glass').onclick=close;document.body.appendChild(ov);}
 let SUM_TIPS=[],SUM_TIPCTX=null;
 function sumTipHtml(t){const X=SUM_TIPCTX,c=t.c,cmp=SUM_CMP[c.k],flow=cmp&&cmp.t==='flow',v=x=>sumTxt(x,c.d);
   const pd=(x,n)=>flow&&X.b&&x!=null&&isFinite(x)?`<span class="sum-tip-s">${sumTxt(x/n,c.d)} в день</span>`:'';
