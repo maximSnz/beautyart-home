@@ -615,7 +615,7 @@
 })();
 </script>
 <script src="auth.js?v=20261021"></script>
-<script src="protocol_calc.js?v=20261106b"></script>   <!-- менять ?v= при каждой правке protocol_calc.js — иначе браузер берёт старый из кэша -->
+<script src="protocol_calc.js?v=20261110"></script>   <!-- менять ?v= при каждой правке protocol_calc.js — иначе браузер берёт старый из кэша -->
 <script>
 // === константы и доступ ===
 // юрлицо: ИП / ООО — своя база и своё разделение товаров по менеджерам (matrixOf как в plan.html юрлица).
@@ -1056,12 +1056,12 @@ const DEV_GROUPS=[
 ];
 const escH=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const monthKeyOf=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-// перчатки: группа = артикул до цвета включительно (GLV-NIT-BNV-BLU-50-L → GLV-NIT-BNV-BLU); упаковка и размер не важны
+// перчатки: группа = артикул до цвета и фасовки включительно (GLV-NIT-BNV-BLU-50-L → GLV-NIT-BNV-BLU-50); размер не важен
 const GLV_COLORS=new Set(['BLK','BLU','PNK','GRY','YLW','PUR','CLR','WHT','GRN','RED','ORG','BRN','BEG']);
 function gloveFamily(offer){
   const s=String(offer).split('-');
   if(s[0]!=='GLV')return null;
-  for(let i=2;i<s.length;i++)if(GLV_COLORS.has(s[i]))return i<s.length-1?s.slice(0,i+1).join('-'):null;
+  for(let i=2;i<s.length;i++)if(GLV_COLORS.has(s[i])){const e=/^\d+$/.test(s[i+1]||'')?i+1:i;return e>i||e<s.length-1?s.slice(0,e+1).join('-'):null;}   // фасовка (число после цвета) — часть группы, 10.11.2026
   return null;
 }
 // группа перчаток — одна позиция: суммы по товарам; цена, ДРР, маржинальность — из сумм; план маржинальности — взвешенный по плановой выручке
@@ -1926,7 +1926,7 @@ function prFindUnit(k){for(const r of PR_CACHE.rows){if(prKey(r)===k)return r;if
 // вид окна товара (06.11.2026, решение владельца): «Диаграмма» — графики главной; «РНП» — «Рука на пульсе» из plan.html юрлица
 // (plan.html?embed=1&pulse=<артикул>: та же таблица и расчёт, одна копия; грузится 10–20 с); выбор помнится (localStorage)
 // метка версии встроенной РНП: после каждой правки plan.html (режим ?embed=1) менять — иначе браузер показывает plan.html из кэша (06.11.2026)
-const PR_RNP_V='20261109d';
+const PR_RNP_V='20261110b';
 let PR_ITEM_VIEW=(()=>{try{return localStorage.getItem('ba_item_view')||'dia';}catch(e){return 'dia';}})();
 function prItemView(btn,v,init){const card=btn.closest('.pr-modal-card');if(!init){PR_ITEM_VIEW=v;try{localStorage.setItem('ba_item_view',v);}catch(e){}}
   card.querySelectorAll('.pr-view button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));card.classList.toggle('pr-item-wide',v==='rnp');

@@ -744,12 +744,12 @@ async function renderPlan(fast){
 // менеджеры — как matrixOf в plan.html юрлица: префиксы Ильи, остальные — Ольга
 const MANAGER_M1={ip:/^(CAP|GLV|SEAL|RNC)-/,ooo:/^(CAP|INS|FW|MS|ML|SE)-/};
 const matrixOf=(b,offer)=>MANAGER_M1[b].test(offer)?'m1':'m2';
-// перчатки — группа по производителю и цвету, как gloveFamily в index.html / plan.html
+// перчатки — группа по производителю, цвету и фасовке, как gloveFamily в index.html / plan.html
 const GLV_COLORS=new Set(['BLK','BLU','PNK','GRY','YLW','PUR','CLR','WHT','GRN','RED','ORG','BRN','BEG']);
 function gloveFamily(offer){
   const s=String(offer).split('-');
   if(s[0]!=='GLV')return null;
-  for(let i=2;i<s.length;i++)if(GLV_COLORS.has(s[i]))return i<s.length-1?s.slice(0,i+1).join('-'):null;
+  for(let i=2;i<s.length;i++)if(GLV_COLORS.has(s[i])){const e=/^\d+$/.test(s[i+1]||'')?i+1:i;return e>i||e<s.length-1?s.slice(0,e+1).join('-'):null;}   // фасовка (число после цвета) — часть группы, 10.11.2026
   return null;
 }
 let PR={mgr:'all',q:'',sort:'marGap'};const PR_OPEN=new Set();
