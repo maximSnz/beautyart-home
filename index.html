@@ -928,23 +928,6 @@ function drawChart(boxId,tooltipId,cfg){
   svg+=`</svg>`;
   box.insertAdjacentHTML('beforeend',svg);
 
-  try{
-    box.querySelectorAll('text.vlbl').forEach(t=>{
-      const b=t.getBBox();
-      const r=document.createElementNS('http://www.w3.org/2000/svg','rect');
-      r.setAttribute('class','vlbl-bg');
-      r.setAttribute('x',(b.x-6).toFixed(1));
-      r.setAttribute('y',(b.y-3).toFixed(1));
-      r.setAttribute('width',(b.width+12).toFixed(1));
-      r.setAttribute('height',(b.height+6).toFixed(1));
-      r.setAttribute('rx',6);
-      r.setAttribute('fill','rgba(28,13,46,0.75)');
-      r.setAttribute('stroke','rgba(255,255,255,0.30)');
-      r.setAttribute('stroke-width','1');
-      t.parentNode.insertBefore(r,t);
-    });
-  }catch(e){console.warn('chips skipped:',e);}
-
   box.querySelectorAll('circle.wk-open').forEach(c=>{
     if(/^(Факт выручки|Выручка \(прогноз\))/.test(c.dataset.label||'')){c.remove();return;}
     const col=c.getAttribute('stroke')&&c.getAttribute('fill').startsWith('rgba')?c.getAttribute('stroke'):c.getAttribute('fill');
@@ -2372,6 +2355,7 @@ function setHomeTab(tab){
   if(tab==='dev'&&s)renderDevTable(s.value);
   if(tab==='proto')renderProto();
   if(tab==='sum')renderSum();
+  if(tab==='fin')drawLabelBg();
 }
 
 function buildMonthOptions(){
@@ -2400,7 +2384,32 @@ function applyAnnotations(){
   if(box)box.classList.toggle('hide-annotations',!SHOW_ANNOT);
   const b=document.getElementById('annotToggle');
   if(b)b.textContent=SHOW_ANNOT?'Аннотации: Вкл':'Аннотации: Выкл';
+  drawLabelBg();
 }
+// Фон подписей недельных точек: размер берётся у видимого текста (getBBox). У скрытого графика (другая вкладка, аннотации выкл.)
+// размер нулевой — тогда не рисуем, а дорисовываем при показе (вкладка, аннотации, загрузка шрифта). Старые фоны удаляются.
+function drawLabelBg(){
+  const box=document.getElementById('chartBoxRub');
+  if(!box||!SHOW_ANNOT||!box.getClientRects().length)return;
+  try{
+    box.querySelectorAll('rect.vlbl-bg').forEach(r=>r.remove());
+    box.querySelectorAll('text.vlbl').forEach(t=>{
+      const b=t.getBBox();if(!b.width)return;
+      const r=document.createElementNS('http://www.w3.org/2000/svg','rect');
+      r.setAttribute('class','vlbl-bg');
+      r.setAttribute('x',(b.x-6).toFixed(1));
+      r.setAttribute('y',(b.y-3).toFixed(1));
+      r.setAttribute('width',(b.width+12).toFixed(1));
+      r.setAttribute('height',(b.height+6).toFixed(1));
+      r.setAttribute('rx',6);
+      r.setAttribute('fill','rgba(28,13,46,0.75)');
+      r.setAttribute('stroke','rgba(255,255,255,0.30)');
+      r.setAttribute('stroke-width','1');
+      t.parentNode.insertBefore(r,t);
+    });
+  }catch(e){console.warn('chips skipped:',e);}
+}
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(drawLabelBg);
 function toggleAnnotations(){
   SHOW_ANNOT=!SHOW_ANNOT;
   localStorage.setItem('ba_home_annot',SHOW_ANNOT?'1':'0');
