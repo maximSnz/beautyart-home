@@ -164,8 +164,9 @@
 
         <div class="hide" id="app">
             <div class="wrap">
-                <h1>Карты Шухарта · Ozon</h1>
-                <div class="controls">
+                <h1 id="pageTitle">Карты Шухарта · Ozon</h1>
+                <!-- юрлицо задаёт пункт меню главной (?e=ip|ooo; 13.11.2026, решение владельца: ИП и ООО раздельно, «Вместе» убрано) -->
+                <div class="controls" hidden>
                     <div class="tabs" title="Юрлицо">
                         <button class="tab" id="ent_ip" onclick="setEnt('ip')">ИП</button>
                         <button class="tab" id="ent_ooo" onclick="setEnt('ooo')">ООО</button>
@@ -296,7 +297,7 @@ const SP=()=>CTX==='plan'?'day':STEP;
 const curB=()=>(CTX==='plan'?PBASE:BASE)[SP()];
 try{const s=JSON.parse(localStorage.getItem('ba_shewhart')||'{}');if(s.ent)ENT=s.ent;if(METRICS[s.met])MET=s.met;if(STEPS[s.step])STEP=s.step;if(Array.isArray(s.rules)&&s.rules.length)SHIFT_RULES=new Set(s.rules.filter(r=>[1,2,3,4].includes(r)));
   ['week','day'].forEach(k=>{if(s.bases&&s.bases[k])BASE[k]={...BASE[k],mode:s.bases[k].mode,n:s.bases[k].n};if(s.pbases&&s.pbases[k])PBASE[k]={...PBASE[k],mode:s.pbases[k].mode,n:s.pbases[k].n};});}catch(e){}
-const q=new URLSearchParams(location.search).get('e');if(['ip','ooo','all'].includes(q))ENT=q;
+const q=new URLSearchParams(location.search).get('e');if(['ip','ooo'].includes(q))ENT=q;if(!['ip','ooo'].includes(ENT))ENT='ip';
 const save=()=>{try{localStorage.setItem('ba_shewhart',JSON.stringify({ent:ENT,met:MET,step:STEP,rules:[...SHIFT_RULES],bases:{week:{mode:BASE.week.mode,n:BASE.week.n},day:{mode:BASE.day.mode,n:BASE.day.n}},pbases:{week:{mode:PBASE.week.mode,n:PBASE.week.n},day:{mode:PBASE.day.mode,n:PBASE.day.n}}}));}catch(e){}};
 
 // === даты ===
@@ -971,7 +972,7 @@ function bindTip(cb,m,P,series,L){
 
 // === управление ===
 async function setEnt(e){
-  ENT=e;save();
+  ENT=e;save();document.getElementById('pageTitle').textContent='Карты Шухарта · Ozon '+BASES[e].name;document.title='Beauty Art - Карты Шухарта Ozon '+BASES[e].name;
   try{
     if(e==='all'){await Promise.all([loadBase('ip'),loadBase('ooo')]);}else await loadBase(e);
   }catch(err){document.getElementById('chart').innerHTML=`<div class="err">Ошибка загрузки: ${esc(err.message)}</div>`;console.error(err);return;}
@@ -1016,7 +1017,7 @@ async function go(){
   [BASE,PBASE].forEach(X=>{X.week.from=0;X.week.to=Math.max(0,WEEKS.length-1);X.day.from=0;X.day.to=DAYS.length-1;});
   syncBaseUI(true);
   if(ENT==='all'&&!AVAIL.ooo)ENT='ip';
-  if(ENT==='ooo'&&!AVAIL.ooo)ENT='ip';
+  if(ENT==='ooo'&&!AVAIL.ooo){document.getElementById('chart').innerHTML='<div class="err">Нет входа в базу ООО — выйдите и войдите снова (почта и пароль те же).</div>';return;}
   setEnt(ENT);
 }
 if(BA_AUTH.has(SUPABASE_URL))go();else document.getElementById('login').classList.remove('hide');
