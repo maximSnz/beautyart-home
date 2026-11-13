@@ -504,7 +504,9 @@
                         <a class="menu-item" data-shop="ozon-ooo" href="https://maximsnz.github.io/beautyart-ooo/weekly.html" target="_blank">Управление остатками</a>
                         <a class="menu-item" data-shop="ozon-ip" href="https://maximsnz.github.io/beautyart/weekly.html" target="_blank">Управление остатками</a>
                         <a class="menu-item" data-shop="ozon-ip" href="https://docs.google.com/spreadsheets/d/18iaMB0iAT4fKAFd-tFfMopklFzAb8cKGXwqRSyxX7AQ/edit?gid=116615647#gid=116615647" target="_blank">Управленческая отчетность</a>
-                        <span class="sub-link locked" data-shop="wb-ip ym-ip" title="Страниц продаж по этой площадке пока нет">Страниц пока нет</span>
+                        <a class="menu-item" data-shop="wb-ip" data-tab="sum" href="#" onclick="setHomeTab('sum');return false">Сводный отчёт</a>
+                        <a class="menu-item" data-shop="wb-ip" href="https://maximsnz.github.io/beautyart/wb-stock.html" target="_blank">Управление остатками</a>
+                        <span class="sub-link locked" data-shop="ym-ip" title="Страниц продаж по этой площадке пока нет">Страниц пока нет</span>
                     </div>
                 </details>
 
@@ -2106,6 +2108,14 @@ const SUM_COLS=[
   {k:'ret',t:'% возвратов',d:1,tip:'возвраты ÷ доставлено (воронка Ozon, product_funnel_daily)'},
   {k:'roi',t:'ROI, %',d:0,tip:'маржа ÷ себестоимость проданного (cf_daily.cogs) за период'}
 ];
+// подсказки заголовков у WB (источники другие)
+const SUM_TIP_WB={offer:'дерево: предмет WB (wb_products.subject; перчатки — по типу) ▸ артикулы; у перчаток ▸ модель, цвет и фасовка ▸ размеры. Строка — размер WB',
+  q:'заказы «Ленты заказов» WB без отмен (wb_orders; день заказа по Москве; лента загружена с ~13.10.2026)',r:'Σ цены продавца со скидкой (price_with_disc) заказов без отмен',
+  rs:'заказы ₽ ÷ заказы ₽ всех размеров WB за период',m:'Σ wb_cf_daily.mar — маржа WB по дате операции (отчёт о реализации − издержки − себестоимость − 3% − реклама)',
+  ms:'маржа ÷ маржа всех размеров WB за период; у убыточных — не считается',mp:'Σ маржи ÷ Σ продажи (отчёт о реализации)',
+  drr:'реклама (wb_ad_spend, расход карточки — по доле выручки размера за день) ÷ заказы ₽',ctr:'воронка WB не загружается — нет данных',
+  st:'Σ по складам WB снимка wb_stock_history на конец периода (без «В пути…»)',sr:'остатки, шт × себестоимость на дату («База товаров WB»)',
+  ret:'нет данных',roi:'маржа ÷ себестоимость проданного (wb_cf_daily.cogs)'};
 let SUM_HIDE=new Set((()=>{try{return JSON.parse(localStorage.getItem('ba_sum_hide')||'[]');}catch(e){return [];}})());
 let SUM_F={},SUM_SORT=null,SUM_MGR=(()=>{try{return localStorage.getItem('ba_sum_mgr')||'all';}catch(e){return 'all';}})(),SUM_CACHE={},SUM_P=null;
 let SUM_PB=null,SUM_VIEW=(()=>{try{return localStorage.getItem('ba_sum_view')==='item'?'item':'grp';}catch(e){return 'grp';}})();   // период сравнения Б (нет — без сравнения); отображение
@@ -2165,6 +2175,40 @@ async function loadSum(from,to){
   // в отчёте — только неархивные товары (архивные скрыты — решение владельца 09.11.2026); доли — от итога юрлица, архивные в нём остаются
   const rows=[...BY.values()].filter(o=>!o.archived);
   const out={from,to,stDay,T,rows,funOk:fun!=null};
+  SUM_CACHE[key]=out;return out;
+}
+// «Сводный отчёт» WB ИП (13.11.2026, решение владельца: страницы WB в коммерческом блоке, сначала — без плана): тот же отчёт, строка — размер WB
+// (wb_products.chrt_id), артикул = артикул продавца + размер (перчатки группируются gloveFamily, как Ozon); группа — предмет WB (subject),
+// свои группы владельца по артикулу — как Ozon. Заказы — «Лента заказов» (wb_orders, source = feed, без отмен; день заказа по Москве; лента — с ~13.10.2026);
+// маржа — wb_cf_daily (по дате операции, purchasing.md «Финансовый отчёт и маржа WB»), маржинальность = Σ маржи ÷ Σ продажи; ДРР = реклама
+// (доля размера, wb_cf_daily.ads) ÷ заказы ₽; остатки — снимок wb_stock_history на конец периода без строк «В пути…»; CTR и % возвратов — нет данных.
+async function loadSumWB(from,to){
+  const key='wb|'+from+'|'+to;if(SUM_CACHE[key])return SUM_CACHE[key];
+  const toD=new Date(to+'T00:00'),t14=keyOfMonday(addDays(toD,-(SUM_TURN_DAYS-1))),sFrom=t14<from?t14:from;
+  const rLast=await fetch(SUPABASE_URL+`/rest/v1/wb_stock_history?report_date=lte.${to}&select=report_date&order=report_date.desc&limit=1`,{headers:HD});
+  if(!rLast.ok)throw new Error('wb_stock_history HTTP '+rLast.status);
+  const stDay=((await rLast.json())[0]||{}).report_date||null;
+  const [prods,prices,cf,ord,stk]=await Promise.all([
+    fetchPages('wb_products?select=chrt_id,nm_id,vendor_code,tech_size,title,subject,archived,wb_archived&order=chrt_id'),
+    fetchPages('wb_product_prices?select=id,chrt_id,cost,created_at&order=id'),
+    fetchPages(`wb_cf_daily?day=gte.${from}&day=lte.${to}&select=chrt_id,day,mar,retail,cogs,ads&order=chrt_id,day`),
+    fetchPages(`wb_orders?source=eq.feed&order_day=gte.${sFrom}&order_day=lte.${to}&select=srid,chrt_id,order_day,price_with_disc,is_cancel&order=srid`),
+    stDay?fetchPages(`wb_stock_history?report_date=eq.${stDay}&select=barcode,warehouse_name,chrt_id,qty&order=barcode,warehouse_name`):Promise.resolve([])
+  ]);
+  const COSTS={};prices.forEach(p=>(COSTS[p.chrt_id]=COSTS[p.chrt_id]||[]).push({t:String(p.created_at||'').slice(0,10),c:Number(p.cost||0)}));
+  const costAt=(c,d)=>{const a=COSTS[c];if(!a||!a.length)return null;let b=null;for(const x of a){if(x.t<=d)b=x;else break;}return (b||a[0]).c;};
+  const BY=new Map();
+  prods.forEach(p=>{const sz=String(p.tech_size||'').trim(),offer=String(p.vendor_code||p.nm_id).toUpperCase()+(sz&&sz!=='0'?'-'+sz.toUpperCase():'');
+    BY.set(p.chrt_id,{pid:p.chrt_id,offer,name:p.title||'',archived:!!(p.archived||p.wb_archived),grp:sumGrpOf(offer,p.subject||'Без категории'),
+      q:0,r:0,m:0,revn:0,cogs:0,ads:0,views:0,pdp:0,rtn:0,dlv:0,st:0,sr:0,q14:0,noCost:false,fun:false});});
+  const T={r:0,m:0};
+  ord.forEach(x=>{if(x.is_cancel)return;const o=BY.get(x.chrt_id),r=Number(x.price_with_disc||0),k=x.order_day;
+    if(k>=from){T.r+=r;if(o){o.q++;o.r+=r;}}if(k>=t14&&o)o.q14++;});
+  cf.forEach(x=>{T.m+=Number(x.mar||0);const o=BY.get(x.chrt_id);if(!o)return;o.m+=Number(x.mar||0);o.revn+=Number(x.retail||0);o.cogs+=Number(x.cogs||0);o.ads+=Number(x.ads||0);});
+  stk.forEach(x=>{if(/^В пути/.test(x.warehouse_name||''))return;const o=BY.get(x.chrt_id);if(o)o.st+=Number(x.qty||0);});
+  BY.forEach(o=>{if(!o.st)return;const c=costAt(o.pid,stDay);if(c==null){o.noCost=true;return;}o.sr=o.st*c;});
+  const rows=[...BY.values()].filter(o=>!o.archived);
+  const out={from,to,stDay,T,rows,funOk:false};
   SUM_CACHE[key]=out;return out;
 }
 // показатели строки (и итогов) из сумм
@@ -2248,10 +2292,10 @@ async function renderSum(){
   const head=`<div class="sum-ctl"><button class="chip-glass dev-toggle" onclick="sumCfgOpen()" title="Настройки: отображение, периоды, менеджер, столбцы">⚙ Настройки</button><span class="sum-sum" id="sumSum"></span></div>`;
   box.innerHTML=head+'<div class="dev-cap">Загрузка…</div>';sumSummary();
   try{
-    const [D,DB]=await Promise.all([loadSum(A[0],A[1]),B?loadSum(B[0],B[1]):null]);
+    const LD=SHOP==='wb-ip'?loadSumWB:loadSum,[D,DB]=await Promise.all([LD(A[0],A[1]),B?LD(B[0],B[1]):null]);
     if(!same())return;   // пока грузилось, выбран другой период
     SUM_D=D;SUM_DB=DB;
-    const th=cols.map(c=>`<th class="${c.txt?'sum-t':''}" title="${escH(c.tip||'')}" onclick="sumSort('${c.k}')" style="cursor:pointer">${c.t}${SUM_SORT&&SUM_SORT.k===c.k?(SUM_SORT.dir>0?' ▲':' ▼'):''}</th>`).join('');
+    const th=cols.map(c=>`<th class="${c.txt?'sum-t':''}" title="${escH((SHOP==='wb-ip'&&SUM_TIP_WB[c.k])||c.tip||'')}" onclick="sumSort('${c.k}')" style="cursor:pointer">${c.t}${SUM_SORT&&SUM_SORT.k===c.k?(SUM_SORT.dir>0?' ▲':' ▼'):''}</th>`).join('');
     const tf=cols.map(c=>`<th class="sum-f"><input class="chip-glass" value="${escH(SUM_F[c.k]||'')}" placeholder="${c.txt?'фильтр':'>0'}" title="${c.txt?'часть текста':'число: >100, <=5, 10..50, =0 или часть значения'} (по периоду А)" oninput="sumSetF('${c.k}',this.value)"></th>`).join('');
     box.innerHTML=head+`<table class="dev-table sum-table"><thead><tr>${th}</tr><tr>${tf}</tr></thead><tbody id="sumBody"></tbody><tfoot id="sumFoot"></tfoot></table>`;
     sumSummary();sumBody();sumTipBind();
@@ -2283,7 +2327,7 @@ function sumGroup(key,items,raw,T,label,name){   // items — строки ур�
 function sumBody(){
   const D=SUM_D,tb=document.getElementById('sumBody'),tf=document.getElementById('sumFoot');if(!D||!tb)return;
   const cols=SUM_COLS.filter(c=>!SUM_HIDE.has(c.k)),cmpT=(a,b)=>String(a).localeCompare(String(b),'ru'),byOffer=(a,b)=>cmpT(a.offer,b.offer);
-  const base=D.rows.filter(o=>SUM_MGR==='all'||matrixOf(o.offer)===SUM_MGR),cats=new Map(),pos=[];
+  const base=D.rows.filter(o=>SUM_MGR==='all'||(SHOP==='wb-ip'?SUM_MGR==='m1':matrixOf(o.offer)===SUM_MGR)),cats=new Map(),pos=[];   // WB ведёт только Илья
   SUM_KEYS=[];
   base.forEach(o=>{if(!cats.has(o.grp))cats.set(o.grp,[]);cats.get(o.grp).push(o);});   // нет type_id — группа «Без категории»
   if(SUM_VIEW==='item'){base.forEach(o=>pos.push(sumVals(o,D.T)));cats.clear();}   // «Товар» — все артикулы одним списком
@@ -2312,9 +2356,10 @@ function sumBody(){
   const cell=(c,v,o,dp,vb)=>{const pad=dp?` style="padding-left:${3+dp*16}px${o.members?';cursor:pointer':''}"`:(o.members?' style="cursor:pointer"':'');
     // группа перчаток «модель + цвет» и артикул — щелчок по названию открывает окно товара (sumItem); ▸ / щелчок по строке — раскрыть
     if(c.k==='offer'&&o.members){const on=SUM_FAM_OPEN.has(o.fam),n=sumLeaves(o).length,f=String(o.fam).startsWith('f:');
-      const nm=f?`<span class="pr-art" onclick="event.stopPropagation();sumItem('${escH(o.fam)}','${escH(o.fam.slice(2))}')" title="${escH(o.name)}
+      const nm=f&&SHOP!=='wb-ip'?`<span class="pr-art" onclick="event.stopPropagation();sumItem('${escH(o.fam)}','${escH(o.fam.slice(2))}')" title="${escH(o.name)}
 Щелчок — окно товара (РНП)">${escH(v)}</span>`:escH(v);
       return `<td class="sum-t"${pad} onclick="sumFamToggle(${o.fi})" title="${escH(o.name)}; щелчок — раскрыть">${on?'▾':'▸'} ${nm} <span class="dev-neutral">(${n})</span></td>`;}
+    if(c.k==='offer'&&SHOP==='wb-ip')return `<td class="sum-t"${pad} title="${escH(o.name)}">${escH(v)}</td>`;   // у WB окна товара (РНП) пока нет
     if(c.k==='offer')return `<td class="sum-t"${pad}><span class="pr-art" onclick="sumItem('${escH(String(o.pid))}','${escH(o.offer)}')" title="${escH(o.name)}
 Щелчок — окно товара (РНП)">${escH(v)}</span></td>`;
     if(c.txt)return `<td class="sum-t">${escH(v)}</td>`;
