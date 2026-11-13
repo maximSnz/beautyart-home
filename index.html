@@ -494,7 +494,7 @@
                     </div>
                 </details>
 
-                <details class="menu-section" open>
+                <details class="menu-section">
                     <summary>💼 Коммерческая деятельность</summary>
                     <div class="section-body">
                         <a class="menu-item" data-shop="ozon-ooo ozon-ip" data-tab="proto" href="#" onclick="setHomeTab('proto');return false">Протокол работ</a>
@@ -2480,9 +2480,6 @@ function showFin(){
 document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('shopSwitch').innerHTML=Object.entries(SHOPS).map(([k,v])=>`<button class="shop-btn${k===SHOP?' on':''}" onclick="setShop('${k}')" title="${v.label}"><span class="shop-logo ${v.logo}">${v.mark}</span></button>`).join('');
   document.querySelectorAll('[data-shop]').forEach(el=>{el.hidden=!el.dataset.shop.split(' ').includes(SHOP);});
-  // раскрыт первый крупный блок меню, где у площадки есть свои страницы (у WB — «Логистика»)
-  const secs=[...document.querySelectorAll('details.menu-section')],own=secs.find(d=>d.querySelector(`a[data-shop~="${SHOP}"]`));
-  if(own){secs.forEach(d=>d.open=false);own.open=true;}
   document.querySelectorAll('.menu-item[data-tab]').forEach(x=>x.classList.toggle('on',x.dataset.tab===HOME_TAB));
   document.title=document.title.replace(/( — .*)?$/,' — '+SHOPS[SHOP].label); if(BA_AUTH.has(SUPABASE_URL))go(); else document.getElementById('login').classList.remove('hide'); });
 </script>
