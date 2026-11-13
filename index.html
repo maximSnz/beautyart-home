@@ -148,7 +148,25 @@
         }
         .tab-glass:hover { background: rgba(255,255,255,.2); }
         .tab-glass.on { background: rgba(255,255,255,.28); border-color: rgba(255,255,255,.55); }
-        .ent-switch { padding-right: 10px; margin-right: 4px; border-right: 1px solid rgba(255,255,255,.3); }
+        /* площадки — кликабельные логотипы (13.11.2026): фирменные цвета, у Ozon юрлицо внутри плашки; невыбранные приглушены */
+        .shop-switch { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+        .shop-btn { display: flex; flex-direction: column; align-items: center; gap: 4px; background: none; border: 0; padding: 0; cursor: pointer;
+            opacity: .55; transition: opacity .2s, transform .2s; }
+        .shop-btn:hover { opacity: .9; transform: translateY(-2px); }
+        .shop-btn.on { opacity: 1; }
+        .shop-logo { display: flex; align-items: center; justify-content: center; height: 30px; min-width: 70px; padding: 0 9px; border-radius: 9px;
+            font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 16px; letter-spacing: -.3px; line-height: 1;
+            box-shadow: 0 4px 12px rgba(28,13,46,.25); border: 2px solid transparent; }
+        .shop-btn.on .shop-logo { border-color: #fff; box-shadow: 0 0 0 3px rgba(255,255,255,.35), 0 4px 14px rgba(28,13,46,.3); }
+        .shop-logo.ozon { background: #005BFF; color: #fff; }
+        .shop-logo.wb { background: linear-gradient(135deg, #CB11AB, #481173); color: #fff; }
+        .shop-logo.ym { background: #FFCC00; color: #1C0D2E; font-size: 13px; gap: 4px; }
+        .shop-logo.ym i { font-style: normal; background: #FC3F1D; color: #fff; border-radius: 50%; width: 17px; height: 17px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; }
+        .shop-logo small { font-size: 9px; font-weight: 700; letter-spacing: .4px; margin-left: 5px; padding: 2px 4px; border-radius: 5px;
+            background: rgba(255,255,255,.22); align-self: center; }
+        [hidden] { display: none !important; }
+        .stub-card { padding: 28px; color: #fff; font-family: 'Forum', serif; font-size: 1.15em; line-height: 1.5; }
+        .stub-card b { font-size: 1.3em; font-weight: 400; display: block; margin-bottom: 8px; }
         .chip-glass {
             display: inline-flex; align-items: center; justify-content: center;
             height: 34px; padding: 0 12px;
@@ -431,6 +449,7 @@
             .chart-box svg { height: auto; }
             .dev-wrap { max-height: 420px; }
             .company-name { font-size: 1.5em; }
+            .header { flex-wrap: wrap; gap: 12px; }
             .legend-bottom { flex-direction: column; gap: 8px; }
         }
     </style>
@@ -442,6 +461,8 @@
                 <img src="https://i.ibb.co/ZzbPQmQt/IMG-8031.png" alt="Beauty Art Logo" class="logo">
             </a>
             <div class="company-name">Beauty Art</div>
+            <!-- площадка и юрлицо (13.11.2026): меню и данные главной; переключение перезагружает страницу -->
+            <div class="shop-switch" id="shopSwitch" title="Площадка и юрлицо: ссылки меню и данные отчётов"></div>
         </div>
 
         <div class="login-box hide" id="login">
@@ -473,19 +494,14 @@
                 <details class="menu-section" open>
                     <summary>💼 Коммерческая деятельность</summary>
                     <div class="section-body">
-                        <details class="subsection">
-                            <summary>👤 ИП Колдомов</summary>
-                            <a class="menu-item" href="https://maximsnz.github.io/beautyart/weekly.html" target="_blank">Управление остатками</a>
-                            <a class="menu-item" href="https://maximsnz.github.io/beautyart/plan.html" target="_blank">Реализация плана продаж</a>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/144n5raWV8mKbBdRQ8pEEfcgc8T_WaNzQ7NDWhRLQnSw/edit?" target="_blank">Юнит-экономика 1.0</a>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/1jF6sDrGninnHtG24xIqVv4uiRZolHtaL4sd8Tj7VWCU/edit?gid=1634462589#gid=1634462589" target="_blank">Юнит-экономика 2.0</a>
-                            <a class="menu-item" href="https://docs.google.com/spreadsheets/d/18iaMB0iAT4fKAFd-tFfMopklFzAb8cKGXwqRSyxX7AQ/edit?gid=116615647#gid=116615647" target="_blank">Управленческая отчетность</a>
-                        </details>
-                        <details class="subsection">
-                            <summary>🏢 ООО Beauty Art</summary>
-                            <a class="menu-item" href="https://maximsnz.github.io/beautyart-ooo/weekly.html" target="_blank">Управление остатками</a>
-                            <a class="menu-item" href="https://maximsnz.github.io/beautyart-ooo/plan.html" target="_blank">Реализация плана продаж</a>
-                        </details>
+                        <a class="menu-item" data-shop="ozon-ooo" href="https://maximsnz.github.io/beautyart-ooo/weekly.html" target="_blank">Управление остатками</a>
+                        <a class="menu-item" data-shop="ozon-ooo" href="https://maximsnz.github.io/beautyart-ooo/plan.html" target="_blank">Реализация плана продаж</a>
+                        <a class="menu-item" data-shop="ozon-ip" href="https://maximsnz.github.io/beautyart/weekly.html" target="_blank">Управление остатками</a>
+                        <a class="menu-item" data-shop="ozon-ip" href="https://maximsnz.github.io/beautyart/plan.html" target="_blank">Реализация плана продаж</a>
+                        <a class="menu-item" data-shop="ozon-ip" href="https://docs.google.com/spreadsheets/d/144n5raWV8mKbBdRQ8pEEfcgc8T_WaNzQ7NDWhRLQnSw/edit?" target="_blank">Юнит-экономика 1.0</a>
+                        <a class="menu-item" data-shop="ozon-ip" href="https://docs.google.com/spreadsheets/d/1jF6sDrGninnHtG24xIqVv4uiRZolHtaL4sd8Tj7VWCU/edit?gid=1634462589#gid=1634462589" target="_blank">Юнит-экономика 2.0</a>
+                        <a class="menu-item" data-shop="ozon-ip" href="https://docs.google.com/spreadsheets/d/18iaMB0iAT4fKAFd-tFfMopklFzAb8cKGXwqRSyxX7AQ/edit?gid=116615647#gid=116615647" target="_blank">Управленческая отчетность</a>
+                        <span class="sub-link locked" data-shop="wb-ip ym-ip" title="Страниц продаж по этой площадке пока нет">Страниц пока нет</span>
                     </div>
                 </details>
 
@@ -505,25 +521,17 @@
                 <details class="menu-section">
                     <summary>🚚 Логистика и доставка</summary>
                     <div class="section-body">
-                        <details class="subsection">
-                            <summary>👤 ИП Колдомов</summary>
-                            <a class="menu-item" href="https://maximsnz.github.io/beautyart/products.html" target="_blank">База товаров</a>
-                            <a class="menu-item" href="https://maximsnz.github.io/beautyart/wb-products.html" target="_blank">База товаров WB</a>
-                            <a class="menu-item" href="https://maximsnz.github.io/beautyart/wb-stock.html" target="_blank">Остатки WB</a>
-                            <a class="menu-item" href="https://maximsnz.github.io/beautyart/wb-purchase.html" target="_blank">Заявка на закупку WB</a>
-                            <a class="menu-item" href="https://maximsnz.github.io/beautyart/purchase.html" target="_blank">Заявка на закупку</a>
-                            <a class="menu-item" href="https://maximsnz.github.io/beautyart/need.html" target="_blank">Потребность на месяц</a>
-                        </details>
-                        <details class="subsection">
-                            <summary>🏢 ООО Beauty Art</summary>
-                            <a class="menu-item" href="https://maximsnz.github.io/beautyart-ooo/products.html" target="_blank">База товаров</a>
-                            <a class="menu-item" href="https://maximsnz.github.io/beautyart-ooo/purchase.html" target="_blank">Заявка на закупку</a>
-                            <a class="menu-item" href="https://maximsnz.github.io/beautyart-ooo/need.html" target="_blank">Потребность на месяц</a>
-                        </details>
-                        <details class="subsection">
-                            <summary>📁 Прочее</summary>
-                            <a class="menu-item" href="https://drive.google.com/drive/folders/1_Fz3CNW4iBB_0RP7CXGB1-78Pw0i7Z4f?usp=share_link" target="_blank">Прайс-листы поставщиков</a>
-                        </details>
+                        <a class="menu-item" data-shop="ozon-ooo" href="https://maximsnz.github.io/beautyart-ooo/products.html" target="_blank">База товаров</a>
+                        <a class="menu-item" data-shop="ozon-ooo" href="https://maximsnz.github.io/beautyart-ooo/purchase.html" target="_blank">Заявка на закупку</a>
+                        <a class="menu-item" data-shop="ozon-ooo" href="https://maximsnz.github.io/beautyart-ooo/need.html" target="_blank">Потребность на месяц</a>
+                        <a class="menu-item" data-shop="ozon-ip" href="https://maximsnz.github.io/beautyart/products.html" target="_blank">База товаров</a>
+                        <a class="menu-item" data-shop="ozon-ip" href="https://maximsnz.github.io/beautyart/purchase.html" target="_blank">Заявка на закупку</a>
+                        <a class="menu-item" data-shop="ozon-ip" href="https://maximsnz.github.io/beautyart/need.html" target="_blank">Потребность на месяц</a>
+                        <a class="menu-item" data-shop="wb-ip" href="https://maximsnz.github.io/beautyart/wb-products.html" target="_blank">База товаров WB</a>
+                        <a class="menu-item" data-shop="wb-ip" href="https://maximsnz.github.io/beautyart/wb-stock.html" target="_blank">Остатки WB</a>
+                        <a class="menu-item" data-shop="wb-ip" href="https://maximsnz.github.io/beautyart/wb-purchase.html" target="_blank">Заявка на закупку WB</a>
+                        <span class="sub-link locked" data-shop="ym-ip" title="Страниц логистики по Яндекс Маркету пока нет">Страниц пока нет</span>
+                        <a class="menu-item" href="https://drive.google.com/drive/folders/1_Fz3CNW4iBB_0RP7CXGB1-78Pw0i7Z4f?usp=share_link" target="_blank">📁 Прайс-листы поставщиков</a>
                     </div>
                 </details>
 
@@ -539,13 +547,12 @@
             <!-- ПРАВАЯ КОЛОНКА -->
             <div class="content-area">
 
+                <!-- WB / ЯМ: отчётов на главной пока нет -->
+                <div class="glass-card stub-card hide" id="stubCard"></div>
+
                 <!-- КАРТОЧКА ДАННЫХ -->
                 <div class="glass-card hide" id="finCard">
                     <div class="card-head">
-                        <div class="tabs-glass ent-switch" title="Юрлицо: данные рабочего пространства (переключение перезагружает страницу)">
-                            <button id="entIp" class="tab-glass" onclick="setEntity('ip')">ИП</button>
-                            <button id="entOoo" class="tab-glass" onclick="setEntity('ooo')">ООО</button>
-                        </div>
                         <div class="tabs-glass">
                             <button id="tabProto" class="tab-glass" onclick="setHomeTab('proto')">Протокол работ</button>
                             <button id="tabFin" class="tab-glass on" onclick="setHomeTab('fin')">Финансовая динамика</button>
@@ -623,20 +630,31 @@
 <script src="protocol_calc.js?v=20261110"></script>   <!-- менять ?v= при каждой правке protocol_calc.js — иначе браузер берёт старый из кэша -->
 <script>
 // === константы и доступ ===
-// юрлицо: ИП / ООО — своя база и своё разделение товаров по менеджерам (matrixOf как в plan.html юрлица).
-// Выбор — ?e=ip|ooo в адресе, иначе последний выбор (localStorage), иначе ИП; переключение перезагружает страницу.
+// площадка и юрлицо (13.11.2026) — переключатель в шапке: Ozon ООО / Ozon ИП / WB ИП / ЯМаркет ИП.
+// Определяет ссылки меню (data-shop у пунктов; без data-shop — общие) и данные отчётов: у Ozon — база юрлица (ENT),
+// у WB и ЯМ отчётов на главной пока нет — заглушка (вход — в базу ИП). Выбор — ?s=… в адресе (старое ?e=ip|ooo → Ozon),
+// иначе последний выбор (localStorage['ba_home_shop'], затем старый ba_home_entity), иначе Ozon ИП; переключение перезагружает страницу.
+const SHOPS={
+  'ozon-ooo':{label:'Ozon ООО',ent:'ooo',logo:'ozon',mark:'ozon<small>ООО</small>'},
+  'ozon-ip':{label:'Ozon ИП',ent:'ip',logo:'ozon',mark:'ozon<small>ИП</small>'},
+  'wb-ip':{label:'WB ИП',ent:'ip',stub:'Wildberries',logo:'wb',mark:'WB'},
+  'ym-ip':{label:'ЯМаркет ИП',ent:'ip',stub:'Яндекс Маркету',logo:'ym',mark:'<i>Я</i>Маркет'}
+};
+let SHOP='ozon-ip';
+try{const u=new URLSearchParams(location.search),q=u.get('s'),e=u.get('e'),ls=localStorage.getItem('ba_home_shop'),le=localStorage.getItem('ba_home_entity');
+  SHOP=SHOPS[q]?q:(e==='ip'||e==='ooo')?'ozon-'+e:SHOPS[ls]?ls:(le==='ooo'?'ozon-ooo':'ozon-ip');}catch(e){}
+try{localStorage.setItem('ba_home_shop',SHOP);}catch(e){}
+function setShop(k){
+  if(!SHOPS[k]||k===SHOP)return;
+  try{localStorage.setItem('ba_home_shop',k);}catch(x){}
+  const u=new URL(location.href);u.searchParams.delete('e');u.searchParams.set('s',k);location.href=u.toString();
+}
+// юрлицо: ИП / ООО — своя база и своё разделение товаров по менеджерам (matrixOf как в plan.html юрлица); задаётся площадкой (SHOPS[SHOP].ent).
 const ENTITIES={
   ip:{name:'ИП',url:'https://jvoofakrkhzoblhhuyvr.supabase.co',anon:'sb_publishable_IA4ReUU9xTL7hb_sbsHaFA_LPATJazE',m1:/^(CAP|GLV|SEAL|RNC)-/},
   ooo:{name:'ООО',url:'https://jaruwkpugxybwcsalhgr.supabase.co',anon:'sb_publishable_09rFaH3adGXnEO3-cybX9A_eK_mCnW0',m1:/^(CAP|INS|FW|MS|ML|SE)-/}
 };
-let ENT='ip';
-try{const q=new URLSearchParams(location.search).get('e'),ls=localStorage.getItem('ba_home_entity');ENT=ENTITIES[q]?q:(ENTITIES[ls]?ls:'ip');}catch(e){}
-try{localStorage.setItem('ba_home_entity',ENT);}catch(e){}
-function setEntity(e){
-  if(!ENTITIES[e]||e===ENT)return;
-  try{localStorage.setItem('ba_home_entity',e);}catch(x){}
-  const u=new URL(location.href);u.searchParams.set('e',e);location.href=u.toString();
-}
+const ENT=SHOPS[SHOP].ent;
 const SUPABASE_URL=ENTITIES[ENT].url;
 const ANON=ENTITIES[ENT].anon;
 const HD={apikey:ANON,Authorization:'Bearer '+ANON};
@@ -2449,6 +2467,8 @@ async function go(){
   if(!await BA_AUTH.login(SUPABASE_URL,HD)){document.getElementById('login').classList.remove('hide');document.getElementById('pwd').value='';return;}
   document.getElementById('login').classList.add('hide');
   document.getElementById('app').classList.remove('hide');
+  const st=SHOPS[SHOP].stub;
+  if(st){const c=document.getElementById('stubCard');c.innerHTML=`<b>${SHOPS[SHOP].label}</b>Отчётов по ${st} на главной пока нет. Страницы площадки — в меню слева.`;c.classList.remove('hide');return;}
   showFin();
 }
 function showFin(){
@@ -2456,7 +2476,13 @@ function showFin(){
   applyAnnotations();
   buildMonthOptions();
 }
-document.addEventListener('DOMContentLoaded',()=>{ document.getElementById(ENT==='ooo'?'entOoo':'entIp').classList.add('on'); document.title=document.title.replace(/( — (ИП|ООО))?$/,' — '+ENTITIES[ENT].name); if(BA_AUTH.has(SUPABASE_URL))go(); else document.getElementById('login').classList.remove('hide'); });
+document.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('shopSwitch').innerHTML=Object.entries(SHOPS).map(([k,v])=>`<button class="shop-btn${k===SHOP?' on':''}" onclick="setShop('${k}')" title="${v.label}"><span class="shop-logo ${v.logo}">${v.mark}</span></button>`).join('');
+  document.querySelectorAll('[data-shop]').forEach(el=>{el.hidden=!el.dataset.shop.split(' ').includes(SHOP);});
+  // раскрыт первый крупный блок меню, где у площадки есть свои страницы (у WB — «Логистика»)
+  const secs=[...document.querySelectorAll('details.menu-section')],own=secs.find(d=>d.querySelector(`a[data-shop~="${SHOP}"]`));
+  if(own){secs.forEach(d=>d.open=false);own.open=true;}
+  document.title=document.title.replace(/( — .*)?$/,' — '+SHOPS[SHOP].label); if(BA_AUTH.has(SUPABASE_URL))go(); else document.getElementById('login').classList.remove('hide'); });
 </script>
 </body>
 </html>
