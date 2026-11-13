@@ -270,9 +270,12 @@
 // === базы и доступ: один вход — сразу в ИП и ООО (auth.js); «Вместе» — сумма двух баз ===
 const BASES={
   ip:{name:'ИП',url:'https://jvoofakrkhzoblhhuyvr.supabase.co',anon:'sb_publishable_IA4ReUU9xTL7hb_sbsHaFA_LPATJazE'},
-  ooo:{name:'ООО',url:'https://jaruwkpugxybwcsalhgr.supabase.co',anon:'sb_publishable_09rFaH3adGXnEO3-cybX9A_eK_mCnW0'}
+  ooo:{name:'ООО',url:'https://jaruwkpugxybwcsalhgr.supabase.co',anon:'sb_publishable_09rFaH3adGXnEO3-cybX9A_eK_mCnW0'},
+  // WB ИП (13.11.2026): та же база ИП, свои таблицы — заказы wb_orders, маржа wb_cf_daily, план wb_sales_plan; строка товара — размер WB
+  wb:{name:'WB ИП',url:'https://jvoofakrkhzoblhhuyvr.supabase.co',anon:'sb_publishable_IA4ReUU9xTL7hb_sbsHaFA_LPATJazE',wb:true}
 };
 const HDS={ip:{apikey:BASES.ip.anon,Authorization:'Bearer '+BASES.ip.anon},ooo:{apikey:BASES.ooo.anon,Authorization:'Bearer '+BASES.ooo.anon}};
+HDS.wb=HDS.ip;   // WB — база ИП: тот же объект заголовков (токен продлевает auth.js)
 const SUPABASE_URL=BASES.ip.url;
 const START='2026-08-31';   // начало работы в инструменте — первая точка карт
 const D2=1.128;
@@ -285,7 +288,7 @@ const METRICS={
   qty:{name:'Заказы, шт',unit:'qty',color:'#0ea5e9',clip0:true}   // только для коридоров плана (на графике не выбирается)
 };
 const STEPS={week:{per:'за неделю',unitN:'нед.',title:'Недели',def:{mode:'all',n:4}},day:{per:'за день',unitN:'дн.',title:'Дни',def:{mode:'all',n:20}}};
-let AVAIL={ip:false,ooo:false},ENT='ip',MET='rev',STEP='week',DATA={},WEEKS=[],DAYS=[];
+let AVAIL={ip:false,ooo:false,wb:false},ENT='ip',MET='rev',STEP='week',DATA={},WEEKS=[],DAYS=[];
 let BASE={week:{...STEPS.week.def,from:0,to:0},day:{...STEPS.day.def,from:0,to:0}};
 // база блоков плана — отдельно от графика; по умолчанию «с последнего сдвига (авто)»
 let PBASE={week:{...STEPS.week.def,mode:'shift',from:0,to:0},day:{...STEPS.day.def,mode:'shift',from:0,to:0}};
@@ -297,7 +300,7 @@ const SP=()=>CTX==='plan'?'day':STEP;
 const curB=()=>(CTX==='plan'?PBASE:BASE)[SP()];
 try{const s=JSON.parse(localStorage.getItem('ba_shewhart')||'{}');if(s.ent)ENT=s.ent;if(METRICS[s.met])MET=s.met;if(STEPS[s.step])STEP=s.step;if(Array.isArray(s.rules)&&s.rules.length)SHIFT_RULES=new Set(s.rules.filter(r=>[1,2,3,4].includes(r)));
   ['week','day'].forEach(k=>{if(s.bases&&s.bases[k])BASE[k]={...BASE[k],mode:s.bases[k].mode,n:s.bases[k].n};if(s.pbases&&s.pbases[k])PBASE[k]={...PBASE[k],mode:s.pbases[k].mode,n:s.pbases[k].n};});}catch(e){}
-const q=new URLSearchParams(location.search).get('e');if(['ip','ooo'].includes(q))ENT=q;if(!['ip','ooo'].includes(ENT))ENT='ip';
+const q=new URLSearchParams(location.search).get('e');if(['ip','ooo','wb'].includes(q))ENT=q;if(!['ip','ooo','wb'].includes(ENT))ENT='ip';
 const save=()=>{try{localStorage.setItem('ba_shewhart',JSON.stringify({ent:ENT,met:MET,step:STEP,rules:[...SHIFT_RULES],bases:{week:{mode:BASE.week.mode,n:BASE.week.n},day:{mode:BASE.day.mode,n:BASE.day.n}},pbases:{week:{mode:PBASE.week.mode,n:PBASE.week.n},day:{mode:PBASE.day.mode,n:PBASE.day.n}}}));}catch(e){}};
 
 // === даты ===
@@ -330,8 +333,38 @@ const esc=s=>String(s).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;',
 // === загрузка: постранично, сортировка по уникальному ключу ===
 async function fetchPages(b,q){let out=[],off=0;while(true){const r=await fetch(BASES[b].url+'/rest/v1/'+q+`${q.includes('order=')?'':'&order=id'}&limit=1000&offset=${off}`,{headers:HDS[b]});if(!r.ok)throw new Error(`${BASES[b].name}: HTTP ${r.status} ${q.split('?')[0]}`);const j=await r.json();out=out.concat(j);if(j.length<1000)break;off+=1000;}return out;}
 async function lastDate(b,table,col){const r=await fetch(BASES[b].url+`/rest/v1/${table}?select=${col}&order=${col}.desc&limit=1`,{headers:HDS[b]});if(!r.ok)return null;const j=await r.json();return j[0]?j[0][col]:null;}
+// WB ИП (13.11.2026): заказы — «Лента заказов» без отмен (wb_orders, день заказа по Москве; лента — с ~13.10.2026, раньше — нет данных),
+// выручка = Σ цены продавца со скидкой; маржа — wb_cf_daily по дате операции (неделя — сумма дней), «GMV» — продажа (retail): маржинальность =
+// Σ маржи ÷ Σ продажи, κ = продажа ÷ выручка заказов; товар — размер WB (chrt_id), артикул = артикул продавца + размер (перчатки — gloveFamily)
+const WB_ORDERS_FROM='2026-10-12';
+async function loadBaseWB(b){
+  const [prods0,ord,cf,lastAd]=await Promise.all([
+    fetchPages(b,'wb_products?select=chrt_id,vendor_code,tech_size,title,archived,wb_archived&order=chrt_id'),
+    fetchPages(b,`wb_orders?source=eq.feed&order_day=gte.${START}&select=srid,chrt_id,order_day,price_with_disc,is_cancel&order=srid`),
+    fetchPages(b,`wb_cf_daily?day=gte.${START}&select=chrt_id,day,mar,retail,no_cost_qty&order=chrt_id,day`),
+    lastDate(b,'wb_ad_spend','day')]);
+  const prods=prods0.map(p=>{const sz=String(p.tech_size||'').trim();return {product_id:p.chrt_id,offer_id:String(p.vendor_code||p.chrt_id).toUpperCase()+(sz&&sz!=='0'?'-'+sz.toUpperCase():''),name:p.title||'',archived:!!(p.archived||p.wb_archived)};});
+  const pd=new Map(),cell=(pid,d)=>{let m=pd.get(pid);if(!m){m=new Map();pd.set(pid,m);}let g=m.get(d);if(!g){g={rev:0,qty:0,mar:0,revn:0,prov:false};m.set(d,g);}return g;};
+  // лента загружена 12.11.2026 на 30 дней назад: полные дни — с 12.10.2026 (раньше в базе только заказы, у которых позже менялся статус) — раньше «нет данных»
+  const first=WB_ORDERS_FROM;
+  const rev={},qty={};DAYS.forEach(d=>{if(first&&d>=first){rev[d]=0;qty[d]=0;}});
+  ord.forEach(x=>{if(x.is_cancel||rev[x.order_day]==null)return;const r=Number(x.price_with_disc||0);rev[x.order_day]+=r;qty[x.order_day]++;const g=cell(x.chrt_id,x.order_day);g.rev+=r;g.qty++;});
+  const cfD={},pw=new Map(),cfW={},wk=d=>{const t=parseISO(d);return localISO(addDays(t,-((t.getDay()+6)%7)));};
+  cf.forEach(x=>{const m=Number(x.mar||0),g=Number(x.retail||0),pv=Number(x.no_cost_qty||0)>0;
+    const c=cfD[x.day]=cfD[x.day]||{mar:0,revn:0,prov:false};c.mar+=m;c.revn+=g;if(pv)c.prov=true;
+    const e=cell(x.chrt_id,x.day);e.mar+=m;e.revn+=g;if(pv)e.prov=true;
+    const w=wk(x.day),cw=cfW[w]=cfW[w]||{mar:0,revn:0,prov:false};cw.mar+=m;cw.revn+=g;if(pv)cw.prov=true;
+    let pm=pw.get(x.chrt_id);if(!pm){pm=new Map();pw.set(x.chrt_id,pm);}const h=pm.get(w)||{mar:0,revn:0,prov:false};h.mar+=m;h.revn+=g;if(pv)h.prov=true;pm.set(w,h);});
+  const adsShort=end=>!lastAd||lastAd<end;
+  const week=WEEKS.map(w=>{const ds=DAYS.filter(d=>d>=w&&d<=weekEnd(w)).filter(d=>rev[d]!=null);const c=cfW[w];
+    return {key:w,rev:ds.length?ds.reduce((s,d)=>s+rev[d],0):null,qty:ds.reduce((s,d)=>s+qty[d],0),days:ds.length,mar:c?c.mar:null,revn:c?c.revn:null,prov:!!(c&&c.prov),adsShort:!!c&&adsShort(weekEnd(w)),we:false};});
+  const day=DAYS.map(d=>{const c=cfD[d];return {key:d,rev:rev[d]!=null?rev[d]:null,qty:qty[d]||0,days:rev[d]!=null?1:0,mar:c?c.mar:null,revn:c?c.revn:null,prov:!!(c&&c.prov),adsShort:!!c&&adsShort(d),we:isWeekend(d)};});
+  DATA[b]={week,day,prods,pd,pw};
+  return DATA[b];
+}
 async function loadBase(b){
   if(DATA[b])return DATA[b];
+  if(BASES[b].wb)return loadBaseWB(b);
   // выручка PNL по дням — запросы по неделям параллельно (у артикула за день много строк — по складам)
   const chunks=[];for(let i=0;i<DAYS.length;i+=7)chunks.push([DAYS[i],DAYS[Math.min(i+6,DAYS.length-1)]]);
   const rev={},qty={};
@@ -529,6 +562,13 @@ const PLAN_CACHE={};
 // действующий план — как «Итого» в plan.html и на главной: только неархивные товары; выручка = Σ plan_qty × price
 async function loadPlan(b,mk){
   const key=b+mk;if(PLAN_CACHE[key])return PLAN_CACHE[key];
+  if(BASES[b].wb){   // WB: план — wb_sales_plan по размеру; цена по умолчанию — средняя цена заказов размера за 28 дней до вчера (у WB нет цены в базе товаров)
+    const D=await loadBase(b),rows=await fetchPages(b,`wb_sales_plan?month=eq.${mk}&select=chrt_id,plan_qty,price,margin_pct&order=chrt_id`),d28=DAYS.slice(-28);
+    const avg=pid=>{const m=D.pd.get(pid);if(!m)return 0;let r=0,q=0;d28.forEach(d=>{const g=m.get(d);if(g){r+=g.rev;q+=g.qty;}});return q>0?Math.round(r/q*100)/100:0;};
+    const g={arch:new Set(D.prods.filter(p=>p.archived).map(p=>p.product_id)),prod:new Map(D.prods.map(p=>[p.product_id,{offer:p.offer_id,name:p.name}])),priceOf:new Map(D.prods.map(p=>[p.product_id,avg(p.product_id)])),raw:new Map()};
+    rows.forEach(r=>g.raw.set(r.chrt_id,{plan_qty:Number(r.plan_qty||0),price:Number(r.price||0),margin_pct:Number(r.margin_pct||0)}));
+    return PLAN_CACHE[key]=rebuildPlan(g);
+  }
   const [prods,rows]=await Promise.all([fetchPages(b,'products?select=product_id,offer_id,name,archived,price&order=product_id'),fetchPages(b,`sales_plan?month=eq.${mk}&select=product_id,plan_qty,price,margin_pct&order=product_id`)]);
   const g={arch:new Set(prods.filter(p=>p.archived).map(p=>p.product_id)),prod:new Map(prods.map(p=>[p.product_id,{offer:p.offer_id||'',name:p.name||''}])),priceOf:new Map(prods.map(p=>[p.product_id,Number(p.price||0)])),raw:new Map()};
   rows.forEach(r=>g.raw.set(r.product_id,{plan_qty:Number(r.plan_qty||0),price:Number(r.price||0),margin_pct:Number(r.margin_pct||0)}));
@@ -593,8 +633,9 @@ function editPlan(td,b,pidStr,field){
     if(num===cur[field]){td.innerHTML=old;return;}
     const row={...cur,[field]:num};
     inp.disabled=true;
-    const r=await fetch(BASES[b].url+'/rest/v1/sales_plan?on_conflict=month,product_id',{method:'POST',headers:{...HDS[b],'Content-Type':'application/json',Prefer:'resolution=merge-duplicates'},
-      body:JSON.stringify({month:PLAN_MK,product_id:pid,price:row.price,plan_qty:row.plan_qty,margin_pct:row.margin_pct})});
+    const wb=!!BASES[b].wb;   // WB — wb_sales_plan по размеру
+    const r=await fetch(BASES[b].url+(wb?'/rest/v1/wb_sales_plan?on_conflict=month,chrt_id':'/rest/v1/sales_plan?on_conflict=month,product_id'),{method:'POST',headers:{...HDS[b],'Content-Type':'application/json',Prefer:'resolution=merge-duplicates'},
+      body:JSON.stringify({month:PLAN_MK,[wb?'chrt_id':'product_id']:pid,price:row.price,plan_qty:row.plan_qty,margin_pct:row.margin_pct})});
     if(!r.ok){alert('Ошибка сохранения: HTTP '+r.status);td.innerHTML=old;return;}
     g.raw.set(pid,row);rebuildPlan(g);renderPlan(true);
   };
@@ -743,7 +784,7 @@ async function renderPlan(fast){
 
 // === рекомендуемый план по товарам ===
 // менеджеры — как matrixOf в plan.html юрлица: префиксы Ильи, остальные — Ольга
-const MANAGER_M1={ip:/^(CAP|GLV|SEAL|RNC)-/,ooo:/^(CAP|INS|FW|MS|ML|SE)-/};
+const MANAGER_M1={ip:/^(CAP|GLV|SEAL|RNC)-/,ooo:/^(CAP|INS|FW|MS|ML|SE)-/,wb:/./};   // WB ведёт только Илья
 const matrixOf=(b,offer)=>MANAGER_M1[b].test(offer)?'m1':'m2';
 // перчатки — группа по производителю, цвету и фасовке, как gloveFamily в index.html / plan.html
 const GLV_COLORS=new Set(['BLK','BLU','PNK','GRY','YLW','PUR','CLR','WHT','GRN','RED','ORG','BRN','BEG']);
@@ -972,7 +1013,7 @@ function bindTip(cb,m,P,series,L){
 
 // === управление ===
 async function setEnt(e){
-  ENT=e;save();document.getElementById('pageTitle').textContent='Карты Шухарта · Ozon '+BASES[e].name;document.title='Beauty Art - Карты Шухарта Ozon '+BASES[e].name;
+  ENT=e;save();const tt=BASES[e].wb?BASES[e].name:'Ozon '+BASES[e].name;document.getElementById('pageTitle').textContent='Карты Шухарта · '+tt;document.title='Beauty Art - Карты Шухарта '+tt;
   try{
     if(e==='all'){await Promise.all([loadBase('ip'),loadBase('ooo')]);}else await loadBase(e);
   }catch(err){document.getElementById('chart').innerHTML=`<div class="err">Ошибка загрузки: ${esc(err.message)}</div>`;console.error(err);return;}
@@ -1007,7 +1048,7 @@ function setBase(ctx){
 // === вход (auth.js — общий для всех страниц); после входа — обе базы ===
 async function go(){
   if(!await BA_AUTH.login(BASES.ip.url,HDS.ip)){document.getElementById('login').classList.remove('hide');document.getElementById('pwd').value='';return;}
-  AVAIL.ip=true;
+  AVAIL.ip=true;AVAIL.wb=true;
   try{AVAIL.ooo=await BA_AUTH.login(BASES.ooo.url,HDS.ooo);}catch(e){AVAIL.ooo=false;}
   document.getElementById('login').classList.add('hide');
   document.getElementById('app').classList.remove('hide');
