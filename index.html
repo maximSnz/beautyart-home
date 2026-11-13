@@ -114,6 +114,8 @@
         }
         .menu-item:hover { background: rgba(255, 255, 255, 0.25); transform: translateX(3px); }
         .menu-item:last-child { margin-bottom: 0; }
+        .menu-item.on { background: rgba(227, 61, 120, 0.55); border-color: rgba(255, 255, 255, 0.6); box-shadow: 0 2px 10px rgba(28,13,46,.25); }
+        .menu-item.on:hover { background: rgba(227, 61, 120, 0.65); }
 
         /* === ПРАВАЯ КОЛОНКА === */
         .content-area { min-height: 0; min-width: 0; overflow: hidden; display: flex; }
@@ -165,8 +167,9 @@
         .shop-logo small { font-size: 9px; font-weight: 700; letter-spacing: .4px; margin-left: 5px; padding: 2px 4px; border-radius: 5px;
             background: rgba(255,255,255,.22); align-self: center; }
         [hidden] { display: none !important; }
-        .stub-card { padding: 28px; color: #fff; font-family: 'Forum', serif; font-size: 1.15em; line-height: 1.5; }
-        .stub-card b { font-size: 1.3em; font-weight: 400; display: block; margin-bottom: 8px; }
+        /* стартовый экран (13.11.2026): страница не выбрана — справа только логотип компании */
+        .home-logo-card { align-items: center; justify-content: center; }
+        .home-logo-card img { width: min(260px, 45%); height: auto; opacity: .9; filter: drop-shadow(0 8px 24px rgba(28,13,46,.35)); }
         .chip-glass {
             display: inline-flex; align-items: center; justify-content: center;
             height: 34px; padding: 0 12px;
@@ -494,12 +497,11 @@
                 <details class="menu-section" open>
                     <summary>💼 Коммерческая деятельность</summary>
                     <div class="section-body">
+                        <a class="menu-item" data-shop="ozon-ooo ozon-ip" data-tab="proto" href="#" onclick="setHomeTab('proto');return false">Протокол работ</a>
+                        <a class="menu-item" data-shop="ozon-ooo ozon-ip" data-tab="fin" href="#" onclick="setHomeTab('fin');return false">Финансовая динамика</a>
+                        <a class="menu-item" data-shop="ozon-ooo ozon-ip" data-tab="sum" href="#" onclick="setHomeTab('sum');return false">Сводный отчёт</a>
                         <a class="menu-item" data-shop="ozon-ooo" href="https://maximsnz.github.io/beautyart-ooo/weekly.html" target="_blank">Управление остатками</a>
-                        <a class="menu-item" data-shop="ozon-ooo" href="https://maximsnz.github.io/beautyart-ooo/plan.html" target="_blank">Реализация плана продаж</a>
                         <a class="menu-item" data-shop="ozon-ip" href="https://maximsnz.github.io/beautyart/weekly.html" target="_blank">Управление остатками</a>
-                        <a class="menu-item" data-shop="ozon-ip" href="https://maximsnz.github.io/beautyart/plan.html" target="_blank">Реализация плана продаж</a>
-                        <a class="menu-item" data-shop="ozon-ip" href="https://docs.google.com/spreadsheets/d/144n5raWV8mKbBdRQ8pEEfcgc8T_WaNzQ7NDWhRLQnSw/edit?" target="_blank">Юнит-экономика 1.0</a>
-                        <a class="menu-item" data-shop="ozon-ip" href="https://docs.google.com/spreadsheets/d/1jF6sDrGninnHtG24xIqVv4uiRZolHtaL4sd8Tj7VWCU/edit?gid=1634462589#gid=1634462589" target="_blank">Юнит-экономика 2.0</a>
                         <a class="menu-item" data-shop="ozon-ip" href="https://docs.google.com/spreadsheets/d/18iaMB0iAT4fKAFd-tFfMopklFzAb8cKGXwqRSyxX7AQ/edit?gid=116615647#gid=116615647" target="_blank">Управленческая отчетность</a>
                         <span class="sub-link locked" data-shop="wb-ip ym-ip" title="Страниц продаж по этой площадке пока нет">Страниц пока нет</span>
                     </div>
@@ -547,16 +549,14 @@
             <!-- ПРАВАЯ КОЛОНКА -->
             <div class="content-area">
 
-                <!-- WB / ЯМ: отчётов на главной пока нет -->
-                <div class="glass-card stub-card hide" id="stubCard"></div>
+                <!-- стартовый экран: страница в меню не выбрана — только логотип -->
+                <div class="glass-card home-logo-card hide" id="homeLogo"><img src="https://i.ibb.co/ZzbPQmQt/IMG-8031.png" alt="Beauty Art"></div>
 
                 <!-- КАРТОЧКА ДАННЫХ -->
                 <div class="glass-card hide" id="finCard">
                     <div class="card-head">
                         <div class="tabs-glass">
-                            <button id="tabProto" class="tab-glass" onclick="setHomeTab('proto')">Протокол работ</button>
-                            <button id="tabFin" class="tab-glass on" onclick="setHomeTab('fin')">Финансовая динамика</button>
-                            <button id="tabSum" class="tab-glass" onclick="setHomeTab('sum')">Сводный отчёт</button>
+                            <!-- «Протокол работ», «Финансовая динамика», «Сводный отчёт» — пункты меню «Коммерческая деятельность» (13.11.2026) -->
                             <!-- «Поиск отклонений» скрыт 09.11.2026 (решение владельца: нужное перенесено в «Протокол работ»); код удалить после 23.11.2026 — ROADMAP -->
                             <button id="tabDev" class="tab-glass hide" onclick="setHomeTab('dev')">Поиск отклонений</button>
                         </div>
@@ -632,13 +632,13 @@
 // === константы и доступ ===
 // площадка и юрлицо (13.11.2026) — переключатель в шапке: Ozon ООО / Ozon ИП / WB ИП / ЯМаркет ИП.
 // Определяет ссылки меню (data-shop у пунктов; без data-shop — общие) и данные отчётов: у Ozon — база юрлица (ENT),
-// у WB и ЯМ отчётов на главной пока нет — заглушка (вход — в базу ИП). Выбор — ?s=… в адресе (старое ?e=ip|ooo → Ozon),
+// у WB и ЯМ отчётов на главной пока нет (вход — в базу ИП). При открытии страница не выбрана — справа логотип. Выбор — ?s=… в адресе (старое ?e=ip|ooo → Ozon),
 // иначе последний выбор (localStorage['ba_home_shop'], затем старый ba_home_entity), иначе Ozon ИП; переключение перезагружает страницу.
 const SHOPS={
   'ozon-ooo':{label:'Ozon ООО',ent:'ooo',logo:'ozon',mark:'ozon<small>ООО</small>'},
   'ozon-ip':{label:'Ozon ИП',ent:'ip',logo:'ozon',mark:'ozon<small>ИП</small>'},
-  'wb-ip':{label:'WB ИП',ent:'ip',stub:'Wildberries',logo:'wb',mark:'WB'},
-  'ym-ip':{label:'ЯМаркет ИП',ent:'ip',stub:'Яндекс Маркету',logo:'ym',mark:'<i>Я</i>Маркет'}
+  'wb-ip':{label:'WB ИП',ent:'ip',logo:'wb',mark:'WB'},
+  'ym-ip':{label:'ЯМаркет ИП',ent:'ip',logo:'ym',mark:'<i>Я</i>Маркет'}
 };
 let SHOP='ozon-ip';
 try{const u=new URLSearchParams(location.search),q=u.get('s'),e=u.get('e'),ls=localStorage.getItem('ba_home_shop'),le=localStorage.getItem('ba_home_entity');
@@ -662,7 +662,7 @@ const CHART_DATA={},REAL_CACHE={},DEV_CACHE={};
 const C_UP='#4ade80',C_DOWN='#f87171';
 const GRID='rgba(255,255,255,0.14)',BASELINE='rgba(255,255,255,0.45)';
 const TXT_WEEK='rgba(255,255,255,0.92)',TXT_SUB='rgba(255,255,255,0.55)';
-let HOME_TAB='fin';
+let HOME_TAB=null; // при открытии страница не выбрана (13.11.2026) — справа логотип; выбор — пункт меню
 
 function getWeeksInMonth(y,m){const weeks=[];const d=new Date(y,m,1);d.setDate(d.getDate()+((4-d.getDay()+7)%7));while(d.getMonth()===m&&d.getFullYear()===y){const mo=new Date(d);mo.setDate(mo.getDate()-3);const su=new Date(d);su.setDate(su.getDate()+3);weeks.push({start:mo,end:su});d.setDate(d.getDate()+7);}return weeks;}
 function getISOWeek(date){const d=new Date(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate()));const dn=d.getUTCDay()||7;d.setUTCDate(d.getUTCDate()+4-dn);const ys=new Date(Date.UTC(d.getUTCFullYear(),0,1));return Math.ceil((((d-ys)/86400000)+1)/7);}
@@ -2363,10 +2363,10 @@ function sumTipBind(){const box=document.getElementById('sumBox');if(!box||box._
   box.addEventListener('mouseleave',off);box.addEventListener('scroll',off,true);}
 function setHomeTab(tab){
   HOME_TAB=tab;
-  document.getElementById('tabProto').classList.toggle('on',tab==='proto');
-  document.getElementById('tabFin').classList.toggle('on',tab==='fin');
+  showFin();
+  if(tab==='fin'&&!FIN_DRAWN){FIN_DRAWN=true;renderMonth(document.getElementById('monthSelect').value);}
   document.getElementById('tabDev').classList.toggle('on',tab==='dev');
-  document.getElementById('tabSum').classList.toggle('on',tab==='sum');
+  document.querySelectorAll('.menu-item[data-tab]').forEach(a=>a.classList.toggle('on',a.dataset.tab===tab)); // активный пункт меню
   document.getElementById('chartBoxRub').classList.toggle('hide',tab!=='fin');
   document.getElementById('legendBottom').classList.toggle('hide',tab!=='fin');
   document.getElementById('devBox').classList.toggle('hide',tab!=='dev');
@@ -2396,8 +2396,7 @@ function buildMonthOptions(){
     s.appendChild(o);
   }
   s.value=curKey;
-  s.addEventListener('change',e=>{renderMonth(e.target.value);if(HOME_TAB==='dev')renderDevTable(e.target.value);});
-  renderMonth(s.value);
+  s.addEventListener('change',e=>{FIN_DRAWN=true;renderMonth(e.target.value);if(HOME_TAB==='dev')renderDevTable(e.target.value);});
 }
 
 // === аннотации ===
@@ -2467,12 +2466,14 @@ async function go(){
   if(!await BA_AUTH.login(SUPABASE_URL,HD)){document.getElementById('login').classList.remove('hide');document.getElementById('pwd').value='';return;}
   document.getElementById('login').classList.add('hide');
   document.getElementById('app').classList.remove('hide');
-  const st=SHOPS[SHOP].stub;
-  if(st){const c=document.getElementById('stubCard');c.innerHTML=`<b>${SHOPS[SHOP].label}</b>Отчётов по ${st} на главной пока нет. Страницы площадки — в меню слева.`;c.classList.remove('hide');return;}
-  showFin();
+  document.getElementById('homeLogo').classList.remove('hide');
 }
+// карточка отчётов готовится при первом выборе пункта меню; график месяца рисуется при первом открытии «Финансовой динамики»
+let FIN_INIT=false,FIN_DRAWN=false;
 function showFin(){
+  document.getElementById('homeLogo').classList.add('hide');
   document.getElementById('finCard').classList.remove('hide');
+  if(FIN_INIT)return;FIN_INIT=true;
   applyAnnotations();
   buildMonthOptions();
 }
@@ -2482,6 +2483,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   // раскрыт первый крупный блок меню, где у площадки есть свои страницы (у WB — «Логистика»)
   const secs=[...document.querySelectorAll('details.menu-section')],own=secs.find(d=>d.querySelector(`a[data-shop~="${SHOP}"]`));
   if(own){secs.forEach(d=>d.open=false);own.open=true;}
+  document.querySelectorAll('.menu-item[data-tab]').forEach(x=>x.classList.toggle('on',x.dataset.tab===HOME_TAB));
   document.title=document.title.replace(/( — .*)?$/,' — '+SHOPS[SHOP].label); if(BA_AUTH.has(SUPABASE_URL))go(); else document.getElementById('login').classList.remove('hide'); });
 </script>
 </body>
