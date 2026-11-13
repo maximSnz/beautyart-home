@@ -505,6 +505,7 @@
                         <a class="menu-item" data-shop="ozon-ooo" href="https://maximsnz.github.io/beautyart-ooo/weekly.html" target="_blank">Управление остатками</a>
                         <a class="menu-item" data-shop="ozon-ip" href="https://maximsnz.github.io/beautyart/weekly.html" target="_blank">Управление остатками</a>
                         <a class="menu-item" data-shop="ozon-ip" href="https://docs.google.com/spreadsheets/d/18iaMB0iAT4fKAFd-tFfMopklFzAb8cKGXwqRSyxX7AQ/edit?gid=116615647#gid=116615647" target="_blank">Управленческая отчетность</a>
+                        <a class="menu-item" data-shop="wb-ip" data-tab="fin" href="#" onclick="setHomeTab('fin');return false">Финансовая динамика</a>
                         <a class="menu-item" data-shop="wb-ip" data-tab="sum" href="#" onclick="setHomeTab('sum');return false">Сводный отчёт</a>
                         <a class="menu-item" data-shop="wb-ip" href="https://maximsnz.github.io/beautyart/wb-stock.html" target="_blank">Управление остатками</a>
                         <span class="sub-link locked" data-shop="ym-ip" title="Страниц продаж по этой площадке пока нет">Страниц пока нет</span>
@@ -713,7 +714,41 @@ async function loadKappa(endD){
 }
 
 // === реальные данные юрлица: план месяца + CF-факты недель (СУММА по товарам) + PNL-дни ===
+// «Финансовая динамика» WB ИП (13.11.2026): те же графики; план — wb_sales_plan (неархивные размеры), заказы по дням — «Лента заказов» без отмен
+// (wb_orders, цена продавца со скидкой; с 12.10.2026), маржа по дням и неделям — wb_cf_daily (по дате операции; «GMV» — продажа retail);
+// κ = продажа ÷ выручка заказов за 4 закрытые недели (как карты Шухарта WB)
+async function loadRealMonthWB(mk){
+  if(REAL_CACHE[mk])return REAL_CACHE[mk];
+  const [y,m]=mk.split('-').map(Number),mondays=calWeeksOfMonth(y,m),weekKeys=mondays.map(keyOfMonday);
+  const yD=new Date();yD.setHours(0,0,0,0);const mEnd=new Date(y,m,0),endD=mEnd<yD?mEnd:addDays(yD,-1);
+  let sun=new Date(endD);while(sun.getDay()!==0)sun=addDays(sun,-1);
+  const kMons=[3,2,1,0].map(i=>keyOfMonday(addDays(sun,-6-7*i)));
+  const dFrom=[weekKeys[0],kMons[0]].sort()[0],dTo=keyOfMonday(addDays(mondays[mondays.length-1],6));
+  const [prods,pl,ord,cf]=await Promise.all([
+    fetchPages('wb_products?select=chrt_id,archived,wb_archived&order=chrt_id'),
+    fetchPages(`wb_sales_plan?month=eq.${mk}&select=chrt_id,plan_qty,price,margin_pct&order=chrt_id`),
+    fetchPages(`wb_orders?source=eq.feed&order_day=gte.${dFrom}&order_day=lte.${dTo}&select=srid,order_day,price_with_disc,is_cancel&order=srid`),
+    fetchPages(`wb_cf_daily?day=gte.${dFrom}&day=lte.${dTo}&select=chrt_id,day,mar,retail&order=chrt_id,day`)]);
+  const arch=new Set(prods.filter(p=>p.archived||p.wb_archived).map(p=>p.chrt_id));
+  let planRub=0,planRev=0;pl.forEach(r=>{if(arch.has(r.chrt_id))return;const q=Number(r.plan_qty||0),pr=Number(r.price||0),pc=Number(r.margin_pct||0);planRev+=q*pr;planRub+=q*pr*pc/100;});
+  const planPct=planRev>0?planRub/planRev*100:0;
+  const wk=d=>{const [yy,mm,dd]=d.split('-').map(Number),t=new Date(yy,mm-1,dd);return keyOfMonday(addDays(t,-((t.getDay()+6)%7)));};
+  const dayMap=new Map(),revW={};
+  ord.forEach(x=>{if(x.is_cancel||x.order_day<WB_ORDERS_FROM)return;const g=dayMap.get(x.order_day)||{rub:0,pcs:0};g.rub+=Number(x.price_with_disc||0);g.pcs++;dayMap.set(x.order_day,g);const w=wk(x.order_day);revW[w]=(revW[w]||0)+Number(x.price_with_disc||0);});
+  const cfWeeks={},cfMap=new Map(),gmvW={};
+  cf.forEach(x=>{const w=wk(x.day),mar=Number(x.mar||0),g=Number(x.retail||0);gmvW[w]=(gmvW[w]||0)+g;
+    if(weekKeys.includes(w)){const c=cfWeeks[w]=cfWeeks[w]||{mar:0,revn:0};c.mar+=mar;c.revn+=g;}
+    if(x.day.slice(0,7)===mk){const d=cfMap.get(x.day)||{mar:0,revn:0};d.mar+=mar;d.revn+=g;cfMap.set(x.day,d);}});
+  const ok=kMons.filter(k=>gmvW[k]>0&&revW[k]>0);
+  const kappa=ok.length?{k:ok.reduce((t,k)=>t+gmvW[k],0)/ok.reduce((t,k)=>t+revW[k],0),from:ok[0],to:keyOfMonday(addDays(new Date(ok[ok.length-1]+'T00:00:00'),6)),n:ok.length}:null;
+  if(kappa)planRub*=kappa.k;
+  const toArr=(mp,f)=>[...mp.entries()].sort((a,b)=>a[0]<b[0]?-1:1).map(([d,g])=>{const [yy,mm,dd]=d.split('-').map(Number);return {t:new Date(yy,mm-1,dd).getTime(),...f(g)};});
+  const out={planRub:Math.round(planRub),planRev:Math.round(planRev),planPct,kappa,cfWeeks,ordersDaily:toArr(dayMap,g=>({rub:g.rub,pcs:g.pcs})),cfDaily:cfMap.size?toArr(cfMap,g=>({mar:g.mar,revn:g.revn})):null,real:true};
+  REAL_CACHE[mk]=out;return out;
+}
+const WB_ORDERS_FROM='2026-10-12';   // лента заказов WB полная с 12.10.2026 (как карты Шухарта WB)
 async function loadRealMonth(mk){
+  if(SHOP==='wb-ip')return loadRealMonthWB(mk);
   if(REAL_CACHE[mk])return REAL_CACHE[mk];
   const [y,m]=mk.split('-').map(Number);
   const mondays=calWeeksOfMonth(y,m);
