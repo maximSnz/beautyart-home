@@ -2192,7 +2192,7 @@ async function loadSumWB(from,to){
   const stDay=((await rLast.json())[0]||{}).report_date||null;
   const [prods,prices,cf,ord,stk]=await Promise.all([
     fetchPages('wb_products?select=chrt_id,nm_id,vendor_code,tech_size,title,subject,archived,wb_archived&order=chrt_id'),
-    fetchPages('wb_product_prices?select=id,chrt_id,cost,created_at&order=id'),
+    fetchPages('wb_product_prices?select=id,chrt_id,cost,created_at&order=created_at,id'),   // по дате: costAt идёт по порядку дат (записи задним числом)
     fetchPages(`wb_cf_daily?day=gte.${from}&day=lte.${to}&select=chrt_id,day,mar,retail,cogs,ads&order=chrt_id,day`),
     fetchPages(`wb_orders?source=eq.feed&order_day=gte.${sFrom}&order_day=lte.${to}&select=srid,chrt_id,order_day,price_with_disc,is_cancel&order=srid`),
     stDay?fetchPages(`wb_stock_history?report_date=eq.${stDay}&select=barcode,warehouse_name,chrt_id,qty&order=barcode,warehouse_name`):Promise.resolve([])
