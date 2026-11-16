@@ -167,7 +167,7 @@ async function patchWeek(pl,body){
 }
 
 // ===== состояние =====
-let PROD={ip:[],ooo:[],wb:[]}, WEEKS={ip:{},ooo:{},wb:{}}, OZ={}, ITEMS=[], WEEK=null, OPEN=new Set(), CLOSED=new Set(), SUP_LIST=[];
+let PROD={ip:[],ooo:[],wb:[]}, WEEKS={ip:{},ooo:{},wb:{}}, OZ={}, ITEMS=[], WEEK=null, OPEN=new Set(), OPENG=new Set(), SUP_LIST=[];
 
 async function go(){
   if(!await BA_AUTH.login(SUPABASE_URL,HD))return;
@@ -304,7 +304,7 @@ function render(){
    <th class="s" title="Согласовано (пока нет — к закупке) + долг">Привезти</th><th class="s" title="По умолчанию = согласовано; правится, когда все три недели закрыты">Факт</th></tr></thead><tbody>`;
   if(!groups.length)h+=`<tr><td colspan="${NC}" class="mute">Нет заявленных товаров</td></tr>`;
   const q=!!document.getElementById('q').value.trim();
-  groups.forEach(([s,g],gi)=>{const open=!CLOSED.has(s)||q;
+  groups.forEach(([s,g],gi)=>{const open=OPENG.has(s)||q;   // по умолчанию поставщики свёрнуты (16.11.2026, решение владельца)
     h+=`<tr class="grp" onclick="toggleG(${gi})"><td colspan="${NC}"><span class="tg">${open?'▾':'▸'}</span>${esc(s)} — ${g.length} тов. · к закупке ${nf.format(S(g,buyOf))} кор.${g.some(it=>agOf(it)!=null)?` · согласовано ${nf.format(S(g,it=>agOf(it)||0))} кор.`:''}</td></tr>`;
     if(!open)return;
     g.sort((a,b)=>buyOf(b)-buyOf(a)||String(a.art).localeCompare(String(b.art))).forEach(it=>{
@@ -334,7 +334,7 @@ function render(){
   document.getElementById('t').innerHTML=h+'</tbody>';
 }
 function toggle(k){OPEN.has(k)?OPEN.delete(k):OPEN.add(k);render();}
-function toggleG(i){const s=SUP_LIST[i];CLOSED.has(s)?CLOSED.delete(s):CLOSED.add(s);render();}
+function toggleG(i){const s=SUP_LIST[i];OPENG.has(s)?OPENG.delete(s):OPENG.add(s);render();}
 function shiftWeek(n){WEEK=addD(WEEK,n);OPEN.clear();loadWeek().catch(e=>document.getElementById('err').textContent='Ошибка: '+e.message);}
 function fail(e){document.getElementById('err').textContent='Не сохранилось: '+e.message;}
 
