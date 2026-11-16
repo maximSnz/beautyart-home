@@ -2433,7 +2433,7 @@ async function sumItem(key,offer){if(SUM_ITEM_BUSY)return;SUM_ITEM_BUSY=true;
   sumRnpOnly(offer);}
 // окно товара WB (13.11.2026): «Рука на пульсе WB» — wb-pulse.html?embed=1 (таблица по дням, гипотезы WB, постановка и дополнения);
 // группа перчаток — семейство (РНП группы); диаграммы Ozon у WB нет. Метка PR_WB_V — менять после правки встроенного режима wb-pulse.html
-const PR_WB_V='20261113';
+const PR_WB_V='20261116u';
 function prItemWB(u){const ov=document.createElement('div');ov.className='pr-modal';const key=u.fam||u.offer;
   const close=()=>{ov.remove();document.removeEventListener('keydown',esc,true);},esc=e=>{if(e.key==='Escape'){e.stopImmediatePropagation();close();}};
   ov.addEventListener('click',e=>{if(e.target===ov)close();});document.addEventListener('keydown',esc,true);
