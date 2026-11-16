@@ -74,6 +74,8 @@
         details.menu-section[open] > summary::after { transform: rotate(90deg); }
         details.menu-section[open] > summary { margin-bottom: 8px; }
         .section-body { padding: 0 4px 4px; }
+        /* пунктир внутри блока меню — отделяет общие страницы всех площадок (сводная заявка поставщику, 16.11.2026) */
+        .menu-sep { border-top: 1px dashed rgba(255,255,255,.55); margin: 6px 10px; }
 
         details.subsection { margin: 6px 0; }
         details.subsection > summary {
@@ -530,6 +532,8 @@
                 <details class="menu-section">
                     <summary>🚚 Логистика и доставка</summary>
                     <div class="section-body">
+                        <a class="menu-item" href="https://maximsnz.github.io/beautyart-home/supply.html" target="_blank" title="Ozon ИП + Ozon ООО + WB: согласование закупщика и Excel поставщику">📦 Сводная заявка поставщику</a>
+                        <div class="menu-sep"></div>
                         <a class="menu-item" data-shop="ozon-ooo" href="https://maximsnz.github.io/beautyart-ooo/products.html" target="_blank">База товаров</a>
                         <a class="menu-item" data-shop="ozon-ooo" href="https://maximsnz.github.io/beautyart-ooo/purchase.html" target="_blank">Заявка на закупку</a>
                         <a class="menu-item" data-shop="ozon-ooo" href="https://maximsnz.github.io/beautyart-ooo/need.html" target="_blank">Потребность на месяц</a>
