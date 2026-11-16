@@ -505,6 +505,7 @@
                         <a class="menu-item" data-shop="ozon-ooo" href="https://maximsnz.github.io/beautyart-ooo/weekly.html" target="_blank">Управление остатками</a>
                         <a class="menu-item" data-shop="ozon-ip" href="https://maximsnz.github.io/beautyart/weekly.html" target="_blank">Управление остатками</a>
                         <a class="menu-item" data-shop="ozon-ip" href="https://docs.google.com/spreadsheets/d/18iaMB0iAT4fKAFd-tFfMopklFzAb8cKGXwqRSyxX7AQ/edit?gid=116615647#gid=116615647" target="_blank">Управленческая отчетность</a>
+                        <a class="menu-item" data-shop="wb-ip" data-tab="proto" href="#" onclick="setHomeTab('proto');return false">Протокол работ</a>
                         <a class="menu-item" data-shop="wb-ip" data-tab="fin" href="#" onclick="setHomeTab('fin');return false">Финансовая динамика</a>
                         <a class="menu-item" data-shop="wb-ip" data-tab="sum" href="#" onclick="setHomeTab('sum');return false">Сводный отчёт</a>
                         <a class="menu-item" data-shop="wb-ip" href="https://maximsnz.github.io/beautyart/wb-pulse.html" target="_blank">Рука на пульсе WB</a>
@@ -634,7 +635,7 @@
 })();
 </script>
 <script src="auth.js?v=20261021"></script>
-<script src="protocol_calc.js?v=20261110"></script>   <!-- менять ?v= при каждой правке protocol_calc.js — иначе браузер берёт старый из кэша -->
+<script src="protocol_calc.js?v=20261113"></script>   <!-- менять ?v= при каждой правке protocol_calc.js — иначе браузер берёт старый из кэша -->
 <script>
 // === константы и доступ ===
 // площадка и юрлицо (13.11.2026) — переключатель в шапке: Ozon ООО / Ozon ИП / WB ИП / ЯМаркет ИП.
@@ -1616,7 +1617,14 @@ function toggleDevDetails(){
 // константы и расчёт позиций — общий модуль protocol_calc.js (PROTO; 03.11.2026 — тот же код считает план дня в ночной загрузке)
 const {DROP_PCT:PR_DROP_PCT,DROP_QTY:PR_DROP_QTY,DEEP_PCT:PR_DEEP_PCT,PRICE_TOL:PR_PRICE_TOL,DEEP_DAYS:PR_DEEP_DAYS,DEEP_LO:PR_DEEP_LO,DEEP_HI:PR_DEEP_HI,DAY_MIN:PR_DAY_MIN,UNDER:PR_UNDER,NET_FLOOR:NET_FLOOR_PR}=PROTO;
 const prLim=PROTO.lim;
+// WB ИП (13.11.2026, решения владельца: «Протокол работ» WB — как Ozon): расчёт PROTO.loadWB (база ИП, таблицы wb_*), минимум — DAY_MIN.wb;
+// свои таблицы плана дня и отметок (wb_protocol_plan / wb_protocol_done — sql/2026-11-13_wb_protocol_plan.sql: шаг 9 ozon-daily-load стирает
+// весь план дня в product_protocol_plan); всё WB — у Ильи; окно товара — «Рука на пульсе WB» (wb-pulse.html?embed=1)
+const PR_WB=SHOP==='wb-ip',PR_ENT=PR_WB?'wb':ENT,PR_NAME=PR_WB?SHOPS[SHOP].label:ENTITIES[ENT].name;
+const PR_T=PR_WB?{plan:'wb_protocol_plan',done:'wb_protocol_done',id:'chrt_id'}:{plan:'product_protocol_plan',done:'product_protocol_done',id:'product_id'};
+const prMgrOf=o=>PR_WB?'m1':matrixOf(o);
 let PR_MGR=(()=>{try{return localStorage.getItem('ba_proto_mgr')||'all';}catch(e){return 'all';}})(),PR_CACHE=null;
+if(PR_WB)PR_MGR='m1';   // WB — один менеджер: селектора и колонки «Менеджер» нет (выбор Ozon в localStorage не меняется)
 const PR_OPEN={},PR_FAM_OPEN=new Set();  // раскрытые блоки (по умолчанию все свёрнуты) и группы перчаток — на время просмотра
 // охват гипотезами (решение владельца 31.10.2026): с гипотезой (действующая, контроль сегодня и позже) / перенесено без гипотезы
 // («дата работы» в будущем, действующей гипотезы нет) / просрочено (срок прошёл) / нет ни гипотезы, ни даты
@@ -1646,7 +1654,7 @@ function prCalApply(){const P=PR_CACHE,c=PR_CAL;P.bNote='';
   prCalClose();prApplyCmp();}
 function prCalReset(){const P=PR_CACHE;P.bNote='';P.aRange=P.aDef.slice();P.bRange=P.bDef.slice();prCalClose();prApplyCmp();}
 function prCalDraw(){
-  const P=PR_CACHE,c=PR_CAL,first=c.w==='a'?P.days[1]:P.days[0],last=c.w==='a'?P.yKey:keyOfMonday(addDays(new Date(P.aRange[0]+'T00:00'),-1)),MN=['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
+  const P=PR_CACHE,c=PR_CAL,first=[c.w==='a'?P.days[1]:P.days[0],P.minDay||''].sort().pop(),last=c.w==='a'?P.yKey:keyOfMonday(addDays(new Date(P.aRange[0]+'T00:00'),-1)),MN=['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
   let ov=document.getElementById('prCal');
   if(!ov){ov=document.createElement('div');ov.id='prCal';ov.className='pr-modal';ov.addEventListener('click',e=>{if(e.target===ov)prCalClose();});document.body.appendChild(ov);}
   let html='';const m0=new Date(first+'T00:00'),m1=new Date(last+'T00:00');
@@ -1671,13 +1679,13 @@ async function loadProto(){
   const api={all:fetchPages,one:async q=>{const r=await fetch(SUPABASE_URL+'/rest/v1/'+q,{headers:HD});if(!r.ok)throw new Error(`HTTP ${r.status} ${q.split('?')[0]}`);return r.json();}};
   const [planRes,doneRes]=await Promise.all([
     // периоды просадки плана дня (a_from / a_to / cmp_to, 06.11.2026); нет колонок (SQL не запущен) — без них
-    api.one(`product_protocol_plan?day=eq.${todayKey}&select=pos_key,mgr,reasons,cmp_day,y_day,a_from,a_to,cmp_to&order=pos_key`).catch(()=>api.one(`product_protocol_plan?day=eq.${todayKey}&select=pos_key,mgr,reasons,cmp_day,y_day&order=pos_key`)).then(r=>({ok:true,rows:r})).catch(()=>({ok:false,rows:[]})),
+    api.one(`${PR_T.plan}?day=eq.${todayKey}&select=pos_key,mgr,reasons,cmp_day,y_day,a_from,a_to,cmp_to&order=pos_key`).catch(()=>api.one(`${PR_T.plan}?day=eq.${todayKey}&select=pos_key,mgr,reasons,cmp_day,y_day&order=pos_key`)).then(r=>({ok:true,rows:r})).catch(()=>({ok:false,rows:[]})),
     // отметки «выполнено» на сегодня; нет таблицы (SQL не запущен) — чек-боксы с подсказкой
-    fetch(SUPABASE_URL+`/rest/v1/product_protocol_done?day=eq.${todayKey}&select=pos_key,comment,user_email,updated_at`,{headers:HD}).then(async r=>r.ok?{ok:true,rows:await r.json()}:{ok:false,status:r.status}).catch(e=>({ok:false,status:e.message}))
+    fetch(SUPABASE_URL+`/rest/v1/${PR_T.done}?day=eq.${todayKey}&select=pos_key,comment,user_email,updated_at`,{headers:HD}).then(async r=>r.ok?{ok:true,rows:await r.json()}:{ok:false,status:r.status}).catch(e=>({ok:false,status:e.message}))
   ]);
   const fixed=planRes.rows.length&&planRes.rows[0].y_day===yKey?planRes.rows:null;
   const f0=fixed&&fixed[0],aRange=f0&&f0.a_from?[f0.a_from,f0.a_to]:null,bRange=f0&&f0.cmp_to?[f0.cmp_day,f0.cmp_to]:null;
-  const P=await PROTO.load(api,{today:todayKey,m1:ENTITIES[ENT].m1,bKey:fixed?f0.cmp_day:null,aRange,bRange});
+  const P=await (PR_WB?PROTO.loadWB:PROTO.load)(api,{today:todayKey,m1:ENTITIES[ENT].m1,bKey:fixed?f0.cmp_day:null,aRange,bRange});
   // периоды по умолчанию — из плана дня (ручная правка владельца), иначе вчера к ближайшему дню того же типа
   PR_CACHE={...P,pKeyDef:P.pKey,aDef:P.aR,bDef:P.bR,aRange:P.aR.slice(),bRange:P.bR.slice(),doneOk:doneRes.ok,done:new Map((doneRes.rows||[]).map(x=>[x.pos_key,x])),
     planOk:planRes.ok,fixed:fixed?{keys:new Set(fixed.map(x=>x.pos_key)),rows:fixed,cmp:fixed[0].cmp_day}:null};
@@ -1706,7 +1714,7 @@ async function renderProto(){
       const ed=isEd?`<tr class="pr-edit"><td colspan="${nc}"><div class="pr-edit-box"><textarea id="prDoneText" placeholder="Что сделано (обязательно)">${escH(dn?dn.comment:'')}</textarea><button class="chip-glass" onclick="prDoneSave('${escH(pk)}')">✓ Выполнено</button>${dn?`<button class="chip-glass" onclick="prDoneDel('${escH(pk)}')">Снять отметку</button>`:''}<button class="chip-glass" onclick="prDoneOpen(null)">Отмена</button><span id="prDoneMsg" class="dev-neutral"></span></div></td></tr>`:'';
       // щелчок по артикулу — окно динамики товара (prItem); группа перчаток раскрывается только по треугольнику (решение владельца 31.10.2026)
       // подсказка артикула — наименование товара (у группы перчаток — первого размера и число размеров), 06.11.2026
-      const art=x=>`<span class="pr-art" onclick="event.stopPropagation();prItem('${escH(prKey(x))}')" title="${escH((x.name?(x.members?`${x.name} — группа: ${x.members.length} разм.`:x.name)+'\n':'')+'Щелчок — динамика за 30 дней')}">${escH(x.offer)}</span>`;
+      const art=x=>`<span class="pr-art" onclick="event.stopPropagation();prItem('${escH(prKey(x))}')" title="${escH((x.name?(x.members?`${x.name} — группа: ${x.members.length} разм.`:x.name)+'\n':'')+(PR_WB?'Щелчок — Рука на пульсе WB':'Щелчок — динамика за 30 дней'))}">${escH(x.offer)}</span>`;
       const head=r.fam?`<tr class="dev-row dev-fam${oos(r)}${up(r)}${dc}"${oT(r)}><td class="dev-art" title="${escH(r.offer)} — группа: ${r.members.length} разм.">${cb}<span class="pr-tog" onclick="event.stopPropagation();toggleProtoFam('${blk}','${escH(r.offer)}')" title="Раскрыть размеры">${open?'▾':'▸'}</span> ${tri(r)}${art(r)} <span class="dev-neutral">(${r.members.length})</span></td>${mgc(r)}${cells(r)}</tr>`
         :`<tr class="${(oos(r)+up(r)+dc).trim()}"${oT(r)}><td class="dev-art" title="${escH(r.offer)}">${cb}${tri(r)}${art(r)}</td>${mgc(r)}${cells(r)}</tr>`;
       return head+ed+(r.fam&&open?(members?members(r):r.members).map(m=>`<tr class="dev-member${oos(m)}${up(m)}"${oT(m)}><td class="dev-art" title="${escH(m.offer)}">${tri(m)}${art(m)}</td>${mgc(m)}${cells(m)}</tr>`).join(''):'');
@@ -1729,7 +1737,7 @@ async function renderProto(){
       if(!L)return '<span class="dev-neutral" title="нет лимитов (мало продаж для модели)">—</span>';
       const tp=L.plan!=null?L.plan:L.be,mx=Math.max(L.be*1.6,tp*1.6,isFinite(d)&&d!=null?d*1.1:0,1),x=v=>Math.min(100,v/mx*100);
       const zone=d==null?'нет рекламы':(d>L.be?'выше безубыточного':(d>tp?'выше планового':'в плане'));
-      const tip=`ДРР вчера: ${d==null?'рекламы не было':(d===Infinity?'∞ (реклама без выручки)':fmt1(d)+'%')} — ${zone}\nреклама ${fmt0(r.aY)} ₽ / выручка ${fmt0(r.revY)} ₽\nлимиты${L.price?` при цене ${fmt0(L.price)} ₽`:' (группа — по размерам)'}: плановый ${L.plan!=null?fmt1(L.plan)+'%':'— (нет плана)'}, безубыточный ${fmt1(L.be)}%`;
+      const tip=`ДРР вчера: ${d==null?'рекламы не было':(d===Infinity?'∞ (реклама без выручки)':fmt1(d)+'%')} — ${zone}\nреклама ${fmt0(r.aY)} ₽ / выручка ${fmt0(r.revYd!=null?r.revYd:r.revY)} ₽${PR_WB?' (все заказы ленты, с отменами)':''}\nлимиты${L.price?` при цене ${fmt0(L.price)} ₽`:' (группа — по размерам)'}: плановый ${L.plan!=null?fmt1(L.plan)+'%':'— (нет плана)'}, безубыточный ${fmt1(L.be)}%`;
       return `<div class="pr-drr" title="${escH(tip)}"><span class="z g" style="width:${x(tp)}%"></span><span class="z y" style="width:${x(L.be)-x(tp)}%"></span><span class="z r" style="width:${100-x(L.be)}%"></span>${d==null?'':`<span class="pt" style="left:${d===Infinity?100:x(d)}%"></span>`}</div><span class="pr-drr-v">${d==null?'—':(d===Infinity?'∞':fmt1(d)+'%')}</span>`;};
     // потенциал позиции — недобор выручки вчера к плану дня, ₽ (= Δ колонки «вчера к плану, ₽»); cum — таблица «Потенциал есть»; 📉 — во всех таблицах блока
     const pot=r=>Math.max(0,r.planRY-r.revY),byPot=(a,b)=>(b.planRY-b.revY)-(a.planRY-a.revY);   // все списки блока — по потенциалу (план дня − факт), по убыванию
@@ -1754,7 +1762,7 @@ async function renderProto(){
     //     не закроет разницу «корпоративный минимум − выручка юрлица вчера (все товары)» (нет минимума — план дня − факт);
     //  3) остальные пополнившиеся ▲ ниже плана дня — по потенциалу.
     // Отбор — по всему юрлицу, фильтр менеджера только скрывает чужие позиции; нет в наличии — на месте, блёкло, в суммы не входит
-    const {dMin,gap,sel}=PROTO.gapSel(P,ENT),below=PROTO.below,mine=r=>PR_MGR==='all'||r.mgr===PR_MGR;
+    const {dMin,gap,sel}=PROTO.gapSel(P,PR_ENT),below=PROTO.below,mine=r=>PR_MGR==='all'||r.mgr===PR_MGR;
     const g1All=P.rows.filter(r=>r.drop&&below(r));   // часть 1 засчитывается недобором к плану дня (решение владельца 31.10.2026, сужение списка)
     const g1=g1All.filter(mine).sort((a,b)=>(a.revC-a.revP)-(b.revC-b.revP)),g2=sel.filter(mine);
     // пополнившиеся (▲), которых нет в таблицах блока — по потенциалу: ниже плана дня — в «Потенциал есть», иначе — в «Потенциал исчерпан»
@@ -1764,7 +1772,7 @@ async function renderProto(){
     // план отработки дня («Всего в работе») по юрлицу и менеджерам — независимо от фильтра: позиция в списке хотя бы по одной причине,
     // в наличии (список менеджера = список юрлица ∩ его позиции); пишется с отметкой «выполнено» для «Статистики»
     // с 03.11.2026 план дня фиксирует ночная загрузка (P.fixed); пока его нет — план с экрана при сравнении по умолчанию
-    {const W=PROTO.work(P,ENT);P.work=W.counts;P.workKeys=W.keys;
+    {const W=PROTO.work(P,PR_ENT);P.work=W.counts;P.workKeys=W.keys;
      if(prIsDef(P)){P.workDef=P.work;P.workDefKeys=P.workKeys;}}
     const shown=new Set([...g1,...g2,...b2]),rX=rows.filter(r=>redY(r)&&!shown.has(r));
     const gRN=rX.filter(below).sort((a,b)=>pot(b)-pot(a)),gRP=rX.filter(r=>!below(r)).sort(byPot);
@@ -1782,7 +1790,7 @@ async function renderProto(){
     // 5. блок «Глубокая аналитика» убран 31.10.2026 (решение владельца): 🔍 и часть «Глубокая аналитика» — в общем списке
     const aSel=`<button class="chip-glass dev-toggle" onclick="prCalOpen('a')" title="Период А — что проверяем на просадку (по умолчанию вчера)">📅 ${prRangeLbl(P.aRange,P)}</button>`;
     const cmpSel=`<button class="chip-glass dev-toggle" onclick="prCalOpen('b')" title="Период Б — с чем сравниваем (по умолчанию ближайший день того же типа)">📅 ${prRangeLbl(P.bRange,P)}</button>`;
-    const mgrSel=`<select class="chip-glass dev-toggle" onchange="setProtoMgr(this.value)">${Object.entries(DEV_MANAGERS).map(([k,v])=>`<option value="${k}"${k===PR_MGR?' selected':''}>${v}</option>`).join('')}</select>`;
+    const mgrSel=PR_WB?'<b>Илья</b> (всё WB)':`<select class="chip-glass dev-toggle" onchange="setProtoMgr(this.value)">${Object.entries(DEV_MANAGERS).map(([k,v])=>`<option value="${k}"${k===PR_MGR?' selected':''}>${v}</option>`).join('')}</select>`;
     box.innerHTML=`<div class="dev-cap">Менеджер ${mgrSel} <span style="margin-left:10px">Просадка: сравнить</span> ${aSel} <span>с</span> ${cmpSel}${P.bNote?` <span class="dev-warn">${P.bNote}</span>`:''} <span style="margin-left:10px">Данные за ${dd(P.yKey)} · позиций с планом: ${rows.length} (перчатки — группой)${P.limKey?` · лимиты ДРР на ${dd(P.limKey)}`:''}</span></div>`
       +head('📉','Просадка заказов',b2.length,h2,((n,k,h,u)=>`<span class="pr-sum2"><span class="dev-restock">▲</span> Пополнение <span class="pr-cnt${n?'':' z'}">${n}</span></span><span class="pr-sum2">📣 Высокий ДРР <span class="pr-cnt${k?'':' z'}">${k}</span></span><span class="pr-sum2">🧪 Нужна гипотеза <span class="pr-cnt${h?'':' z'}">${h}</span></span>`)(rows.filter(r=>r.restock).length,rows.filter(redY).length,rows.filter(r=>r.hState!=='hyp').length,new Set([...g1,...(gap>0?g2:[]),...gRN,...gHN,...g3,...b2p,...gRP,...gHP,...b2rP].filter(r=>!r.oos)).size),(W=>`<span class="chip-glass pr-total-chip" title="${P.fixed?`план дня зафиксирован ночной загрузкой (сравнение вчера к ${dd(P.fixed.cmp)})`:'план дня ещё не зафиксирован — по экрану'}: отмечено «выполнено» / позиции в работе (группа перчаток — одна, без товаров не в наличии)">Отработано позиций <b>${W.filter(k=>P.done.has(k)).length}/${W.length}</b></span><button class="chip-glass pr-total-chip pr-stat-btn" onclick="prStats()" title="план и факт отработки по дням">📊 Статистика</button>`)(prPlanKeys(P)))   // доп. заголовки — пополнения и высокий ДРР вчера (блоки «Поступления» и «Убыток из-за рекламы» убраны 31.10.2026)
     box.querySelectorAll('details.pr-blk,details.pr-pot').forEach(d=>d.addEventListener('toggle',()=>{PR_OPEN[d.dataset.k]=d.open;}));
@@ -1807,7 +1815,7 @@ function prPlanKeys(P){const mine=m=>PR_MGR==='all'||m===PR_MGR;
   const K=P.workDefKeys||P.workKeys||new Set();return P.rows.filter(r=>mine(r.mgr)&&K.has(prKey(r))).map(prKey);}
 let PR_EDIT=null;
 function prDoneOpen(k){
-  if(k&&PR_CACHE&&!PR_CACHE.doneOk){alert('Отметки пока недоступны: нужна таблица product_protocol_done (SQL в beautyart-docs/sql, запускает владелец).');return;}
+  if(k&&PR_CACHE&&!PR_CACHE.doneOk){alert(`Отметки пока недоступны: нужна таблица ${PR_T.done} (SQL в beautyart-docs/sql, запускает владелец).`);return;}
   PR_EDIT=k;renderProto().then(()=>{const t=document.getElementById('prDoneText');if(t)t.focus();});
 }
 async function prDoneSave(k){
@@ -1816,10 +1824,10 @@ async function prDoneSave(k){
   const r=PR_CACHE.rows.find(x=>prKey(x)===k);if(!r)return;
   const F=PR_CACHE.fixed,W=F?{all:F.rows.length,m1:F.rows.filter(x=>x.mgr==='m1').length,m2:F.rows.filter(x=>x.mgr==='m2').length}:(PR_CACHE.workDef||PR_CACHE.work||{}),WK=F?F.keys:(PR_CACHE.workDefKeys||PR_CACHE.workKeys);
   // in_plan — позиция в плане «в работе» в момент отметки (03.11.2026): «Статистика» считает факт только по таким отметкам
-  const row={in_plan:WK?WK.has(k):null,plan_all:W.all??null,plan_m1:W.m1??null,plan_m2:W.m2??null,day:PR_CACHE.todayKey,pos_key:k,product_id:r.fam?null:r.pid,offer_id:r.offer,comment:txt,user_email:(window.BA_AUTH&&BA_AUTH.email())||null,updated_at:new Date().toISOString()};
+  const row={in_plan:WK?WK.has(k):null,plan_all:W.all??null,plan_m1:W.m1??null,plan_m2:W.m2??null,day:PR_CACHE.todayKey,pos_key:k,[PR_T.id]:r.fam?null:r.pid,offer_id:r.offer,comment:txt,user_email:(window.BA_AUTH&&BA_AUTH.email())||null,updated_at:new Date().toISOString()};
   msg.textContent='Сохранение…';
   try{
-    const post=b=>fetch(SUPABASE_URL+'/rest/v1/product_protocol_done?on_conflict=day,pos_key',{method:'POST',headers:{...HD,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(b)});
+    const post=b=>fetch(SUPABASE_URL+`/rest/v1/${PR_T.done}?on_conflict=day,pos_key`,{method:'POST',headers:{...HD,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(b)});
     let res=await post(row);
     if(res.status===400){const t=await res.text();if(/in_plan/.test(t)){console.warn('product_protocol_done: нет колонки in_plan — нужен SQL 2026-11-03');const {in_plan,...b}=row;res=await post(b);}}   // до SQL — без признака
     if(!res.ok)throw new Error('HTTP '+res.status);
@@ -1829,7 +1837,7 @@ async function prDoneSave(k){
 async function prDoneDel(k){
   const msg=document.getElementById('prDoneMsg');msg.textContent='Снятие…';
   try{
-    const res=await fetch(SUPABASE_URL+`/rest/v1/product_protocol_done?day=eq.${PR_CACHE.todayKey}&pos_key=eq.${encodeURIComponent(k)}`,{method:'DELETE',headers:HD});
+    const res=await fetch(SUPABASE_URL+`/rest/v1/${PR_T.done}?day=eq.${PR_CACHE.todayKey}&pos_key=eq.${encodeURIComponent(k)}`,{method:'DELETE',headers:HD});
     if(!res.ok)throw new Error('HTTP '+res.status);
     PR_CACHE.done.delete(k);PR_EDIT=null;renderProto();
   }catch(e){msg.textContent='Ошибка: '+e.message;}
@@ -1842,22 +1850,22 @@ async function prStats(){
   const close=()=>{ov.remove();document.removeEventListener('keydown',esc);},esc=e=>{if(e.key!=='Escape')return;const c=ov.querySelector('.pr-modal-card.pr-full');if(c)prStatsFull(c.querySelector('.pr-full-btn'));else close();};   // Esc: сначала свернуть разворот
   ov.addEventListener('click',e=>{if(e.target===ov)close();});document.addEventListener('keydown',esc);document.body.appendChild(ov);
   const card=ov.querySelector('.pr-modal-card'),pk=PR_MGR==='all'?'plan_all':'plan_'+PR_MGR;
-  const head=`<div class="pr-modal-head"><b>📊 Статистика отработки</b> <span class="dev-neutral">${ENTITIES[ENT].name} · ${DEV_MANAGERS[PR_MGR]} · последние 30 дней</span><button class="chip-glass pr-full-btn" onclick="prStatsFull(this)" title="Развернуть на весь экран (Esc — свернуть)">⤢</button><button class="chip-glass" onclick="this.closest('.pr-modal').remove()">✕</button></div>`;
-  if(!P.doneOk){card.innerHTML=head+'<div class="dev-cap dev-warn">Нет таблицы отметок product_protocol_done (SQL).</div>';return;}
+  const head=`<div class="pr-modal-head"><b>📊 Статистика отработки</b> <span class="dev-neutral">${PR_NAME} · ${DEV_MANAGERS[PR_MGR]} · последние 30 дней</span><button class="chip-glass pr-full-btn" onclick="prStatsFull(this)" title="Развернуть на весь экран (Esc — свернуть)">⤢</button><button class="chip-glass" onclick="this.closest('.pr-modal').remove()">✕</button></div>`;
+  if(!P.doneOk){card.innerHTML=head+`<div class="dev-cap dev-warn">Нет таблицы отметок ${PR_T.done} (SQL).</div>`;return;}
   try{
     const from=keyOfMonday(addDays(new Date(P.todayKey+'T00:00'),-29));
-    const q=c=>fetchPages(`product_protocol_done?day=gte.${from}&day=lte.${P.todayKey}&select=day,pos_key,offer_id,plan_all,plan_m1,plan_m2,comment,user_email,updated_at${c}&order=day,pos_key`);
-    const qp=c=>fetchPages(`product_protocol_plan?day=gte.${from}&day=lte.${P.todayKey}&select=day,pos_key,mgr,offer_id,reasons,y_day,cmp_day,src${c}&order=day,pos_key`);
+    const q=c=>fetchPages(`${PR_T.done}?day=gte.${from}&day=lte.${P.todayKey}&select=day,pos_key,offer_id,plan_all,plan_m1,plan_m2,comment,user_email,updated_at${c}&order=day,pos_key`);
+    const qp=c=>fetchPages(`${PR_T.plan}?day=gte.${from}&day=lte.${P.todayKey}&select=day,pos_key,mgr,offer_id,reasons,y_day,cmp_day,src${c}&order=day,pos_key`);
     const [rows,plan]=await Promise.all([q(',in_plan').catch(()=>q('')),   // нет колонки in_plan (SQL не запущен) — все отметки, как до 03.11.2026
       qp(',info,a_from,a_to,cmp_to').catch(()=>qp(',info')).catch(()=>qp('')).catch(()=>[])]);   // нет колонки info — таблица без цифр причин; нет таблицы плана — пусто
     // дни с планом, зафиксированным ночной загрузкой (с 03.11.2026): план = позиции плана менеджера, факт = отметки на них — не больше плана
     const FIX=new Map();plan.forEach(x=>{if(PR_MGR!=='all'&&x.mgr!==PR_MGR)return;(FIX.get(x.day)||FIX.set(x.day,new Set()).get(x.day)).add(x.pos_key);});
     const fixDays=new Set(plan.map(x=>x.day));
     // факт — отметки на позициях плана (in_plan; 03.11.2026); вне плана — отдельно (out); пусто (до 03.11) — в факт, как раньше
-    const by=new Map();rows.forEach(x=>{if(fixDays.has(x.day))return;if(PR_MGR!=='all'&&matrixOf(x.offer_id||'')!==PR_MGR)return;const d=by.get(x.day)||{fact:0,out:0,plan:null};if(x.in_plan===false)d.out++;else d.fact++;const v=x[pk];if(v!=null)d.plan=Math.max(d.plan??0,v);by.set(x.day,d);});
+    const by=new Map();rows.forEach(x=>{if(fixDays.has(x.day))return;if(PR_MGR!=='all'&&prMgrOf(x.offer_id||'')!==PR_MGR)return;const d=by.get(x.day)||{fact:0,out:0,plan:null};if(x.in_plan===false)d.out++;else d.fact++;const v=x[pk];if(v!=null)d.plan=Math.max(d.plan??0,v);by.set(x.day,d);});
     // план дня по всем отметкам дня (у менеджера — его план), а не только его отметкам
     rows.forEach(x=>{const v=x[pk];if(v==null||fixDays.has(x.day))return;const d=by.get(x.day)||{fact:0,out:0,plan:null};d.plan=Math.max(d.plan??0,v);by.set(x.day,d);});
-    fixDays.forEach(day=>{const K=FIX.get(day)||new Set(),mine=rows.filter(x=>x.day===day&&(PR_MGR==='all'||matrixOf(x.offer_id||'')===PR_MGR));
+    fixDays.forEach(day=>{const K=FIX.get(day)||new Set(),mine=rows.filter(x=>x.day===day&&(PR_MGR==='all'||prMgrOf(x.offer_id||'')===PR_MGR));
       const f=mine.filter(x=>K.has(x.pos_key)).length;by.set(day,{fact:f,out:mine.length-f,plan:K.size,fixed:true});});
     // сегодня — как чип: план — зафиксированный (нет — с экрана), факт — отметки на его позициях
     {const K=prPlanKeys(P),KS=new Set(K),mine=[...P.done.keys()].filter(k=>{const r=P.rows.find(x=>prKey(x)===k);return r&&(PR_MGR==='all'||r.mgr===PR_MGR);});
@@ -1878,10 +1886,12 @@ async function prStats(){
     card.innerHTML=head+`<svg viewBox="0 0 ${W} ${H}" class="pr-stat-svg">${g}</svg>`
       +`<div class="dev-cap"><span style="color:#fde047">- - план</span> (всего в работе) · <span style="color:#4ade80">— факт</span> (отмечено выполненным по позициям плана)${withP.length?` · за прошедшие дни с планом: ${sf} из ${sp} (${Math.round(sf/sp*100)}%)`:''}. План дня фиксирует ночная загрузка (с 03.11.2026); раньше он записывался вместе с отметкой — дни без отметок без точки плана.</div>`;
     // позиции × дни (03.11.2026, решение владельца): по каждой позиции плана — значки причин по дням, выполненные — зелёные; щелчок — разбор
-    {const pl=plan.slice();if(!plan.some(x=>x.day===P.todayKey)&&prIsDef(P))pl.push(...PROTO.planRows(P,PROTO.work(P,ENT),'screen'));   // сегодня без плана — с экрана
+    {const pl=plan.slice();if(!plan.some(x=>x.day===P.todayKey)&&prIsDef(P))pl.push(...PROTO.planRows(P,PROTO.work(P,PR_ENT),'screen'));   // сегодня без плана — с экрана
      const d30=[];for(let d=new Date(from+'T00:00');keyOfMonday(d)<=P.todayKey;d=addDays(d,1))d30.push(keyOfMonday(d));
      // маржа по дате заказа по дням (product_margin_daily — ночная загрузка, шаг 10); нет таблицы — без рядов разниц
-     const md=await fetchPages(`product_margin_daily?day=gte.${from}&day=lte.${P.todayKey}&select=product_id,day,mar,est&order=product_id,day`).catch(()=>null);
+     // WB — маржа WB за день по дате операции (wb_cf_daily, ночная загрузка WB, шаг 6; все дни — факт финансового отчёта)
+     const md=await (PR_WB?fetchPages(`wb_cf_daily?day=gte.${from}&day=lte.${P.todayKey}&select=chrt_id,day,mar&order=chrt_id,day`).then(r=>r.map(x=>({product_id:x.chrt_id,day:x.day,mar:x.mar,est:false})))
+       :fetchPages(`product_margin_daily?day=gte.${from}&day=lte.${P.todayKey}&select=product_id,day,mar,est&order=product_id,day`)).catch(()=>null);
      const MAR=new Map();(md||[]).forEach(x=>MAR.set(x.product_id+'|'+x.day,{mar:x.mar==null?null:Number(x.mar),est:!!x.est}));
      PR_MX={plan:pl,done:rows,days:d30,today:P.todayKey,mar:md?MAR:null,all:P.rows.map(r=>({k:prKey(r),offer:r.offer,mgr:r.mgr,name:r.name||'',n:r.members?r.members.length:0,pids:r.members?r.members.map(m=>m.pid):[r.pid]}))};}
     card.insertAdjacentHTML('beforeend',`<div class="pr-mx-bar"><b>Позиции по дням</b> <select class="chip-glass dev-toggle" onchange="prMxDraw(this.value)">${Object.entries(DEV_MANAGERS).map(([k,v])=>`<option value="${k}"${k===PR_MGR?' selected':''}>${v}</option>`).join('')}</select>
@@ -1907,13 +1917,13 @@ function prMxDraw(mgr){const M=PR_MX,box=document.getElementById('prMx');if(!M||
   // все товары с планом продаж (и группы перчаток), даже если ни разу не были в плане дня (решение владельца 03.11.2026), и отметки вне плана
   M.all.forEach(x=>{if(mine(x.mgr)&&!pos.has(x.k))pos.set(x.k,{k:x.k,offer:x.offer,mgr:x.mgr,cells:new Map()});});
   const PIDS=new Map(M.all.map(x=>[x.k,x.pids]));
-  M.done.forEach(x=>{const m=matrixOf(x.offer_id||'');if(mine(m)&&!pos.has(x.pos_key))pos.set(x.pos_key,{k:x.pos_key,offer:x.offer_id,mgr:m,cells:new Map()});});
+  M.done.forEach(x=>{const m=prMgrOf(x.offer_id||'');if(mine(m)&&!pos.has(x.pos_key))pos.set(x.pos_key,{k:x.pos_key,offer:x.offer_id,mgr:m,cells:new Map()});});
   const DN=new Map();M.done.forEach(x=>DN.set(x.day+'|'+x.pos_key,x));const PD=new Set(M.plan.map(x=>x.day));
   const list=[...pos.values()].sort((a,b)=>b.cells.size-a.cells.size||String(a.offer).localeCompare(String(b.offer)));
   if(!list.length){box.innerHTML='<div class="dev-cap">Нет позиций: план дня фиксируется с 03.11.2026.</div>';return;}
   const th=M.days.map(k=>`<th class="${isWeekendD(new Date(k+'T00:00'))?'we':''}">${dd(k)}</th>`).join('');
   // артикул — как на главном экране протокола (06.11.2026): подсказка — наименование, щелчок — окно динамики товара (если позиция в списке)
-  const NM=new Map(M.all.map(x=>[x.k,x])),tipA=p=>{const x=NM.get(p.k);return (x&&x.name?(x.n?`${x.name} — группа: ${x.n} разм.`:x.name)+'\n':'')+(x?'Щелчок — динамика за 30 дней':p.offer);};
+  const NM=new Map(M.all.map(x=>[x.k,x])),tipA=p=>{const x=NM.get(p.k);return (x&&x.name?(x.n?`${x.name} — группа: ${x.n} разм.`:x.name)+'\n':'')+(x?(PR_WB?'Щелчок — Рука на пульсе WB':'Щелчок — динамика за 30 дней'):p.offer);};
   const art=p=>`<td class="pr-mx-art" rowspan="${M.mar?3:1}">${NM.has(p.k)?`<span class="pr-art" onclick="event.stopPropagation();prItem('${escH(p.k)}')" title="${escH(tipA(p))}">${escH(p.offer)}</span>`:`<span title="${escH(p.offer)}">${escH(p.offer)}</span>`}</td>`;
   const pv=p=>i=>prMxPV(M,PIDS.get(p.k),i);
   const tr=p=>(M.mar?`<tr class="pr-mx-drow top">${art(p)}${prMxDelta(M,pv(p),'top')}${prMxSumH(prMxTot(M,pv(p)))}</tr>`:'')+`<tr class="pr-mx-main">${M.mar?'':art(p)}${M.days.map(k=>{const c=p.cells.get(k),dn=DN.get(k+'|'+p.k);
@@ -1963,14 +1973,14 @@ function prMxCell(k,day){const M=PR_MX;if(!M)return;const c=M.plan.find(x=>x.pos
   const R={
     drop:()=>sec('📉','Просадка заказов',I&&I.drop?`Заказы ${c.a_from?`${dd(c.a_from)}–${dd(c.a_to)} (в день)`:dd(c.y_day)}: <b>${n1(I.drop.cur)} шт</b> против ${n1(I.drop.prev)} шт ${c.cmp_to&&c.cmp_to!==c.cmp_day?`${dd(c.cmp_day)}–${dd(c.cmp_to)} (в день)`:dd(c.cmp_day)} (−${n1(I.drop.pct)}%${Math.abs(I.drop.pct-Math.round(I.drop.pct))>=0.05?`, округлённо −${Math.round(I.drop.pct)}%`:''}; порог — ≥ 15% и ≥ 5 шт). Выручка ${n0(I.drop.revC)} ₽ против ${n0(I.drop.revP)} ₽.`:`Заказы ${dd(c.y_day)} ниже ${dd(c.cmp_day)} на ≥ 15% и ≥ 5 шт.`),
     gap:()=>sec('🎯','Потенциал до условной нормы',I&&I.gap?`Выручка ${n0(I.revY)} ₽ при плане дня ${n0(I.planRY)} ₽ — недобор <b>${n0(I.gap.pot)} ₽</b>. Юрлицу до минимума ${n0(I.gap.min)} ₽ не хватало ${n0(I.gap.gap)} ₽ (выручка всех товаров ${n0(I.gap.revAll)} ₽) — позиция взята в добор по потенциалу.`:'Ниже плана дня — взята в добор до корпоративного минимума выручки.'),
-    drr:()=>sec('📣','ДРР в красной зоне',I&&I.drr?`ДРР ${dd(c.y_day)}: <b>${n1(I.drr.drr)}%</b> (реклама ${n0(I.drr.ads)} ₽ / выручка ${n0(I.revY)} ₽) — выше безубыточного лимита ${n1(I.drr.be)}%${I.drr.plan!=null?` (плановый ${n1(I.drr.plan)}%)`:''}${I.drr.price?` при цене ${n0(I.drr.price)} ₽`:''}: реклама в убыток.`:'ДРР вчера выше безубыточного лимита от цены дня.'),
+    drr:()=>sec('📣','ДРР в красной зоне',I&&I.drr?`ДРР ${dd(c.y_day)}: <b>${n1(I.drr.drr)}%</b> (реклама ${n0(I.drr.ads)} ₽ / выручка ${n0(I.drr.rev!=null?I.drr.rev:I.revY)} ₽${PR_WB?' — все заказы, с отменами':''}) — выше безубыточного лимита ${n1(I.drr.be)}%${I.drr.plan!=null?` (плановый ${n1(I.drr.plan)}%)`:''}${I.drr.price?` при цене ${n0(I.drr.price)} ₽`:''}: реклама в убыток.`:'ДРР вчера выше безубыточного лимита от цены дня.'),
     hyp:()=>sec('🧪','Нужна гипотеза',I&&I.hyp?`${HS[I.hyp.state]||'есть размеры без гипотезы'}${I.hyp.due?` (срок ${dd(I.hyp.due)})`:''}.${I.hyp.action?` Последняя гипотеза: «${escH(I.hyp.action)}»${I.hyp.deadline?`, контроль ${dd(I.hyp.deadline)}`:''}.`:''}${I.hyp.sizes&&I.hyp.sizes.length?` Размеры без гипотезы: ${I.hyp.sizes.map(([o,st])=>escH(o)+' — '+(HS[st]||st)).join('; ')}.`:''}`:'Нет действующей гипотезы.'),
     restock:()=>sec('▲','Пополнение',I&&I.restock?`${I.restock.before!=null&&I.restock.now!=null?`Остаток ${n0(I.restock.before)} → <b>${n0(I.restock.now)} шт</b>. `:''}${I.restock.afterZero?`Снова в наличии после нуля (${dd(I.restock.afterZero)}). `:''}${I.restock.days!=null?`Запас ${n1(I.restock.days)} дн. по плановому темпу.`:''}`:'Остатки пополнились.')};
   const body=c?String(c.reasons||'').split(',').filter(Boolean).map(r=>R[r]?R[r]():'').join(''):`<div class="dev-cap">${M.plan.some(x=>x.day===day)?'Позиции не было в плане этого дня.':'План этого дня не зафиксирован (фиксация — с 03.11.2026): причин нет.'}</div>`;
   const gen=I?`<div class="dev-cap">Данные за ${dd(c.y_day)}: заказы ${n1(I.yest)} шт при плане дня ${n1(I.planY)} · выручка ${n0(I.revY)} ₽ при плане ${n0(I.planRY)} ₽ · остаток ${n0(I.stock)} шт (норма наличия ${n0(I.need)})</div>`:(c?`<div class="dev-cap">Данные за ${dd(c.y_day)}, сравнение с ${dd(c.cmp_day)}${c.src==='screen'?' (план дня ещё не зафиксирован — с экрана)':''}; цифры причин не сохранены.</div>`:'');
   const dnH=dn?`<div class="pr-mx-r pr-mx-dn"><div class="pr-mx-rt">✓ Выполнено${dn.updated_at?' '+new Date(dn.updated_at).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}).replace(',',''):''}</div><div>${escH(dn.comment||'')}${dn.user_email?' — '+escH(dn.user_email):''}</div></div>`:'<div class="dev-cap">Отметки «выполнено» нет.</div>';
   const off=(c||dn||{}).offer_id||k,ov=document.createElement('div');ov.className='pr-modal pr-modal-top';
-  ov.innerHTML=`<div class="pr-modal-card pr-mx-card"><div class="pr-modal-head"><b>${escH(off)}</b> <span class="dev-neutral">${ENTITIES[ENT].name} · протокол ${dd(day)}${c&&c.src==='manual'?' · план правлен вручную':''}</span><button class="chip-glass" onclick="this.closest('.pr-modal').remove()">✕</button></div>${gen}${body}${dnH}</div>`;
+  ov.innerHTML=`<div class="pr-modal-card pr-mx-card"><div class="pr-modal-head"><b>${escH(off)}</b> <span class="dev-neutral">${PR_NAME} · протокол ${dd(day)}${c&&c.src==='manual'?' · план правлен вручную':''}</span><button class="chip-glass" onclick="this.closest('.pr-modal').remove()">✕</button></div>${gen}${body}${dnH}</div>`;
   const esc=e=>{if(e.key==='Escape'){e.stopImmediatePropagation();ov.remove();document.removeEventListener('keydown',esc,true);}};
   ov.addEventListener('click',e=>{if(e.target===ov){ov.remove();document.removeEventListener('keydown',esc,true);}});document.addEventListener('keydown',esc,true);document.body.appendChild(ov);}
 // === окно динамики позиции (решения владельца 31.10.2026): 30 дней до вчера — выручка PNL по дням и план дня (пунктир), маржинальность
@@ -2000,6 +2010,7 @@ function prItemView(btn,v,init){const card=btn.closest('.pr-modal-card');if(!ini
     rnp.innerHTML=`<iframe class="pr-rnp-frame" data-key="${escH(key)}" src="../${ENT==='ooo'?'beautyart-ooo':'beautyart'}/plan.html?embed=1&v=${PR_RNP_V}&pulse=${encodeURIComponent(key)}" title="Рука на пульсе"></iframe>`;}}
 async function prItem(k){
   const P=PR_CACHE,u=prFindUnit(k);if(!u)return;
+  if(PR_WB)return prItemWB(u);
   const ov=document.createElement('div');ov.className='pr-modal';ov.innerHTML='<div class="pr-modal-card pr-item-card"><div class="dev-cap">Загрузка…</div></div>';
   // Esc закрывает только это окно (поверх «Статистики» — не трогая её; 06.11.2026)
   const close=()=>{ov.remove();document.removeEventListener('keydown',esc,true);},esc=e=>{if(e.key==='Escape'){e.stopImmediatePropagation();close();}};
@@ -2420,6 +2431,15 @@ async function sumItem(key,offer){if(SUM_ITEM_BUSY)return;SUM_ITEM_BUSY=true;
   wait.remove();SUM_ITEM_BUSY=false;
   if(ok)return prItem(key);
   sumRnpOnly(offer);}
+// окно товара WB (13.11.2026): «Рука на пульсе WB» — wb-pulse.html?embed=1 (таблица по дням, гипотезы WB, постановка и дополнения);
+// группа перчаток — семейство (РНП группы); диаграммы Ozon у WB нет. Метка PR_WB_V — менять после правки встроенного режима wb-pulse.html
+const PR_WB_V='20261113';
+function prItemWB(u){const ov=document.createElement('div');ov.className='pr-modal';const key=u.fam||u.offer;
+  const close=()=>{ov.remove();document.removeEventListener('keydown',esc,true);},esc=e=>{if(e.key==='Escape'){e.stopImmediatePropagation();close();}};
+  ov.addEventListener('click',e=>{if(e.target===ov)close();});document.addEventListener('keydown',esc,true);
+  ov.innerHTML=`<div class="pr-modal-card pr-item-card pr-item-wide"><div class="pr-modal-head"><b>🩺 ${escH(key)}</b> <span class="dev-neutral">${PR_NAME} · Рука на пульсе WB${u.members?` · группа: ${u.members.length} разм.`:''}${u.name?' · '+escH(u.name):''}</span><button class="chip-glass">✕</button></div>
+    <div class="pr-item-rnp"><iframe class="pr-rnp-frame" data-key="${escH(key)}" src="../beautyart/wb-pulse.html?embed=1&v=${PR_WB_V}&pulse=${encodeURIComponent(key)}" title="Рука на пульсе WB"></iframe></div></div>`;
+  ov.querySelector('.pr-modal-head .chip-glass').onclick=close;document.body.appendChild(ov);}
 function sumRnpOnly(offer){const ov=document.createElement('div');ov.className='pr-modal';
   const close=()=>{ov.remove();document.removeEventListener('keydown',esc,true);},esc=e=>{if(e.key==='Escape'){e.stopImmediatePropagation();close();}};
   ov.addEventListener('click',e=>{if(e.target===ov)close();});document.addEventListener('keydown',esc,true);
