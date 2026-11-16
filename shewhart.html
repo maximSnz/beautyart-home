@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Beauty Art - Карты Шухарта</title>
+    <title>Beauty Art - План продаж</title>
     <link href="https://fonts.googleapis.com/css2?family=Forum&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -68,6 +68,12 @@
         details > summary::before { content: '▸ '; color: #544273; }
         details[open] > summary::before { content: '▾ '; }
         details > summary::-webkit-details-marker { display: none; }
+        .rnp-link { cursor: pointer; border-bottom: 1px dotted currentColor; } .rnp-link:hover { color: #E33D78; }
+        .rnp-modal { position: fixed; inset: 0; z-index: 1000; background: rgba(20,8,34,.55); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); display: flex; padding: 16px; }
+        .rnp-card { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; background: rgba(60,24,80,.85); border: 1px solid rgba(255,255,255,.35); border-radius: 14px; padding: 14px 16px; color: #fff; box-shadow: 0 10px 40px rgba(0,0,0,.4); }
+        .rnp-head { display: flex; align-items: center; gap: 10px; font-family: 'Forum', serif; margin-bottom: 8px; } .rnp-head .muted { color: rgba(255,255,255,.75); }
+        .rnp-head button { margin-left: auto; height: 28px; padding: 0 12px; border-radius: 14px; border: 1px solid rgba(255,255,255,.45); background: rgba(255,255,255,.15); color: #fff; font-family: 'Forum', serif; cursor: pointer; }
+        .rnp-frame { flex: 1 1 auto; min-height: 0; width: 100%; border: 0; border-radius: 10px; background: #fff; display: block; }
         .tbl-wrap { overflow-x: auto; margin-top: 10px; max-height: 520px; overflow-y: auto; }
         table { border-collapse: collapse; width: 100%; font-size: .92em; }
         th, td { padding: 5px 9px; text-align: right; border-bottom: 1px dashed #cbd5e1; white-space: nowrap; }
@@ -164,7 +170,7 @@
 
         <div class="hide" id="app">
             <div class="wrap">
-                <h1 id="pageTitle">Карты Шухарта · Ozon</h1>
+                <h1 id="pageTitle">План продаж · Ozon</h1>
                 <!-- юрлицо задаёт пункт меню главной (?e=ip|ooo; 13.11.2026, решение владельца: ИП и ООО раздельно, «Вместе» убрано) -->
                 <div class="controls" style="display:none">
                     <div class="tabs" title="Юрлицо">
@@ -794,10 +800,10 @@ function gloveFamily(offer){
   for(let i=2;i<s.length;i++)if(GLV_COLORS.has(s[i])){const e=/^\d+$/.test(s[i+1]||'')?i+1:i;return e>i||e<s.length-1?s.slice(0,e+1).join('-'):null;}   // фасовка (число после цвета) — часть группы, 10.11.2026
   return null;
 }
-let PR={mgr:'all',q:'',sort:'marGap'};const PR_OPEN=new Set();
-try{const s=JSON.parse(localStorage.getItem('ba_shewhart_prod')||'{}');if(s.mgr)PR.mgr=s.mgr;if(s.sort)PR.sort=s.sort;}catch(e){}
+let PR={mgr:'all',q:'',sort:'offer'};const PR_OPEN=new Set();
+try{const s=JSON.parse(localStorage.getItem('ba_shewhart_prod2')||'{}');if(s.mgr)PR.mgr=s.mgr;if(s.sort)PR.sort=s.sort;}catch(e){}
 let PR_ARGS=null;
-function setPr(k,v){PR[k]=v;try{localStorage.setItem('ba_shewhart_prod',JSON.stringify({mgr:PR.mgr,sort:PR.sort}));}catch(e){}if(k==='mgr')renderPlan(true);else if(PR_ARGS)renderProducts(...PR_ARGS);}
+function setPr(k,v){PR[k]=v;try{localStorage.setItem('ba_shewhart_prod2',JSON.stringify({mgr:PR.mgr,sort:PR.sort}));}catch(e){}if(k==='mgr')renderPlan(true);else if(PR_ARGS)renderProducts(...PR_ARGS);}
 // ряд товара по точкам юрлица: нет строки за день/неделю, а у юрлица данные есть — 0 (товар не продавался), иначе нет данных
 function prodPoints(D,pid){
   const pd=D.pd.get(pid),pw=D.pw.get(pid);
@@ -946,7 +952,7 @@ function renderProductsBody(ents,plans,k,ra,all){
       <div class="tbl-wrap" id="prBody" style="max-height:640px"></div>`;
     card.dataset.ready='1';
   }
-  document.getElementById('prSort').value=PR.sort in {marGap:1,tgtGap:1,revGap:1,planRev:1,offer:1}?PR.sort:'marGap';
+  document.getElementById('prSort').value=PR.sort in {marGap:1,tgtGap:1,revGap:1,planRev:1,offer:1}?PR.sort:'offer';
   document.getElementById('prHint').innerHTML=planEditable()?`· <span class="ed-mark">✎</span> ячейки плана правятся и сразу сохраняются в план ${monthName(PLAN_MK)} · суммы — тыс ₽`
     :`· план ${monthName(PLAN_MK)} — прошлый месяц, только просмотр · суммы — тыс ₽`;
   const q=PR.q.trim().toUpperCase();
@@ -968,6 +974,7 @@ function renderProductsBody(ents,plans,k,ra,all){
   const tg=(it,txt,t)=>`<td class="num tgt" title="${esc(t||it.segTxt)}">${txt}</td>`;
   // подсветка по маржинальности цели: < 0 — ярко-розовая, 0…5% — бледно-розовая (решение владельца 29.10.2026)
   const tgCls=it=>{const v=it.r.pctT;return v==null?'':v<0?' tg-neg':v<5?' tg-low':'';};
+  const lnk=it=>`<span class="rnp-link" title="Рука на пульсе${it.group?' группы':''}" onclick="openRnp(event,'${it.b}','${esc(it.offer)}')">${esc(it.offer)}</span>`;
   const tr=(it,cls,label)=>`<tr class="${cls}${tgCls(it)}"${it.group?` onclick="togglePr('${it.gkey}')" style="cursor:pointer"`:''}><td>${label}${ent(it.b)}</td>`+
     (isAuto()?`<td class="muted" title="${esc(it.from||'')}">${it.from?esc(it.from.replace('с ','').replace(' (мало данных)','*')):''}</td>`:'')+
     `<td class="num bs">${fR(it.r.rev)}</td>${tg(it,fR(it.r.revT),it.segTxtR)}<td>${fR(it.p&&it.p.rev)}</td><td>${placeTag(it.p&&it.p.rev,it.c.rev)}</td>`+
@@ -977,10 +984,10 @@ function renderProductsBody(ents,plans,k,ra,all){
     `<td class="num bs" title="фактическая средняя цена дней базы (Σ выручки ÷ Σ шт)">${fC(it.r.price)}</td>${tg(it,fC(it.r.priceT),it.qtyTxt)}${ed(it,'price',fC(it.p&&it.p.price))}<td>${placeTag(it.p&&it.p.price,it.c.price)}</td></tr>`;
   let html='';
   items.forEach(it=>{
-    if(!it.group){html+=tr(it,'',esc(it.offer));return;}
+    if(!it.group){html+=tr(it,'',lnk(it));return;}
     const open=PR_OPEN.has(it.gkey)||!!q;
-    html+=tr(it,'pr-group',`${open?'▾':'▸'} ${esc(it.offer)} <span class="muted">(${it.members.length} шт)</span>`);
-    if(open)it.members.forEach(m=>{html+=tr(m,'pr-member',esc(m.offer));});
+    html+=tr(it,'pr-group',`${open?'▾':'▸'} ${lnk(it)} <span class="muted">(${it.members.length} шт)</span>`);
+    if(open)it.members.forEach(m=>{html+=tr(m,'pr-member',lnk(m));});
   });
   // итог: суммы по позициям (не медиана итога — см. общий блок)
   const tot=(src,key)=>items.reduce((s,it)=>s+((it[src]&&it[src][key])||0),0);
@@ -992,6 +999,18 @@ function renderProductsBody(ents,plans,k,ra,all){
     <tr>${'<th class="bs">мед.</th><th>цель</th><th>план</th><th title="где план в коридоре: N% пути от медианы до UCL, >UCL, <мед, <LCL">откл.</th>'.repeat(5)}</tr>${html}</table>`
     :'<div class="empty">Нет товаров по фильтру</div>';
 }
+// окно РНП по щелчку на артикул (16.11.2026, решение владельца — как на главной, вид «РНП»): Ozon — plan.html?embed=1 своего юрлица,
+// WB — wb-pulse.html?embed=1; у группы перчаток — РНП группы (семейство). Метки v — те же, что PR_RNP_V / PR_WB_V в index.html (менять вместе)
+const RNP_V={ozon:'20261112h',wb:'20261113'};
+function openRnp(ev,b,key){if(ev)ev.stopPropagation();
+  const wb=!!BASES[b].wb,src=wb?`../beautyart/wb-pulse.html?embed=1&v=${RNP_V.wb}&pulse=${encodeURIComponent(key)}`
+    :`../${b==='ooo'?'beautyart-ooo':'beautyart'}/plan.html?embed=1&v=${RNP_V.ozon}&pulse=${encodeURIComponent(key)}`;
+  const g=PLAN_CACHE[b+PLAN_MK],p=g&&[...g.prod.values()].find(x=>x.offer===key),name=p&&p.name?' · '+esc(p.name):'';
+  const ov=document.createElement('div');ov.className='rnp-modal';
+  const close=()=>{ov.remove();document.removeEventListener('keydown',onKey,true);},onKey=e=>{if(e.key==='Escape'){e.stopImmediatePropagation();close();}};
+  ov.addEventListener('click',e=>{if(e.target===ov)close();});document.addEventListener('keydown',onKey,true);
+  ov.innerHTML=`<div class="rnp-card"><div class="rnp-head"><b>🩺 ${esc(key)}</b> <span class="muted">${wb?BASES[b].name:'Ozon '+BASES[b].name} · Рука на пульсе${name}</span><button>✕</button></div><iframe class="rnp-frame" src="${src}" title="Рука на пульсе"></iframe></div>`;
+  ov.querySelector('.rnp-head button').onclick=close;document.body.appendChild(ov);}
 function togglePr(k){PR_OPEN.has(k)?PR_OPEN.delete(k):PR_OPEN.add(k);if(PR_ARGS)renderProducts(...PR_ARGS);}
 function bindTip(cb,m,P,series,L){
   const tip=cb.querySelector('.tooltip');
@@ -1013,7 +1032,7 @@ function bindTip(cb,m,P,series,L){
 
 // === управление ===
 async function setEnt(e){
-  ENT=e;save();const tt=BASES[e].wb?BASES[e].name:'Ozon '+BASES[e].name;document.getElementById('pageTitle').textContent='Карты Шухарта · '+tt;document.title='Beauty Art - Карты Шухарта '+tt;
+  ENT=e;save();const tt=BASES[e].wb?BASES[e].name:'Ozon '+BASES[e].name;document.getElementById('pageTitle').textContent='План продаж · '+tt;document.title='Beauty Art - План продаж '+tt;
   try{
     if(e==='all'){await Promise.all([loadBase('ip'),loadBase('ooo')]);}else await loadBase(e);
   }catch(err){document.getElementById('chart').innerHTML=`<div class="err">Ошибка загрузки: ${esc(err.message)}</div>`;console.error(err);return;}
