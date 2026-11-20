@@ -2367,13 +2367,13 @@ function sumDelta(k,a,b,nA,nB){const c=SUM_CMP[k];if(!c||a==null||b==null||!isFi
   return c.t==='dn'?out(a-b,0,' дн'):out(a-b,1,' п.п.');}
 // группы (09.11.2026, решения владельца): дерево в одном столбце — каждая категория Ozon (даже из 1 артикула) — строка верхнего уровня; внутри
 // перчаток — второй уровень: группы по модели и цвету, как в «Протоколе работ» и plan.html (gloveFamily, от 2 размеров), в них — размеры.
-// Строка группы — суммы, проценты — из сумм; фильтры и сортировка — по позициям верхнего уровня, фильтр артикула находит группу и по
-// артикулу внутри; ▸ раскрывает (на время просмотра)
+// Строка группы — суммы, проценты — из сумм; фильтры и сортировка — по позициям верхнего уровня; ▸ раскрывает (на время просмотра).
+// Фильтр артикула (20.11.2026, решение владельца): в группе остаются только совпавшие артикулы, суммы группы — по ним; совпало название
+// категории или группы перчаток — она целиком
 const SUM_FAM_OPEN=new Set();
 let SUM_KEYS=[];                // ключи групп текущей отрисовки — в onclick передаётся номер (название категории может содержать кавычки)
 function sumFamToggle(i){const k=SUM_KEYS[i];if(k==null)return;SUM_FAM_OPEN.has(k)?SUM_FAM_OPEN.delete(k):SUM_FAM_OPEN.add(k);sumBody();}
 const sumLeaves=o=>o.members?o.members.flatMap(sumLeaves):[o];
-const sumLabels=o=>[o.offer,...(o.members||[]).flatMap(sumLabels)];   // категория, группы перчаток и артикулы — для фильтра
 function sumGroup(key,items,raw,T,label,name){   // items — строки уровня ниже (артикулы или группы), raw — исходные артикулы для сумм
   SUM_KEYS.push(key);const g=sumTotal(raw,T);
   return {...g,fam:key,fi:SUM_KEYS.length-1,members:items,grp:raw[0].grp,offer:label,name,archived:false,noCost:false};}
@@ -2384,17 +2384,20 @@ function sumBody(){
   SUM_KEYS=[];
   base.forEach(o=>{if(!cats.has(o.grp))cats.set(o.grp,[]);cats.get(o.grp).push(o);});   // нет type_id — группа «Без категории»
   if(SUM_VIEW==='item'){base.forEach(o=>pos.push(sumVals(o,D.T)));cats.clear();}   // «Товар» — все артикулы одним списком
+  const oc=SUM_COLS.find(c=>c.k==='offer'),hit=t=>sumMatch(oc,t,SUM_F.offer);   // фильтр артикула — по названию категории / группы / артикулу
   cats.forEach((m,cat)=>{
     // внутри категории: перчатки — группами по модели и цвету (от 2 размеров), остальное — артикулами
-    const fam=new Map(),items=[];
+    const fam=new Map(),items=[],all=hit(cat);
     m.forEach(o=>{const f=gloveFamily(o.offer);if(!f){items.push(o);return;}if(!fam.has(f))fam.set(f,[]);fam.get(f).push(o);});
-    const lvl=[];
-    items.forEach(o=>lvl.push(sumVals(o,D.T)));
-    fam.forEach((fm,f)=>{if(fm.length<2){lvl.push(sumVals(fm[0],D.T));return;}fm.sort(byOffer);
+    const lvl=[],raw=[];
+    items.forEach(o=>{if(all||hit(o.offer)){lvl.push(sumVals(o,D.T));raw.push(o);}});
+    fam.forEach((fm,f)=>{const big=fm.length>=2;if(!all&&!(big&&hit(f+'-*')))fm=fm.filter(o=>hit(o.offer));if(!fm.length)return;raw.push(...fm);
+      if(fm.length<2){lvl.push(sumVals(fm[0],D.T));return;}fm.sort(byOffer);   // от группы остался один размер — строкой артикула
       lvl.push(sumGroup('f:'+f,fm.map(o=>sumVals(o,D.T)),fm,D.T,f+'-*',`${fm[0].name||''} — ${fm.length} разм.`));});
+    if(!raw.length)return;
     lvl.sort(byOffer);
-    pos.push(sumGroup('c:'+cat,lvl,m,D.T,cat,`${cat}: ${m.length} арт.`));});
-  const ok=v=>cols.every(c=>c.k==='offer'&&v.members?(!String(SUM_F.offer||'').trim()||sumLabels(v).some(t=>sumMatch(c,t,SUM_F.offer))):sumMatch(c,v[c.k],SUM_F[c.k]));
+    pos.push(sumGroup('c:'+cat,lvl,raw,D.T,cat,`${cat}: ${raw.length} арт.`));});
+  const ok=v=>cols.every(c=>c.k==='offer'&&v.members||sumMatch(c,v[c.k],SUM_F[c.k]));   // группы по артикулу уже отобраны выше
   let list=pos.filter(ok);
   list.sort((a,b)=>{if(SUM_SORT){const c=SUM_COLS.find(x=>x.k===SUM_SORT.k),x=a[c.k],y=b[c.k];
       if(c.txt)return cmpT(x,y)*SUM_SORT.dir;const nx=x==null?-Infinity:x,ny=y==null?-Infinity:y;if(nx!==ny)return (nx<ny?-1:1)*SUM_SORT.dir;}
