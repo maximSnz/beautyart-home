@@ -1001,7 +1001,7 @@ function renderProductsBody(ents,plans,k,ra,all){
 }
 // окно РНП по щелчку на артикул (16.11.2026, решение владельца — как на главной, вид «РНП»): Ozon — plan.html?embed=1 своего юрлица,
 // WB — wb-pulse.html?embed=1; у группы перчаток — РНП группы (семейство). Метки v — те же, что PR_RNP_V / PR_WB_V в index.html (менять вместе)
-const RNP_V={ozon:'20261112h',wb:'20261116u'};
+const RNP_V={ozon:'20261120a',wb:'20261116u'};
 function openRnp(ev,b,key){if(ev)ev.stopPropagation();
   const wb=!!BASES[b].wb,src=wb?`../beautyart/wb-pulse.html?embed=1&v=${RNP_V.wb}&pulse=${encodeURIComponent(key)}`
     :`../${b==='ooo'?'beautyart-ooo':'beautyart'}/plan.html?embed=1&v=${RNP_V.ozon}&pulse=${encodeURIComponent(key)}`;
