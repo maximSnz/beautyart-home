@@ -341,6 +341,10 @@
         .pr-blk > summary { cursor: pointer; font-family: 'Forum', serif; font-size: 1.02em; color: #fff; padding: 4px 2px; list-style-position: inside; }
         .pr-cnt { display: inline-block; min-width: 22px; padding: 0 7px; margin-left: 6px; border-radius: 10px; background: #E33D78; color: #fff; font-size: .85em; text-align: center; }
         .pr-sum2 { margin-left: 14px; white-space: nowrap; }   /* значок, подпись и счётчик не разрываются переносом */
+        .pr-cap-sum { float: right; }   /* счётчики причин — справа в строке периодов (20.11.2026) */
+        .pr-cap-sum .pr-cnt { font-size: .95em; }
+        .pr-find { float: right; margin-left: 14px; }   /* поиск по артикулу — справа в заголовке списка */
+        .pr-find .dev-filter { height: 26px; width: 170px; font-size: .8em; }
         #protoBox .dev-table thead th, #protoBox .dev-table thead th:first-child { text-align: center; vertical-align: middle; }   /* заголовки колонок протокола — по центру */
         #protoBox .dev-table thead th:not(:first-child) { max-width: 150px; }   /* длинные заголовки — с переносом, место — артикулам (06.11.2026) */
         #protoBox .dev-table td.dev-art { max-width: none; overflow: visible; white-space: nowrap; }   /* артикул — целиком, наименование — в подсказке */
@@ -1628,6 +1632,7 @@ const PR_WB=SHOP==='wb-ip',PR_ENT=PR_WB?'wb':ENT,PR_NAME=PR_WB?SHOPS[SHOP].label
 const PR_T=PR_WB?{plan:'wb_protocol_plan',done:'wb_protocol_done',id:'chrt_id'}:{plan:'product_protocol_plan',done:'product_protocol_done',id:'product_id'};
 const prMgrOf=o=>PR_WB?'m1':matrixOf(o);
 let PR_MGR=(()=>{try{return localStorage.getItem('ba_proto_mgr')||'all';}catch(e){return 'all';}})(),PR_CACHE=null;
+let PR_FILTER='';   // поиск по артикулу в протоколе — на время просмотра
 if(PR_WB)PR_MGR='m1';   // WB — один менеджер: селектора и колонки «Менеджер» нет (выбор Ozon в localStorage не меняется)
 const PR_OPEN={},PR_FAM_OPEN=new Set();  // раскрытые блоки (по умолчанию все свёрнуты) и группы перчаток — на время просмотра
 // охват гипотезами (решение владельца 31.10.2026): с гипотезой (действующая, контроль сегодня и позже) / перенесено без гипотезы
@@ -1702,6 +1707,8 @@ async function renderProto(){
     const P=await loadProto();
     const dd=k=>k?k.slice(8,10)+'.'+k.slice(5,7):'—';
     const rows=P.rows.filter(r=>PR_MGR==='all'||r.mgr===PR_MGR);
+    // поиск по артикулу (20.11.2026, решение владельца): во всех списках — только совпавшие; счётчики в заголовках — без фильтра
+    const q=PR_FILTER.trim().toLowerCase(),hitO=o=>String(o||'').toLowerCase().includes(q),hit=r=>!q||hitO(r.offer)||(r.members||[]).some(m=>hitO(m.offer));
     const pct=v=>v==null||!isFinite(v)?(v===Infinity?'∞':'—'):fmt1(v)+'%';
     const sg=v=>v==null?'—':(v>0?'+':'')+fmt0(v);
     const ordPlan=r=>`${fmt0(r.q7)} / ${fmt0(r.qPlan7)} <span class="${r.ordDev7<0?'dev-neg':'dev-pos'}">${r.ordDev7==null?'':'('+sg(r.ordDev7)+'%)'}</span>`;
@@ -1721,7 +1728,7 @@ async function renderProto(){
       const art=x=>`<span class="pr-art" onclick="event.stopPropagation();prItem('${escH(prKey(x))}')" title="${escH((x.name?(x.members?`${x.name} — группа: ${x.members.length} разм.`:x.name)+'\n':'')+(PR_WB?'Щелчок — Рука на пульсе WB':'Щелчок — динамика за 30 дней'))}">${escH(x.offer)}</span>`;
       const head=r.fam?`<tr class="dev-row dev-fam${oos(r)}${up(r)}${dc}"${oT(r)}><td class="dev-art" title="${escH(r.offer)} — группа: ${r.members.length} разм.">${cb}<span class="pr-tog" onclick="event.stopPropagation();toggleProtoFam('${blk}','${escH(r.offer)}')" title="Раскрыть размеры">${open?'▾':'▸'}</span> ${tri(r)}${art(r)} <span class="dev-neutral">(${r.members.length})</span></td>${mgc(r)}${cells(r)}</tr>`
         :`<tr class="${(oos(r)+up(r)+dc).trim()}"${oT(r)}><td class="dev-art" title="${escH(r.offer)}">${cb}${tri(r)}${art(r)}</td>${mgc(r)}${cells(r)}</tr>`;
-      return head+ed+(r.fam&&open?(members?members(r):r.members).map(m=>`<tr class="dev-member${oos(m)}${up(m)}"${oT(m)}><td class="dev-art" title="${escH(m.offer)}">${tri(m)}${art(m)}</td>${mgc(m)}${cells(m)}</tr>`).join(''):'');
+      return head+ed+(r.fam&&open?(members?members(r):r.members).filter(m=>!q||hitO(r.offer)||hitO(m.offer)).map(m=>`<tr class="dev-member${oos(m)}${up(m)}"${oT(m)}><td class="dev-art" title="${escH(m.offer)}">${tri(m)}${art(m)}</td>${mgc(m)}${cells(m)}</tr>`).join(''):'');
     };
     const tbl=(head,list,row,foot)=>list.length?`<table class="dev-table"><thead><tr><th>Артикул</th>${PR_MGR==='all'?'<th>Менеджер</th>':''}${head}</tr></thead><tbody>${list.map(row).join('')}${foot?`<tr class="pr-total"><td>Итого</td>${PR_MGR==='all'?'<td></td>':''}${foot}</tr>`:''}</tbody></table>`:'<div class="dev-cap">Нет товаров — всё в порядке.</div>';
     // общий список — не сворачивается (решение владельца 31.10.2026): заголовок со счётчиками и таблицы видны сразу
@@ -1753,9 +1760,10 @@ async function renderProto(){
     // заменил жирные черты); «Итого» — после части с индексом tk, по частям 0…tk (решение владельца 31.10.2026: «Потенциал есть» —
     // по 📉 + 🎯, сумма до минимума; «Потенциал исчерпан» — по 📉), без товаров не в наличии; части ниже в итог не входят
     const t2=(parts,cum,tk)=>{
+      parts=parts.map(p=>[p[0],(p[1]||[]).filter(hit)]);
       const totL=parts.slice(0,tk+1).flatMap(p=>p[1]||[]);
       parts=parts.map((p,i)=>[p[0],p[1]||[],i]).filter(p=>p[1].length);
-      if(!parts.length)return tbl(H2,[],null);
+      if(!parts.length)return q?`<div class="dev-cap">Нет артикулов с «${escH(PR_FILTER.trim())}».</div>`:tbl(H2,[],null);
       const nc=6+(PR_MGR==='all'?1:0),r2=row2(cum);
       const tot=l=>`<tr class="pr-total"><td title="без товаров не в наличии">Итого</td>${PR_MGR==='all'?'<td></td>':''}${foot2(l.filter(r=>!r.oos))}</tr>`;
       return `<table class="dev-table"><thead><tr><th>Артикул</th>${PR_MGR==='all'?'<th>Менеджер</th>':''}${H2}</tr></thead><tbody>${parts.map(([h,l,i],j)=>`<tr class="pr-subh"><td colspan="${nc}">${h} <span class="pr-cnt z">${l.length}</span></td></tr>${l.map(r2).join('')}${totL.length&&i<=tk&&!(parts[j+1]&&parts[j+1][2]<=tk)?tot(totL):''}`).join('')}</tbody></table>`;
@@ -1795,8 +1803,8 @@ async function renderProto(){
     const aSel=`<button class="chip-glass dev-toggle" onclick="prCalOpen('a')" title="Период А — что проверяем на просадку (по умолчанию вчера)">📅 ${prRangeLbl(P.aRange,P)}</button>`;
     const cmpSel=`<button class="chip-glass dev-toggle" onclick="prCalOpen('b')" title="Период Б — с чем сравниваем (по умолчанию ближайший день того же типа)">📅 ${prRangeLbl(P.bRange,P)}</button>`;
     const mgrSel=PR_WB?'<b>Илья</b> (всё WB)':`<select class="chip-glass dev-toggle" onchange="setProtoMgr(this.value)">${Object.entries(DEV_MANAGERS).map(([k,v])=>`<option value="${k}"${k===PR_MGR?' selected':''}>${v}</option>`).join('')}</select>`;
-    box.innerHTML=`<div class="dev-cap">Менеджер ${mgrSel} <span style="margin-left:10px">Просадка: сравнить</span> ${aSel} <span>с</span> ${cmpSel}${P.bNote?` <span class="dev-warn">${P.bNote}</span>`:''} <span style="margin-left:10px">Данные за ${dd(P.yKey)} · позиций с планом: ${rows.length} (перчатки — группой)${P.limKey?` · лимиты ДРР на ${dd(P.limKey)}`:''}</span></div>`
-      +head('📉','Просадка заказов',b2.length,h2,((n,k,h,u)=>`<span class="pr-sum2"><span class="dev-restock">▲</span> Пополнение <span class="pr-cnt${n?'':' z'}">${n}</span></span><span class="pr-sum2">📣 Высокий ДРР <span class="pr-cnt${k?'':' z'}">${k}</span></span><span class="pr-sum2">🧪 Нужна гипотеза <span class="pr-cnt${h?'':' z'}">${h}</span></span>`)(rows.filter(r=>r.restock).length,rows.filter(redY).length,rows.filter(r=>r.hState!=='hyp').length,new Set([...g1,...(gap>0?g2:[]),...gRN,...gHN,...g3,...b2p,...gRP,...gHP,...b2rP].filter(r=>!r.oos)).size),(W=>`<span class="chip-glass pr-total-chip" title="${P.fixed?`план дня зафиксирован ночной загрузкой (сравнение вчера к ${dd(P.fixed.cmp)})`:'план дня ещё не зафиксирован — по экрану'}: отмечено «выполнено» / позиции в работе (группа перчаток — одна, без товаров не в наличии)">Отработано позиций <b>${W.filter(k=>P.done.has(k)).length}/${W.length}</b></span><button class="chip-glass pr-total-chip pr-stat-btn" onclick="prStats()" title="план и факт отработки по дням">📊 Статистика</button>`)(prPlanKeys(P)))   // доп. заголовки — пополнения и высокий ДРР вчера (блоки «Поступления» и «Убыток из-за рекламы» убраны 31.10.2026)
+    box.innerHTML=`<div class="dev-cap"><span class="pr-cap-sum">${((n,k,h)=>`<span class="pr-sum2"><span class="dev-restock">▲</span> Пополнение <span class="pr-cnt${n?'':' z'}">${n}</span></span><span class="pr-sum2">📣 Высокий ДРР <span class="pr-cnt${k?'':' z'}">${k}</span></span><span class="pr-sum2">🧪 Нужна гипотеза <span class="pr-cnt${h?'':' z'}">${h}</span></span>`)(rows.filter(r=>r.restock).length,rows.filter(redY).length,rows.filter(r=>r.hState!=='hyp').length)}</span>Менеджер ${mgrSel} <span style="margin-left:10px">Просадка: сравнить</span> ${aSel} <span>с</span> ${cmpSel}${P.bNote?` <span class="dev-warn">${P.bNote}</span>`:''}</div>`
+      +head('📉','Просадка заказов',b2.length,h2,'',(W=>`<span class="pr-find"><input type="search" id="prFilter" class="chip-glass dev-filter" placeholder="Артикул…" value="${escH(PR_FILTER)}" oninput="setProtoFilter(this.value)" title="Во всех списках протокола — только артикулы, содержащие этот текст (группа перчаток — если совпала она или её размер)"></span><span class="chip-glass pr-total-chip" title="${P.fixed?`план дня зафиксирован ночной загрузкой (сравнение вчера к ${dd(P.fixed.cmp)})`:'план дня ещё не зафиксирован — по экрану'}: отмечено «выполнено» / позиции в работе (группа перчаток — одна, без товаров не в наличии)">Отработано позиций <b>${W.filter(k=>P.done.has(k)).length}/${W.length}</b></span><button class="chip-glass pr-total-chip pr-stat-btn" onclick="prStats()" title="план и факт отработки по дням">📊 Статистика</button>`)(prPlanKeys(P)))   // доп. заголовки — пополнения и высокий ДРР вчера (блоки «Поступления» и «Убыток из-за рекламы» убраны 31.10.2026)
     box.querySelectorAll('details.pr-blk,details.pr-pot').forEach(d=>d.addEventListener('toggle',()=>{PR_OPEN[d.dataset.k]=d.open;}));
     prFitHead();
     // плавное раскрытие / сворачивание групп «Потенциал есть / исчерпан» — как меню главной (260 мс, без анимации при reduced motion)
@@ -2135,6 +2143,7 @@ async function prItem(k){
     prTips(card);
   }catch(e){card.innerHTML=head+`<div class="dev-cap dev-neg">Ошибка загрузки: ${escH(e.message)}</div>`;}
 }
+async function setProtoFilter(v){PR_FILTER=v;await renderProto();const i=document.getElementById('prFilter');if(i){i.focus();try{i.setSelectionRange(v.length,v.length);}catch(e){}}}
 function setProtoMgr(v){PR_MGR=v;try{localStorage.setItem('ba_proto_mgr',v);}catch(e){}renderProto();}
 // === вкладка «Сводный отчёт» (09.11.2026, ТЗ собственника «ТЗ 10.08.2026-2»; определения — решения владельца 09.11.2026, CLAUDE.md 5.14) ===
 // строка = артикул (перчатки — группой); Группа — категория Ozon 3 уровня (products.raw.type_id); столбец «Подгруппа» убран 09.11.2026 (дублировал артикул); период с … по …; только чтение
