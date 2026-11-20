@@ -341,7 +341,9 @@
         .pr-blk > summary { cursor: pointer; font-family: 'Forum', serif; font-size: 1.02em; color: #fff; padding: 4px 2px; list-style-position: inside; }
         .pr-cnt { display: inline-block; min-width: 22px; padding: 0 7px; margin-left: 6px; border-radius: 10px; background: #E33D78; color: #fff; font-size: .85em; text-align: center; }
         .pr-sum2 { margin-left: 14px; white-space: nowrap; }   /* значок, подпись и счётчик не разрываются переносом */
-        .pr-cap-sum { float: right; }   /* счётчики причин — справа в строке периодов (20.11.2026) */
+        .pr-cap1 { display: flex; align-items: center; white-space: nowrap; }   /* строка периодов — всегда одна строка (20.11.2026) */
+        .pr-cap-l { flex: none; }
+        .pr-cap-sum { margin-left: auto; padding-left: 14px; }   /* счётчики причин — справа; не помещаются — уменьшаются (prFitHead) */
         .pr-cap-sum .pr-cnt { font-size: .95em; }
         .pr-head2 { display: flex; align-items: center; }   /* строка «Отработано · Статистика · поиск» (20.11.2026) */
         .pr-find { flex: 1; display: flex; }   /* поиск по артикулу — на всю оставшуюся ширину строки */
@@ -1804,7 +1806,7 @@ async function renderProto(){
     const aSel=`<button class="chip-glass dev-toggle" onclick="prCalOpen('a')" title="Период А — что проверяем на просадку (по умолчанию вчера)">📅 ${prRangeLbl(P.aRange,P)}</button>`;
     const cmpSel=`<button class="chip-glass dev-toggle" onclick="prCalOpen('b')" title="Период Б — с чем сравниваем (по умолчанию ближайший день того же типа)">📅 ${prRangeLbl(P.bRange,P)}</button>`;
     const mgrSel=PR_WB?'<b>Илья</b> (всё WB)':`<select class="chip-glass dev-toggle" onchange="setProtoMgr(this.value)">${Object.entries(DEV_MANAGERS).map(([k,v])=>`<option value="${k}"${k===PR_MGR?' selected':''}>${v}</option>`).join('')}</select>`;
-    box.innerHTML=`<div class="dev-cap"><span class="pr-cap-sum">${((n,k,h)=>`<span class="pr-sum2">📉 Просадка заказов <span class="pr-cnt${b2.length?'':' z'}">${b2.length}</span></span><span class="pr-sum2"><span class="dev-restock">▲</span> Пополнение <span class="pr-cnt${n?'':' z'}">${n}</span></span><span class="pr-sum2">📣 Высокий ДРР <span class="pr-cnt${k?'':' z'}">${k}</span></span><span class="pr-sum2">🧪 Нужна гипотеза <span class="pr-cnt${h?'':' z'}">${h}</span></span>`)(rows.filter(r=>r.restock).length,rows.filter(redY).length,rows.filter(r=>r.hState!=='hyp').length)}</span>Менеджер ${mgrSel} <span style="margin-left:10px">Просадка: сравнить</span> ${aSel} <span>с</span> ${cmpSel}${P.bNote?` <span class="dev-warn">${P.bNote}</span>`:''}</div>`
+    box.innerHTML=`<div class="dev-cap pr-cap1"><span class="pr-cap-l">Менеджер ${mgrSel} <span style="margin-left:10px">Просадка: сравнить</span> ${aSel} <span>с</span> ${cmpSel}${P.bNote?` <span class="dev-warn">${P.bNote}</span>`:''}</span><span class="pr-cap-sum">${((n,k,h)=>`<span class="pr-sum2">📉 Просадка заказов <span class="pr-cnt${b2.length?'':' z'}">${b2.length}</span></span><span class="pr-sum2"><span class="dev-restock">▲</span> Пополнение <span class="pr-cnt${n?'':' z'}">${n}</span></span><span class="pr-sum2">📣 Высокий ДРР <span class="pr-cnt${k?'':' z'}">${k}</span></span><span class="pr-sum2">🧪 Нужна гипотеза <span class="pr-cnt${h?'':' z'}">${h}</span></span>`)(rows.filter(r=>r.restock).length,rows.filter(redY).length,rows.filter(r=>r.hState!=='hyp').length)}</span></div>`
       +`<div class="pr-main"><div class="pr-head pr-head2">${(W=>`<span class="chip-glass pr-total-chip" title="${P.fixed?`план дня зафиксирован ночной загрузкой (сравнение вчера к ${dd(P.fixed.cmp)})`:'план дня ещё не зафиксирован — по экрану'}: отмечено «выполнено» / позиции в работе (группа перчаток — одна, без товаров не в наличии)">Отработано позиций <b>${W.filter(k=>P.done.has(k)).length}/${W.length}</b></span><button class="chip-glass pr-total-chip pr-stat-btn" onclick="prStats()" title="план и факт отработки по дням">📊 Статистика</button>`)(prPlanKeys(P))}<span class="pr-find"><input type="search" id="prFilter" class="chip-glass dev-filter" placeholder="Артикул…" value="${escH(PR_FILTER)}" oninput="setProtoFilter(this.value)" title="Во всех списках протокола — только артикулы, содержащие этот текст (группа перчаток — если совпала она или её размер)"></span></div>${h2}</div>`   // доп. заголовки — пополнения и высокий ДРР вчера (блоки «Поступления» и «Убыток из-за рекламы» убраны 31.10.2026)
     box.querySelectorAll('details.pr-blk,details.pr-pot').forEach(d=>d.addEventListener('toggle',()=>{PR_OPEN[d.dataset.k]=d.open;}));
     prFitHead();
@@ -1816,8 +1818,11 @@ async function renderProto(){
 function toggleProtoFam(blk,k){const key=blk+'|'+k;PR_FAM_OPEN.has(key)?PR_FAM_OPEN.delete(key):PR_FAM_OPEN.add(key);renderProto();}
 // заголовок списка — строго в одну строку (решение владельца 02.11.2026): не помещается — весь заголовок (текст, чипы, отступы)
 // пропорционально уменьшается (zoom) до ширины блока
-function prFitHead(){const h=document.querySelector('#protoBox .pr-head');if(!h||!h.clientWidth)return;h.style.zoom='';
+function prFitHead(){prFitCap();const h=document.querySelector('#protoBox .pr-head');if(!h||!h.clientWidth)return;h.style.zoom='';
   if(h.scrollWidth>h.clientWidth)h.style.zoom=Math.floor(h.clientWidth/h.scrollWidth*985)/1000;}   // 1,5% запаса на округление ширин
+// строка периодов (20.11.2026): счётчики справа уменьшаются (zoom), пока не поместятся рядом с менеджером и периодами — даты не переносятся
+function prFitCap(){const c=document.querySelector('#protoBox .pr-cap1'),s=c&&c.querySelector('.pr-cap-sum'),l=c&&c.querySelector('.pr-cap-l');if(!s||!c.clientWidth)return;s.style.zoom='';
+  const av=c.clientWidth-l.offsetWidth;if(s.offsetWidth>av)s.style.zoom=Math.max(.5,Math.floor(av/s.offsetWidth*985)/1000);}
 if(window.ResizeObserver)new ResizeObserver(e=>{const w=Math.round(e[0].contentRect.width);if(w!==prFitHead.w){prFitHead.w=w;prFitHead();}}).observe(document.getElementById('protoBox'));   // смена ширины окна и разворот ⤢
 window.addEventListener('resize',()=>prFitHead());
 // отметки «выполнено»: ключ позиции — product_id или 'f:<семейство перчаток>'
